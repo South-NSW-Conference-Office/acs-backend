@@ -3,7 +3,7 @@ const { body, validationResult, query } = require('express-validator');
 const User = require('../models/User');
 const Role = require('../models/Role');
 const Organization = require('../models/Organization');
-const { authenticateToken, authorize } = require('../middleware/auth');
+const { authenticateToken, authorize, rateLimit } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -52,6 +52,8 @@ router.get('/', [
     const total = await User.countDocuments(query);
 
     res.json({
+      success: true,
+      message: 'Users retrieved successfully',
       users: users.map(user => ({
         ...user.toJSON(),
         id: user._id
