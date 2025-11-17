@@ -22,10 +22,10 @@ app.use(helmet());
 app.use(
   cors({
     origin: [
-      'http://localhost:3000', 
+      'http://localhost:3000',
       'http://localhost:3001',
       'https://acs-admin.adventhub.org',
-      'https://admin.adventhub.org'
+      'https://admin.adventhub.org',
     ], // Admin frontend URLs
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
