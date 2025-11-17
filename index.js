@@ -63,7 +63,7 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error, req, res) => {
+app.use((error, req, res, next) => {
   console.error(error.stack);
   res.status(500).json({
     success: false,
