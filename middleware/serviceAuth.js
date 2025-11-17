@@ -230,7 +230,7 @@ function requireServicePermission(permission) {
     try {
       const { user } = req;
       const { organizationId } = req.body;
-      const { serviceId } = req.params;
+      const serviceId = req.params.serviceId || req.params.id;
 
       if (!user) {
         return res.status(401).json({ error: 'Authentication required' });
