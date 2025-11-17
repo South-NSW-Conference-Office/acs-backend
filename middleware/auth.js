@@ -10,18 +10,20 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Access token required',
-        err: 'No token provided'
+        err: 'No token provided',
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).populate('organizations.organization organizations.role');
-    
+    const user = await User.findById(decoded.userId).populate(
+      'organizations.organization organizations.role'
+    );
+
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token or user not found',
-        err: 'User not found or inactive'
+        err: 'User not found or inactive',
       });
     }
 
@@ -30,27 +32,27 @@ const authenticateToken = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
         message: 'Invalid token',
-        err: 'Token verification failed'
+        err: 'Token verification failed',
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
         message: 'Token expired',
-        err: 'Token has expired'
+        err: 'Token has expired',
       });
     }
-    
+
     return res.status(500).json({
       success: false,
       message: 'Authentication error',
-      err: error.message
+      err: error.message,
     });
   }
 };
@@ -61,37 +63,42 @@ const authorize = (requiredPermission, options = {}) => {
       if (!req.user) {
         return res.status(401).json({
           success: false,
-          message: 'Authentication required'
+          message: 'Authentication required',
         });
       }
 
-      const organizationId = req.headers['x-organization-id'] || req.user.primaryOrganization;
-      
+      const organizationId =
+        req.headers['x-organization-id'] || req.user.primaryOrganization;
+
       if (!organizationId) {
         return res.status(400).json({
           success: false,
-          message: 'Organization context required'
+          message: 'Organization context required',
         });
       }
 
-      const userPermissions = await req.user.getPermissionsForOrganization(organizationId);
-      
+      const userPermissions =
+        await req.user.getPermissionsForOrganization(organizationId);
+
       if (!userPermissions.role) {
         return res.status(403).json({
           success: false,
-          message: 'No role assigned in this organization'
+          message: 'No role assigned in this organization',
         });
       }
 
       // Check if user has the required permission
-      const hasPermission = checkPermission(userPermissions.permissions, requiredPermission);
-      
+      const hasPermission = checkPermission(
+        userPermissions.permissions,
+        requiredPermission
+      );
+
       if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: 'Insufficient permissions',
           required: requiredPermission,
-          userPermissions: userPermissions.permissions
+          userPermissions: userPermissions.permissions,
         });
       }
 
@@ -103,7 +110,7 @@ const authorize = (requiredPermission, options = {}) => {
       return res.status(500).json({
         success: false,
         message: 'Authorization error',
-        err: error.message
+        err: error.message,
       });
     }
   };
@@ -131,12 +138,12 @@ const checkPermission = (userPermissions, requiredPermission) => {
   }
 
   // Check for scoped permissions (e.g., 'organizations.create:subordinate' matches 'organizations.create')
-  const matchesScoped = userPermissions.some(permission => {
+  const matchesScoped = userPermissions.some((permission) => {
     const [permResource, permActionWithScope] = permission.split('.');
     if (!permActionWithScope || !permActionWithScope.includes(':')) {
       return false;
     }
-    
+
     const [permAction] = permActionWithScope.split(':');
     return permResource === resource && permAction === action;
   });
@@ -147,5 +154,5 @@ const checkPermission = (userPermissions, requiredPermission) => {
 module.exports = {
   authenticateToken,
   authorize,
-  checkPermission
+  checkPermission,
 };

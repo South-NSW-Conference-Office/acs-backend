@@ -1,15 +1,25 @@
 const Organization = require('../models/Organization');
-const { AppError, NotFoundError, ValidationError, ConflictError } = require('../middleware/errorHandler');
+const {
+  AppError,
+  NotFoundError,
+  ValidationError,
+  ConflictError,
+} = require('../middleware/errorHandler');
 
 class OrganizationService {
   // Get organizations with filtering and permission-based access
-  static async getOrganizations(filters = {}, userPermissions = {}, userId = null) {
+  static async getOrganizations(
+    filters = {},
+    userPermissions = {},
+    userId = null
+  ) {
     try {
-      let query = { isActive: true };
+      const query = { isActive: true };
 
       // Apply filters
       if (filters.type) query.type = filters.type;
-      if (filters.parentOrganization) query.parentOrganization = filters.parentOrganization;
+      if (filters.parentOrganization)
+        query.parentOrganization = filters.parentOrganization;
       if (filters.isActive !== undefined) query.isActive = filters.isActive;
 
       // Apply permission-based filtering
@@ -46,9 +56,16 @@ class OrganizationService {
       }
 
       // Check access permissions
-      const hasAccess = await this.canUserAccessOrganization(userId, id, userPermissions);
+      const hasAccess = await this.canUserAccessOrganization(
+        userId,
+        id,
+        userPermissions
+      );
       if (!hasAccess) {
-        throw new AppError('Insufficient permissions to access this organization', 403);
+        throw new AppError(
+          'Insufficient permissions to access this organization',
+          403
+        );
       }
 
       return organization;
@@ -62,15 +79,22 @@ class OrganizationService {
   static async createOrganization(orgData, createdBy) {
     try {
       // Validate hierarchy rules
-      await this.validateOrganizationHierarchy(orgData.type, orgData.parentOrganization);
+      await this.validateOrganizationHierarchy(
+        orgData.type,
+        orgData.parentOrganization
+      );
 
       // Check for duplicate names
-      await this.checkDuplicateName(orgData.name, orgData.parentOrganization, orgData.type);
+      await this.checkDuplicateName(
+        orgData.name,
+        orgData.parentOrganization,
+        orgData.type
+      );
 
       // Create organization
       const organization = new Organization({
         ...orgData,
-        createdBy
+        createdBy,
       });
 
       await organization.save();
@@ -87,7 +111,12 @@ class OrganizationService {
   }
 
   // Update organization
-  static async updateOrganization(id, updates, userPermissions = {}, userId = null) {
+  static async updateOrganization(
+    id,
+    updates,
+    userPermissions = {},
+    userId = null
+  ) {
     try {
       const organization = await Organization.findById(id);
       if (!organization) {
@@ -95,9 +124,16 @@ class OrganizationService {
       }
 
       // Check access permissions
-      const hasAccess = await this.canUserAccessOrganization(userId, id, userPermissions);
+      const hasAccess = await this.canUserAccessOrganization(
+        userId,
+        id,
+        userPermissions
+      );
       if (!hasAccess) {
-        throw new AppError('Insufficient permissions to update this organization', 403);
+        throw new AppError(
+          'Insufficient permissions to update this organization',
+          403
+        );
       }
 
       // Validate hierarchy if parent is being changed
@@ -139,15 +175,27 @@ class OrganizationService {
       }
 
       // Check access permissions
-      const hasAccess = await this.canUserAccessOrganization(userId, id, userPermissions);
+      const hasAccess = await this.canUserAccessOrganization(
+        userId,
+        id,
+        userPermissions
+      );
       if (!hasAccess) {
-        throw new AppError('Insufficient permissions to delete this organization', 403);
+        throw new AppError(
+          'Insufficient permissions to delete this organization',
+          403
+        );
       }
 
       // Check for active children
-      const children = await Organization.find({ parentOrganization: id, isActive: true });
+      const children = await Organization.find({
+        parentOrganization: id,
+        isActive: true,
+      });
       if (children.length > 0) {
-        throw new ValidationError('Cannot delete organization with active child organizations');
+        throw new ValidationError(
+          'Cannot delete organization with active child organizations'
+        );
       }
 
       // Soft delete
@@ -184,7 +232,9 @@ class OrganizationService {
   // Helper methods
   static async validateOrganizationHierarchy(type, parentId, excludeId = null) {
     if (type === 'union' && parentId) {
-      throw new ValidationError('Union organizations cannot have a parent organization');
+      throw new ValidationError(
+        'Union organizations cannot have a parent organization'
+      );
     }
 
     if (parentId) {
@@ -200,25 +250,38 @@ class OrganizationService {
 
       // Validate type hierarchy
       if (type === 'conference' && parent.type !== 'union') {
-        throw new ValidationError('Conference organizations must have a union parent');
+        throw new ValidationError(
+          'Conference organizations must have a union parent'
+        );
       }
 
       if (type === 'church' && parent.type !== 'conference') {
-        throw new ValidationError('Church organizations must have a conference parent');
+        throw new ValidationError(
+          'Church organizations must have a conference parent'
+        );
       }
 
       // Check for circular references
       const hierarchy = await Organization.getHierarchy(parentId);
-      if (excludeId && hierarchy.some(org => org._id.toString() === excludeId.toString())) {
-        throw new ValidationError('Cannot create circular organizational hierarchy');
+      if (
+        excludeId &&
+        hierarchy.some((org) => org._id.toString() === excludeId.toString())
+      ) {
+        throw new ValidationError(
+          'Cannot create circular organizational hierarchy'
+        );
       }
     } else {
       // No parent specified
       if (type === 'conference') {
-        throw new ValidationError('Conference organizations must have a union parent');
+        throw new ValidationError(
+          'Conference organizations must have a union parent'
+        );
       }
       if (type === 'church') {
-        throw new ValidationError('Church organizations must have a conference parent');
+        throw new ValidationError(
+          'Church organizations must have a conference parent'
+        );
       }
     }
   }
@@ -227,7 +290,7 @@ class OrganizationService {
     const query = {
       name: name.trim(),
       type,
-      isActive: true
+      isActive: true,
     };
 
     if (parentId) {
@@ -242,34 +305,40 @@ class OrganizationService {
 
     const existing = await Organization.findOne(query);
     if (existing) {
-      throw new ConflictError('Organization with this name already exists in the same parent');
+      throw new ConflictError(
+        'Organization with this name already exists in the same parent'
+      );
     }
   }
 
   static async getUserAccessibleOrganizations(userId) {
     try {
       const User = require('../models/User');
-      const user = await User.findById(userId).populate('organizations.organization');
-      
+      const user = await User.findById(userId).populate(
+        'organizations.organization'
+      );
+
       if (!user) return [];
 
       let accessibleIds = [];
 
       // Add user's direct organizations
       accessibleIds = user.organizations
-        .filter(org => org.organization)
-        .map(org => org.organization._id);
+        .filter((org) => org.organization)
+        .map((org) => org.organization._id);
 
       // Add subordinate organizations for each user organization
       for (const userOrg of user.organizations) {
         if (userOrg.organization) {
-          const subordinates = await Organization.getSubordinates(userOrg.organization._id);
-          accessibleIds.push(...subordinates.map(sub => sub._id));
+          const subordinates = await Organization.getSubordinates(
+            userOrg.organization._id
+          );
+          accessibleIds.push(...subordinates.map((sub) => sub._id));
         }
       }
 
       // Remove duplicates
-      return [...new Set(accessibleIds.map(id => id.toString()))];
+      return [...new Set(accessibleIds.map((id) => id.toString()))];
     } catch (error) {
       console.error('Error getting user accessible organizations:', error);
       return [];

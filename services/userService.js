@@ -1,35 +1,44 @@
 const User = require('../models/User');
 const Role = require('../models/Role');
 const Organization = require('../models/Organization');
-const { AppError, NotFoundError, ValidationError, ConflictError } = require('../middleware/errorHandler');
-const emailService = require('./emailService');
+const {
+  AppError,
+  NotFoundError,
+  ConflictError,
+} = require('../middleware/errorHandler');
+// const emailService = require('./emailService');
 
 class UserService {
   // Get users with filtering and pagination
-  static async getUsers(filters = {}, pagination = {}, userPermissions = {}, requestingUserId = null) {
+  static async getUsers(
+    filters = {},
+    pagination = {},
+    userPermissions = {},
+    requestingUserId = null
+  ) {
     try {
       const {
         search,
         organizationId,
         roleId,
         isActive = true,
-        verified
+        verified,
       } = filters;
 
       const {
         limit = 50,
         skip = 0,
         sortBy = 'createdAt',
-        sortOrder = -1
+        sortOrder = -1,
       } = pagination;
 
       // Build query
-      let query = { isActive };
+      const query = { isActive };
 
       if (search) {
         query.$or = [
           { name: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } }
+          { email: { $regex: search, $options: 'i' } },
         ];
       }
 
@@ -39,8 +48,9 @@ class UserService {
 
       // Apply permission-based filtering
       if (!userPermissions.permissions?.includes('*')) {
-        const accessibleOrgIds = await this.getUserAccessibleOrganizations(requestingUserId);
-        
+        const accessibleOrgIds =
+          await this.getUserAccessibleOrganizations(requestingUserId);
+
         if (organizationId) {
           // Check if requesting user can access the specified organization
           if (!accessibleOrgIds.includes(organizationId.toString())) {
@@ -49,4 +59,416 @@ class UserService {
           query['organizations.organization'] = organizationId;
         } else {
           // Filter to only accessible organizations
-          if (accessibleOrgIds.length > 0) {\n            query['organizations.organization'] = { $in: accessibleOrgIds };\n          } else {\n            return { users: [], total: 0, pagination: {} };\n          }\n        }\n      } else if (organizationId) {\n        query['organizations.organization'] = organizationId;\n      }\n\n      if (roleId) {\n        query['organizations.role'] = roleId;\n      }\n\n      // Execute query with pagination\n      const users = await User.find(query)\n        .populate('organizations.organization', 'name type')\n        .populate('organizations.role', 'name displayName level')\n        .populate('primaryOrganization', 'name type')\n        .select('-password')\n        .sort({ [sortBy]: sortOrder })\n        .limit(limit)\n        .skip(skip)\n        .lean();\n\n      const total = await User.countDocuments(query);\n\n      // Add computed id field for frontend compatibility\n      const usersWithId = users.map(user => ({\n        ...user,\n        id: user._id.toString()\n      }));\n\n      return {\n        users: usersWithId,\n        total,\n        pagination: {\n          limit,\n          skip,\n          hasMore: skip + limit < total,\n          totalPages: Math.ceil(total / limit),\n          currentPage: Math.floor(skip / limit) + 1\n        }\n      };\n    } catch (error) {\n      throw new AppError('Failed to fetch users', 500);\n    }\n  }\n\n  // Get single user by ID\n  static async getUserById(id, userPermissions = {}, requestingUserId = null) {\n    try {\n      const user = await User.findById(id)\n        .populate('organizations.organization', 'name type')\n        .populate('organizations.role', 'name displayName level permissions')\n        .populate('primaryOrganization', 'name type')\n        .select('-password')\n        .lean();\n\n      if (!user) {\n        throw new NotFoundError('User');\n      }\n\n      // Check if requesting user can access this user\n      const canAccess = await this.canUserAccessUser(requestingUserId, id, userPermissions);\n      if (!canAccess) {\n        throw new AppError('Insufficient permissions to access this user', 403);\n      }\n\n      return {\n        ...user,\n        id: user._id.toString()\n      };\n    } catch (error) {\n      if (error instanceof AppError) throw error;\n      throw new AppError('Failed to fetch user', 500);\n    }\n  }\n\n  // Create new user\n  static async createUser(userData, createdBy) {\n    try {\n      const { name, email, password, phone, address, city, state, country, organizations = [] } = userData;\n\n      // Check if user already exists\n      const existingUser = await User.findOne({ email });\n      if (existingUser) {\n        throw new ConflictError('User with this email already exists');\n      }\n\n      // Validate organization assignments\n      const validatedOrganizations = await this.validateOrganizationAssignments(organizations);\n\n      // Create user\n      const user = new User({\n        name,\n        email,\n        password,\n        phone,\n        address,\n        city,\n        state,\n        country: country || 'Australia',\n        verified: process.env.NODE_ENV === 'development', // Auto-verify in development\n        organizations: validatedOrganizations.map(org => ({\n          organization: org.organizationId,\n          role: org.roleId,\n          assignedAt: new Date(),\n          assignedBy: createdBy\n        })),\n        primaryOrganization: validatedOrganizations.length > 0 ? validatedOrganizations[0].organizationId : null\n      });\n\n      await user.save();\n\n      // Send welcome email (if not in development)\n      if (process.env.NODE_ENV !== 'development') {\n        await this.sendWelcomeEmail(user.email, user.name);\n      }\n\n      // Populate and return\n      await user.populate('organizations.organization organizations.role primaryOrganization');\n      \n      const userObj = user.toObject();\n      delete userObj.password;\n      \n      return {\n        ...userObj,\n        id: userObj._id.toString()\n      };\n    } catch (error) {\n      if (error instanceof AppError) throw error;\n      if (error.code === 11000) {\n        throw new ConflictError('User with this email already exists');\n      }\n      throw new AppError('Failed to create user', 500);\n    }\n  }\n\n  // Update user\n  static async updateUser(id, updates, userPermissions = {}, requestingUserId = null) {\n    try {\n      const user = await User.findById(id);\n      if (!user) {\n        throw new NotFoundError('User');\n      }\n\n      // Check permissions\n      const canAccess = await this.canUserAccessUser(requestingUserId, id, userPermissions);\n      if (!canAccess) {\n        throw new AppError('Insufficient permissions to update this user', 403);\n      }\n\n      // Validate email uniqueness if changed\n      if (updates.email && updates.email !== user.email) {\n        const existingUser = await User.findOne({ email: updates.email });\n        if (existingUser) {\n          throw new ConflictError('User with this email already exists');\n        }\n      }\n\n      // Remove sensitive fields from updates\n      const { password, organizations, ...safeUpdates } = updates;\n\n      // Update user\n      Object.assign(user, safeUpdates);\n      await user.save();\n\n      await user.populate('organizations.organization organizations.role primaryOrganization');\n      \n      const userObj = user.toObject();\n      delete userObj.password;\n      \n      return {\n        ...userObj,\n        id: userObj._id.toString()\n      };\n    } catch (error) {\n      if (error instanceof AppError) throw error;\n      throw new AppError('Failed to update user', 500);\n    }\n  }\n\n  // Assign role to user\n  static async assignRole(userId, organizationId, roleName, assignedBy) {\n    try {\n      const user = await User.findById(userId);\n      if (!user) {\n        throw new NotFoundError('User');\n      }\n\n      const organization = await Organization.findById(organizationId);\n      if (!organization) {\n        throw new NotFoundError('Organization');\n      }\n\n      const role = await Role.findOne({ name: roleName, isActive: true });\n      if (!role) {\n        throw new NotFoundError('Role');\n      }\n\n      // Check if user already has a role in this organization\n      const existingIndex = user.organizations.findIndex(\n        org => org.organization.toString() === organizationId\n      );\n\n      if (existingIndex !== -1) {\n        // Update existing assignment\n        user.organizations[existingIndex] = {\n          organization: organizationId,\n          role: role._id,\n          assignedAt: new Date(),\n          assignedBy\n        };\n      } else {\n        // Add new assignment\n        user.organizations.push({\n          organization: organizationId,\n          role: role._id,\n          assignedAt: new Date(),\n          assignedBy\n        });\n      }\n\n      // Set as primary organization if user doesn't have one\n      if (!user.primaryOrganization) {\n        user.primaryOrganization = organizationId;\n      }\n\n      await user.save();\n      await user.populate('organizations.organization organizations.role');\n\n      return user.organizations;\n    } catch (error) {\n      if (error instanceof AppError) throw error;\n      throw new AppError('Failed to assign role', 500);\n    }\n  }\n\n  // Revoke user role\n  static async revokeRole(userId, organizationId) {\n    try {\n      const user = await User.findById(userId);\n      if (!user) {\n        throw new NotFoundError('User');\n      }\n\n      // Remove organization assignment\n      user.organizations = user.organizations.filter(\n        org => org.organization.toString() !== organizationId\n      );\n\n      // Update primary organization if it was removed\n      if (user.primaryOrganization?.toString() === organizationId) {\n        user.primaryOrganization = user.organizations.length > 0 \n          ? user.organizations[0].organization \n          : null;\n      }\n\n      await user.save();\n      return user.organizations;\n    } catch (error) {\n      if (error instanceof AppError) throw error;\n      throw new AppError('Failed to revoke role', 500);\n    }\n  }\n\n  // Get user permissions for organization\n  static async getUserPermissions(userId, organizationId) {\n    try {\n      const user = await User.findById(userId);\n      if (!user) {\n        throw new NotFoundError('User');\n      }\n\n      return await user.getPermissionsForOrganization(organizationId);\n    } catch (error) {\n      if (error instanceof AppError) throw error;\n      throw new AppError('Failed to fetch user permissions', 500);\n    }\n  }\n\n  // Helper methods\n  static async validateOrganizationAssignments(assignments) {\n    const validated = [];\n\n    for (const assignment of assignments) {\n      const org = await Organization.findById(assignment.organizationId);\n      if (!org) {\n        throw new NotFoundError(`Organization with ID ${assignment.organizationId}`);\n      }\n\n      const role = await Role.findOne({ name: assignment.roleName, isActive: true });\n      if (!role) {\n        throw new NotFoundError(`Role ${assignment.roleName}`);\n      }\n\n      validated.push({\n        organizationId: assignment.organizationId,\n        roleId: role._id\n      });\n    }\n\n    return validated;\n  }\n\n  static async getUserAccessibleOrganizations(userId) {\n    try {\n      const user = await User.findById(userId).populate('organizations.organization');\n      if (!user) return [];\n\n      let accessibleIds = [];\n\n      // Add user's direct organizations\n      accessibleIds = user.organizations\n        .filter(org => org.organization)\n        .map(org => org.organization._id.toString());\n\n      // Add subordinate organizations\n      for (const userOrg of user.organizations) {\n        if (userOrg.organization) {\n          const subordinates = await Organization.getSubordinates(userOrg.organization._id);\n          accessibleIds.push(...subordinates.map(sub => sub._id.toString()));\n        }\n      }\n\n      return [...new Set(accessibleIds)];\n    } catch (error) {\n      console.error('Error getting user accessible organizations:', error);\n      return [];\n    }\n  }\n\n  static async canUserAccessUser(requestingUserId, targetUserId, userPermissions) {\n    // System admins can access all users\n    if (userPermissions.permissions?.includes('*')) {\n      return true;\n    }\n\n    // Users can access themselves\n    if (requestingUserId === targetUserId) {\n      return true;\n    }\n\n    // Check if users share any organizations\n    const requestingUserOrgs = await this.getUserAccessibleOrganizations(requestingUserId);\n    const targetUserOrgs = await this.getUserAccessibleOrganizations(targetUserId);\n\n    return requestingUserOrgs.some(orgId => targetUserOrgs.includes(orgId));\n  }\n\n  static async sendWelcomeEmail(email, name) {\n    try {\n      // Implementation would depend on your email service\n      console.log(`Sending welcome email to ${name} (${email})`);\n      // await emailService.sendWelcomeEmail(email, name);\n    } catch (error) {\n      console.error('Failed to send welcome email:', error);\n      // Don't throw error - user creation should still succeed\n    }\n  }\n}\n\nmodule.exports = UserService;
+          if (accessibleOrgIds.length > 0) {
+            query['organizations.organization'] = { $in: accessibleOrgIds };
+          } else {
+            return { users: [], total: 0, pagination: {} };
+          }
+        }
+      } else if (organizationId) {
+        query['organizations.organization'] = organizationId;
+      }
+
+      if (roleId) {
+        query['organizations.role'] = roleId;
+      }
+
+      // Execute query with pagination
+      const users = await User.find(query)
+        .populate('organizations.organization', 'name type')
+        .populate('organizations.role', 'name displayName level')
+        .populate('primaryOrganization', 'name type')
+        .select('-password')
+        .sort({ [sortBy]: sortOrder })
+        .limit(limit)
+        .skip(skip)
+        .lean();
+
+      const total = await User.countDocuments(query);
+
+      // Add computed id field for frontend compatibility
+      const usersWithId = users.map((user) => ({
+        ...user,
+        id: user._id.toString(),
+      }));
+
+      return {
+        users: usersWithId,
+        total,
+        pagination: {
+          limit,
+          skip,
+          hasMore: skip + limit < total,
+          totalPages: Math.ceil(total / limit),
+          currentPage: Math.floor(skip / limit) + 1,
+        },
+      };
+    } catch (error) {
+      throw new AppError('Failed to fetch users', 500);
+    }
+  }
+
+  // Get single user by ID
+  static async getUserById(id, userPermissions = {}, requestingUserId = null) {
+    try {
+      const user = await User.findById(id)
+        .populate('organizations.organization', 'name type')
+        .populate('organizations.role', 'name displayName level permissions')
+        .populate('primaryOrganization', 'name type')
+        .select('-password')
+        .lean();
+
+      if (!user) {
+        throw new NotFoundError('User');
+      }
+
+      // Check if requesting user can access this user
+      const canAccess = await this.canUserAccessUser(
+        requestingUserId,
+        id,
+        userPermissions
+      );
+      if (!canAccess) {
+        throw new AppError('Insufficient permissions to access this user', 403);
+      }
+
+      return {
+        ...user,
+        id: user._id.toString(),
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to fetch user', 500);
+    }
+  }
+
+  // Create new user
+  static async createUser(userData, createdBy) {
+    try {
+      const {
+        name,
+        email,
+        password,
+        phone,
+        address,
+        city,
+        state,
+        country,
+        organizations = [],
+      } = userData;
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        throw new ConflictError('User with this email already exists');
+      }
+
+      // Validate organization assignments
+      const validatedOrganizations =
+        await this.validateOrganizationAssignments(organizations);
+
+      // Create user
+      const user = new User({
+        name,
+        email,
+        password,
+        phone,
+        address,
+        city,
+        state,
+        country: country || 'Australia',
+        verified: process.env.NODE_ENV === 'development', // Auto-verify in development
+        organizations: validatedOrganizations.map((org) => ({
+          organization: org.organizationId,
+          role: org.roleId,
+          assignedAt: new Date(),
+          assignedBy: createdBy,
+        })),
+        primaryOrganization:
+          validatedOrganizations.length > 0
+            ? validatedOrganizations[0].organizationId
+            : null,
+      });
+
+      await user.save();
+
+      // Send welcome email (if not in development)
+      if (process.env.NODE_ENV !== 'development') {
+        await this.sendWelcomeEmail(user.email, user.name);
+      }
+
+      // Populate and return
+      await user.populate(
+        'organizations.organization organizations.role primaryOrganization'
+      );
+
+      const userObj = user.toObject();
+      delete userObj.password;
+
+      return {
+        ...userObj,
+        id: userObj._id.toString(),
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error.code === 11000) {
+        throw new ConflictError('User with this email already exists');
+      }
+      throw new AppError('Failed to create user', 500);
+    }
+  }
+
+  // Update user
+  static async updateUser(
+    id,
+    updates,
+    userPermissions = {},
+    requestingUserId = null
+  ) {
+    try {
+      const user = await User.findById(id);
+      if (!user) {
+        throw new NotFoundError('User');
+      }
+
+      // Check permissions
+      const canAccess = await this.canUserAccessUser(
+        requestingUserId,
+        id,
+        userPermissions
+      );
+      if (!canAccess) {
+        throw new AppError('Insufficient permissions to update this user', 403);
+      }
+
+      // Validate email uniqueness if changed
+      if (updates.email && updates.email !== user.email) {
+        const existingUser = await User.findOne({ email: updates.email });
+        if (existingUser) {
+          throw new ConflictError('User with this email already exists');
+        }
+      }
+
+      // Remove sensitive fields from updates
+      const { ...safeUpdates } = updates;
+      delete safeUpdates.password;
+      delete safeUpdates.organizations;
+
+      // Update user
+      Object.assign(user, safeUpdates);
+      await user.save();
+
+      await user.populate(
+        'organizations.organization organizations.role primaryOrganization'
+      );
+
+      const userObj = user.toObject();
+      delete userObj.password;
+
+      return {
+        ...userObj,
+        id: userObj._id.toString(),
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to update user', 500);
+    }
+  }
+
+  // Assign role to user
+  static async assignRole(userId, organizationId, roleName, assignedBy) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User');
+      }
+
+      const organization = await Organization.findById(organizationId);
+      if (!organization) {
+        throw new NotFoundError('Organization');
+      }
+
+      const role = await Role.findOne({ name: roleName, isActive: true });
+      if (!role) {
+        throw new NotFoundError('Role');
+      }
+
+      // Check if user already has a role in this organization
+      const existingIndex = user.organizations.findIndex(
+        (org) => org.organization.toString() === organizationId
+      );
+
+      if (existingIndex !== -1) {
+        // Update existing assignment
+        user.organizations[existingIndex] = {
+          organization: organizationId,
+          role: role._id,
+          assignedAt: new Date(),
+          assignedBy,
+        };
+      } else {
+        // Add new assignment
+        user.organizations.push({
+          organization: organizationId,
+          role: role._id,
+          assignedAt: new Date(),
+          assignedBy,
+        });
+      }
+
+      // Set as primary organization if user doesn't have one
+      if (!user.primaryOrganization) {
+        user.primaryOrganization = organizationId;
+      }
+
+      await user.save();
+      await user.populate('organizations.organization organizations.role');
+
+      return user.organizations;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to assign role', 500);
+    }
+  }
+
+  // Revoke user role
+  static async revokeRole(userId, organizationId) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User');
+      }
+
+      // Remove organization assignment
+      user.organizations = user.organizations.filter(
+        (org) => org.organization.toString() !== organizationId
+      );
+
+      // Update primary organization if it was removed
+      if (user.primaryOrganization?.toString() === organizationId) {
+        user.primaryOrganization =
+          user.organizations.length > 0
+            ? user.organizations[0].organization
+            : null;
+      }
+
+      await user.save();
+      return user.organizations;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to revoke role', 500);
+    }
+  }
+
+  // Get user permissions for organization
+  static async getUserPermissions(userId, organizationId) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User');
+      }
+
+      return await user.getPermissionsForOrganization(organizationId);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to fetch user permissions', 500);
+    }
+  }
+
+  // Helper methods
+  static async validateOrganizationAssignments(assignments) {
+    const validated = [];
+
+    for (const assignment of assignments) {
+      const org = await Organization.findById(assignment.organizationId);
+      if (!org) {
+        throw new NotFoundError(
+          `Organization with ID ${assignment.organizationId}`
+        );
+      }
+
+      const role = await Role.findOne({
+        name: assignment.roleName,
+        isActive: true,
+      });
+      if (!role) {
+        throw new NotFoundError(`Role ${assignment.roleName}`);
+      }
+
+      validated.push({
+        organizationId: assignment.organizationId,
+        roleId: role._id,
+      });
+    }
+
+    return validated;
+  }
+
+  static async getUserAccessibleOrganizations(userId) {
+    try {
+      const user = await User.findById(userId).populate(
+        'organizations.organization'
+      );
+      if (!user) return [];
+
+      let accessibleIds = [];
+
+      // Add user's direct organizations
+      accessibleIds = user.organizations
+        .filter((org) => org.organization)
+        .map((org) => org.organization._id.toString());
+
+      // Add subordinate organizations
+      for (const userOrg of user.organizations) {
+        if (userOrg.organization) {
+          const subordinates = await Organization.getSubordinates(
+            userOrg.organization._id
+          );
+          accessibleIds.push(...subordinates.map((sub) => sub._id.toString()));
+        }
+      }
+
+      return [...new Set(accessibleIds)];
+    } catch (error) {
+      console.error('Error getting user accessible organizations:', error);
+      return [];
+    }
+  }
+
+  static async canUserAccessUser(
+    requestingUserId,
+    targetUserId,
+    userPermissions
+  ) {
+    // System admins can access all users
+    if (userPermissions.permissions?.includes('*')) {
+      return true;
+    }
+
+    // Users can access themselves
+    if (requestingUserId === targetUserId) {
+      return true;
+    }
+
+    // Check if users share any organizations
+    const requestingUserOrgs =
+      await this.getUserAccessibleOrganizations(requestingUserId);
+    const targetUserOrgs =
+      await this.getUserAccessibleOrganizations(targetUserId);
+
+    return requestingUserOrgs.some((orgId) => targetUserOrgs.includes(orgId));
+  }
+
+  static async sendWelcomeEmail(email, name) {
+    try {
+      // Implementation would depend on your email service
+      console.log(`Sending welcome email to ${name} (${email})`);
+      // await emailService.sendWelcomeEmail(email, name);
+    } catch (error) {
+      console.error('Failed to send welcome email:', error);
+      // Don't throw error - user creation should still succeed
+    }
+  }
+}
+
+module.exports = UserService;

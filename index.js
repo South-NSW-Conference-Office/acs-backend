@@ -19,12 +19,14 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'], // Admin frontend URLs
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id']
-}));
+app.use(
+  cors({
+    origin: ['http://localhost:3000', 'http://localhost:3001'], // Admin frontend URLs
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+  })
+);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -34,17 +36,18 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
 
 // Database connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('Connected to MongoDB');
-})
-.catch((error) => {
-  console.error('MongoDB connection error:', error);
-  process.exit(1);
-});
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log('Connected to MongoDB');
+  })
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  });
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -60,12 +63,12 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error, req, res, next) => {
+app.use((error, req, res) => {
   console.error(error.stack);
   res.status(500).json({
     success: false,
     message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    error: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 });
 
@@ -73,7 +76,7 @@ app.use((error, req, res, next) => {
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: 'Route not found',
   });
 });
 

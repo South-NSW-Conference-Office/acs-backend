@@ -58,12 +58,12 @@ const handleDuplicateFieldsDB = (err) => {
 };
 
 const handleValidationErrorDB = (err) => {
-  const errors = Object.values(err.errors).map(el => ({
+  const errors = Object.values(err.errors).map((el) => ({
     field: el.path,
     message: el.message,
-    value: el.value
+    value: el.value,
   }));
-  
+
   const message = 'Invalid input data';
   const validationError = new ValidationError(message, errors);
   return validationError;
@@ -83,7 +83,7 @@ const sendErrorDev = (err, req, res) => {
     message: err.message,
     errorCode: err.errorCode,
     stack: err.stack,
-    errors: err.errors || undefined
+    errors: err.errors || undefined,
   });
 };
 
@@ -97,7 +97,7 @@ const sendErrorProd = (err, req, res) => {
     method: req.method,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   // Operational, trusted error: send message to client
@@ -106,7 +106,7 @@ const sendErrorProd = (err, req, res) => {
       success: false,
       message: err.message,
       errorCode: err.errorCode,
-      errors: err.errors || undefined
+      errors: err.errors || undefined,
     });
   }
 
@@ -114,7 +114,7 @@ const sendErrorProd = (err, req, res) => {
   return res.status(500).json({
     success: false,
     message: 'Something went wrong!',
-    errorCode: 'INTERNAL_SERVER_ERROR'
+    errorCode: 'INTERNAL_SERVER_ERROR',
   });
 };
 
@@ -132,7 +132,8 @@ const globalErrorHandler = (err, req, res, next) => {
     // Handle specific MongoDB errors
     if (error.name === 'CastError') error = handleCastErrorDB(error);
     if (error.code === 11000) error = handleDuplicateFieldsDB(error);
-    if (error.name === 'ValidationError') error = handleValidationErrorDB(error);
+    if (error.name === 'ValidationError')
+      error = handleValidationErrorDB(error);
     if (error.name === 'JsonWebTokenError') error = handleJWTError();
     if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
 
@@ -157,10 +158,10 @@ const notFoundHandler = (req, res, next) => {
 const gracefulShutdown = (server) => {
   return (signal) => {
     console.log(`Received ${signal}. Starting graceful shutdown...`);
-    
+
     server.close(() => {
       console.log('HTTP server closed.');
-      
+
       // Close database connections
       mongoose.connection.close(false, () => {
         console.log('MongoDB connection closed.');
@@ -170,7 +171,9 @@ const gracefulShutdown = (server) => {
 
     // Force close after 30 seconds
     setTimeout(() => {
-      console.error('Could not close connections in time, forcefully shutting down');
+      console.error(
+        'Could not close connections in time, forcefully shutting down'
+      );
       process.exit(1);
     }, 30000);
   };
@@ -181,9 +184,9 @@ process.on('unhandledRejection', (err, promise) => {
   console.error('Unhandled Promise Rejection:', {
     error: err.message,
     stack: err.stack,
-    promise
+    promise,
   });
-  
+
   // Close server & exit process
   server.close(() => {
     process.exit(1);
@@ -194,9 +197,9 @@ process.on('unhandledRejection', (err, promise) => {
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', {
     error: err.message,
-    stack: err.stack
+    stack: err.stack,
   });
-  
+
   process.exit(1);
 });
 
@@ -210,5 +213,5 @@ module.exports = {
   globalErrorHandler,
   catchAsync,
   notFoundHandler,
-  gracefulShutdown
+  gracefulShutdown,
 };

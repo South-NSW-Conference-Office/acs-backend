@@ -4,12 +4,12 @@ const Service = require('../models/Service');
 const ServiceEvent = require('../models/ServiceEvent');
 const VolunteerRole = require('../models/VolunteerRole');
 const Story = require('../models/Story');
-const { 
-  requireServicePermission, 
+const {
+  requireServicePermission,
   requireStoryPermission,
   filterServicesByPermission,
   getManageableOrganizations,
-  canManageService
+  canManageService,
 } = require('../middleware/serviceAuth');
 const { authenticateToken } = require('../middleware/auth');
 const multer = require('multer');
@@ -26,18 +26,18 @@ const upload = multer({ dest: 'uploads/temp/' });
 router.get('/manageable', authenticateToken, async (req, res) => {
   try {
     const manageableOrgIds = await getManageableOrganizations(req.user);
-    
+
     const services = await Service.find({
-      organization: { $in: manageableOrgIds }
+      organization: { $in: manageableOrgIds },
     })
-    .populate('organization', 'name type')
-    .sort('-createdAt');
-    
+      .populate('organization', 'name type')
+      .sort('-createdAt');
+
     res.json({
       success: true,
       count: services.length,
       services,
-      organizations: manageableOrgIds
+      organizations: manageableOrgIds,
     });
   } catch (error) {
     console.error('Error fetching manageable services:', error);
@@ -51,11 +51,14 @@ router.get('/manageable', authenticateToken, async (req, res) => {
  */
 router.get('/organizations', authenticateToken, async (req, res) => {
   try {
-    const organizations = await getManageableOrganizations(req.user, 'services.create');
-    
+    const organizations = await getManageableOrganizations(
+      req.user,
+      'services.create'
+    );
+
     res.json({
       success: true,
-      organizations
+      organizations,
     });
   } catch (error) {
     console.error('Error fetching organizations:', error);
@@ -74,14 +77,14 @@ router.get('/organizations', authenticateToken, async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { type, organization, search, lat, lng, radius } = req.query;
-    
-    let query = { status: 'active' };
-    
+
+    const query = { status: 'active' };
+
     if (type) query.type = type;
     if (organization) query.organization = organization;
-    
+
     let services;
-    
+
     if (lat && lng) {
       // Geographic search
       services = await Service.findNearby(
@@ -92,19 +95,19 @@ router.get('/', async (req, res) => {
       // Text search
       services = await Service.find({
         ...query,
-        $text: { $search: search }
+        $text: { $search: search },
       })
-      .populate('organization', 'name type')
-      .sort({ score: { $meta: 'textScore' } });
+        .populate('organization', 'name type')
+        .sort({ score: { $meta: 'textScore' } });
     } else {
       // Standard query
       services = await Service.findActiveServices(query);
     }
-    
+
     res.json({
       success: true,
       count: services.length,
-      services
+      services,
     });
   } catch (error) {
     console.error('Error fetching services:', error);
@@ -122,19 +125,19 @@ router.get('/:id', async (req, res) => {
       .populate('organization', 'name type parent')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
-    
+
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
-    
+
     // Check if service can be viewed
     if (!service.canBeViewedBy(req.user)) {
       return res.status(403).json({ error: 'Service not publicly available' });
     }
-    
+
     res.json({
       success: true,
-      service
+      service,
     });
   } catch (error) {
     console.error('Error fetching service:', error);
@@ -148,15 +151,15 @@ router.get('/:id', async (req, res) => {
  */
 router.get('/:id/events', async (req, res) => {
   try {
-    const events = await ServiceEvent.findUpcoming({ 
+    const events = await ServiceEvent.findUpcoming({
       service: req.params.id,
-      visibility: 'public'
+      visibility: 'public',
     });
-    
+
     res.json({
       success: true,
       count: events.length,
-      events
+      events,
     });
   } catch (error) {
     console.error('Error fetching events:', error);
@@ -170,15 +173,15 @@ router.get('/:id/events', async (req, res) => {
  */
 router.get('/:id/volunteer-roles', async (req, res) => {
   try {
-    const roles = await VolunteerRole.findOpenRoles({ 
+    const roles = await VolunteerRole.findOpenRoles({
       service: req.params.id,
-      visibility: 'public'
+      visibility: 'public',
     });
-    
+
     res.json({
       success: true,
       count: roles.length,
-      roles
+      roles,
     });
   } catch (error) {
     console.error('Error fetching volunteer roles:', error);
@@ -192,15 +195,15 @@ router.get('/:id/volunteer-roles', async (req, res) => {
  */
 router.get('/:id/stories', async (req, res) => {
   try {
-    const stories = await Story.findPublished({ 
+    const stories = await Story.findPublished({
       service: req.params.id,
-      visibility: 'public'
+      visibility: 'public',
     });
-    
+
     res.json({
       success: true,
       count: stories.length,
-      stories
+      stories,
     });
   } catch (error) {
     console.error('Error fetching stories:', error);
@@ -216,7 +219,8 @@ router.get('/:id/stories', async (req, res) => {
  * POST /services
  * Create a new service
  */
-router.post('/', 
+router.post(
+  '/',
   authenticateToken,
   requireServicePermission('services.create'),
   async (req, res) => {
@@ -225,17 +229,17 @@ router.post('/',
         ...req.body,
         organization: req.authorizedOrgId,
         createdBy: req.user._id,
-        updatedBy: req.user._id
+        updatedBy: req.user._id,
       };
-      
+
       const service = new Service(serviceData);
       await service.save();
-      
+
       await service.populate('organization', 'name type');
-      
+
       res.status(201).json({
         success: true,
-        service
+        service,
       });
     } catch (error) {
       console.error('Error creating service:', error);
@@ -248,36 +252,41 @@ router.post('/',
  * PUT /services/:id
  * Update a service
  */
-router.put('/:id',
+router.put(
+  '/:id',
   authenticateToken,
   requireServicePermission('services.update'),
   async (req, res) => {
     try {
       const service = await Service.findById(req.params.id);
-      
+
       if (!service) {
         return res.status(404).json({ error: 'Service not found' });
       }
-      
+
       // Verify permission for this specific service
-      const hasPermission = await canManageService(req.user, service.organization, 'services.update');
+      const hasPermission = await canManageService(
+        req.user,
+        service.organization,
+        'services.update'
+      );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot update this service' });
       }
-      
+
       // Prevent changing organization
       delete req.body.organization;
       delete req.body.createdBy;
-      
+
       Object.assign(service, req.body);
       service.updatedBy = req.user._id;
-      
+
       await service.save();
       await service.populate('organization', 'name type');
-      
+
       res.json({
         success: true,
-        service
+        service,
       });
     } catch (error) {
       console.error('Error updating service:', error);
@@ -290,31 +299,36 @@ router.put('/:id',
  * DELETE /services/:id
  * Delete (archive) a service
  */
-router.delete('/:id',
+router.delete(
+  '/:id',
   authenticateToken,
   requireServicePermission('services.delete'),
   async (req, res) => {
     try {
       const service = await Service.findById(req.params.id);
-      
+
       if (!service) {
         return res.status(404).json({ error: 'Service not found' });
       }
-      
+
       // Verify permission for this specific service
-      const hasPermission = await canManageService(req.user, service.organization, 'services.delete');
+      const hasPermission = await canManageService(
+        req.user,
+        service.organization,
+        'services.delete'
+      );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot delete this service' });
       }
-      
+
       // Archive instead of hard delete
       service.status = 'archived';
       service.updatedBy = req.user._id;
       await service.save();
-      
+
       res.json({
         success: true,
-        message: 'Service archived successfully'
+        message: 'Service archived successfully',
       });
     } catch (error) {
       console.error('Error deleting service:', error);
@@ -327,48 +341,53 @@ router.delete('/:id',
  * POST /services/:id/upload-image
  * Upload service image
  */
-router.post('/:id/upload-image',
+router.post(
+  '/:id/upload-image',
   authenticateToken,
   requireServicePermission('services.update'),
   upload.single('image'),
   async (req, res) => {
     try {
       const service = await Service.findById(req.params.id);
-      
+
       if (!service) {
         return res.status(404).json({ error: 'Service not found' });
       }
-      
+
       // Verify permission
-      const hasPermission = await canManageService(req.user, service.organization, 'services.update');
+      const hasPermission = await canManageService(
+        req.user,
+        service.organization,
+        'services.update'
+      );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot update this service' });
       }
-      
+
       // TODO: Process and store image (S3, Cloudinary, etc.)
       // For now, just return a placeholder
       const imageUrl = `/uploads/services/${req.file.filename}`;
-      
+
       if (req.body.imageType === 'primary') {
         service.primaryImage = {
           url: imageUrl,
-          alt: req.body.alt || ''
+          alt: req.body.alt || '',
         };
       } else {
         service.gallery.push({
           url: imageUrl,
           alt: req.body.alt || '',
-          caption: req.body.caption || ''
+          caption: req.body.caption || '',
         });
       }
-      
+
       service.updatedBy = req.user._id;
       await service.save();
-      
+
       res.json({
         success: true,
         imageUrl,
-        service
+        service,
       });
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -381,38 +400,43 @@ router.post('/:id/upload-image',
  * POST /services/:id/events
  * Create an event for a service
  */
-router.post('/:id/events',
+router.post(
+  '/:id/events',
   authenticateToken,
   requireServicePermission('services.manage'),
   async (req, res) => {
     try {
       const service = await Service.findById(req.params.id);
-      
+
       if (!service) {
         return res.status(404).json({ error: 'Service not found' });
       }
-      
-      const hasPermission = await canManageService(req.user, service.organization, 'services.manage');
+
+      const hasPermission = await canManageService(
+        req.user,
+        service.organization,
+        'services.manage'
+      );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot manage this service' });
       }
-      
+
       const eventData = {
         ...req.body,
         service: service._id,
         organization: service.organization,
         createdBy: req.user._id,
-        updatedBy: req.user._id
+        updatedBy: req.user._id,
       };
-      
+
       const event = new ServiceEvent(eventData);
       await event.save();
-      
+
       await event.populate('service', 'name type');
-      
+
       res.status(201).json({
         success: true,
-        event
+        event,
       });
     } catch (error) {
       console.error('Error creating event:', error);
@@ -429,7 +453,8 @@ router.post('/:id/events',
  * POST /services/stories
  * Create a new story
  */
-router.post('/stories',
+router.post(
+  '/stories',
   authenticateToken,
   requireStoryPermission('stories.create'),
   async (req, res) => {
@@ -438,20 +463,20 @@ router.post('/stories',
         ...req.body,
         organization: req.authorizedOrgId,
         createdBy: req.user._id,
-        updatedBy: req.user._id
+        updatedBy: req.user._id,
       };
-      
+
       const story = new Story(storyData);
       await story.save();
-      
+
       await story.populate('organization', 'name type');
       if (story.service) {
         await story.populate('service', 'name type');
       }
-      
+
       res.status(201).json({
         success: true,
-        story
+        story,
       });
     } catch (error) {
       console.error('Error creating story:', error);
@@ -464,36 +489,41 @@ router.post('/stories',
  * PUT /services/stories/:id
  * Update a story
  */
-router.put('/stories/:id',
+router.put(
+  '/stories/:id',
   authenticateToken,
   requireStoryPermission('stories.update'),
   async (req, res) => {
     try {
       const story = await Story.findById(req.params.id);
-      
+
       if (!story) {
         return res.status(404).json({ error: 'Story not found' });
       }
-      
+
       // Verify permission for this specific story
-      const hasPermission = await canManageService(req.user, story.organization, 'stories.update');
+      const hasPermission = await canManageService(
+        req.user,
+        story.organization,
+        'stories.update'
+      );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot update this story' });
       }
-      
+
       // Prevent changing organization
       delete req.body.organization;
       delete req.body.createdBy;
-      
+
       Object.assign(story, req.body);
       story.updatedBy = req.user._id;
-      
+
       await story.save();
       await story.populate('organization', 'name type');
-      
+
       res.json({
         success: true,
-        story
+        story,
       });
     } catch (error) {
       console.error('Error updating story:', error);
@@ -506,27 +536,32 @@ router.put('/stories/:id',
  * POST /services/stories/:id/publish
  * Publish a story
  */
-router.post('/stories/:id/publish',
+router.post(
+  '/stories/:id/publish',
   authenticateToken,
   requireStoryPermission('stories.manage'),
   async (req, res) => {
     try {
       const story = await Story.findById(req.params.id);
-      
+
       if (!story) {
         return res.status(404).json({ error: 'Story not found' });
       }
-      
-      const hasPermission = await canManageService(req.user, story.organization, 'stories.manage');
+
+      const hasPermission = await canManageService(
+        req.user,
+        story.organization,
+        'stories.manage'
+      );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot publish this story' });
       }
-      
+
       await story.publish(req.user._id);
-      
+
       res.json({
         success: true,
-        story
+        story,
       });
     } catch (error) {
       console.error('Error publishing story:', error);

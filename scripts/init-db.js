@@ -24,12 +24,12 @@ const logError = (message, error = null) => {
 
 async function initializeDatabase() {
   const session = await mongoose.startSession();
-  
+
   try {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI);
     log('Connected to MongoDB');
-    
+
     // Start transaction for atomic operations
     await session.startTransaction();
     log('Starting database initialization transaction');
@@ -38,16 +38,19 @@ async function initializeDatabase() {
     log('Creating system roles...');
     await Role.createSystemRoles();
     log('System roles created successfully');
-    
+
     // Verify roles were created
     const roleCount = await Role.countDocuments({ isSystem: true });
     log(`Verified ${roleCount} system roles created`);
 
     // Create sample organizations if they don't exist
     log('Creating sample organizations...');
-    
+
     // Create Union organization
-    let union = await Organization.findOne({ type: 'union', name: 'Australian Union Conference' });
+    let union = await Organization.findOne({
+      type: 'union',
+      name: 'Australian Union Conference',
+    });
     if (!union) {
       union = new Organization({
         name: 'Australian Union Conference',
@@ -56,8 +59,8 @@ async function initializeDatabase() {
           address: '148 Fox Valley Rd, Wahroonga NSW 2076',
           phone: '+61 2 9847 3333',
           email: 'admin@adventist.org.au',
-          territory: ['Australia', 'New Zealand', 'Pacific Islands']
-        }
+          territory: ['Australia', 'New Zealand', 'Pacific Islands'],
+        },
       });
       await union.save({ session });
       log('Union organization created: Australian Union Conference');
@@ -73,8 +76,8 @@ async function initializeDatabase() {
           address: '2 Aintree Ave, Epping NSW 2121',
           phone: '+61 2 9868 6522',
           email: 'office@gscsda.org.au',
-          territory: ['Sydney', 'Central Coast', 'Blue Mountains']
-        }
+          territory: ['Sydney', 'Central Coast', 'Blue Mountains'],
+        },
       },
       {
         name: 'North New South Wales Conference',
@@ -82,19 +85,22 @@ async function initializeDatabase() {
           address: '18 King St, Coffs Harbour NSW 2450',
           phone: '+61 2 6652 8000',
           email: 'info@nnsw.org.au',
-          territory: ['Newcastle', 'Central Coast', 'Northern Rivers']
-        }
-      }
+          territory: ['Newcastle', 'Central Coast', 'Northern Rivers'],
+        },
+      },
     ];
-    
+
     const createdConferences = [];
     for (const confData of conferences) {
-      let conference = await Organization.findOne({ type: 'conference', name: confData.name });
+      let conference = await Organization.findOne({
+        type: 'conference',
+        name: confData.name,
+      });
       if (!conference) {
         conference = new Organization({
           ...confData,
           type: 'conference',
-          parentOrganization: union._id
+          parentOrganization: union._id,
         });
         await conference.save({ session });
         log(`Conference organization created: ${confData.name}`);
@@ -113,8 +119,8 @@ async function initializeDatabase() {
           address: '2 Aintree Ave, Epping NSW 2121',
           phone: '+61 2 9868 6644',
           email: 'office@hornsbysda.org.au',
-          territory: ['Hornsby', 'Wahroonga', 'Turramurra']
-        }
+          territory: ['Hornsby', 'Wahroonga', 'Turramurra'],
+        },
       },
       {
         name: 'Wahroonga Adventist Church',
@@ -123,8 +129,8 @@ async function initializeDatabase() {
           address: '8 Redleaf Ave, Wahroonga NSW 2076',
           phone: '+61 2 9489 8000',
           email: 'office@wahroongasda.org.au',
-          territory: ['Wahroonga', 'Pymble', 'Turramurra']
-        }
+          territory: ['Wahroonga', 'Pymble', 'Turramurra'],
+        },
       },
       {
         name: 'Newcastle Adventist Church',
@@ -133,20 +139,24 @@ async function initializeDatabase() {
           address: '45 Main Rd, Cardiff NSW 2285',
           phone: '+61 2 4954 5566',
           email: 'office@newcastlesda.org.au',
-          territory: ['Newcastle', 'Cardiff', 'Lake Macquarie']
-        }
-      }
+          territory: ['Newcastle', 'Cardiff', 'Lake Macquarie'],
+        },
+      },
     ];
-    
+
     const createdChurches = [];
     for (const churchData of churches) {
-      let church = await Organization.findOne({ type: 'church', name: churchData.name });
+      let church = await Organization.findOne({
+        type: 'church',
+        name: churchData.name,
+      });
       if (!church) {
         church = new Organization({
           name: churchData.name,
           type: 'church',
-          parentOrganization: createdConferences[churchData.conferenceIndex]._id,
-          metadata: churchData.metadata
+          parentOrganization:
+            createdConferences[churchData.conferenceIndex]._id,
+          metadata: churchData.metadata,
         });
         await church.save({ session });
         log(`Church organization created: ${churchData.name}`);
@@ -158,44 +168,44 @@ async function initializeDatabase() {
 
     // Create sample users
     log('Creating sample users...');
-    
+
     const users = [
       {
         name: 'System Administrator',
         email: 'admin@adventist.org.au',
         password: 'Admin123!@#',
         roleName: 'union_admin',
-        organizationIndex: 'union'
+        organizationIndex: 'union',
       },
       {
         name: 'Conference Administrator',
         email: 'admin@gscsda.org.au',
         password: 'Conference123!@#',
         roleName: 'conference_admin',
-        organizationIndex: 0 // Greater Sydney Conference
+        organizationIndex: 0, // Greater Sydney Conference
       },
       {
         name: 'Pastor John Smith',
         email: 'pastor@hornsbysda.org.au',
         password: 'Pastor123!@#',
         roleName: 'church_pastor',
-        organizationIndex: 0 // Hornsby Church
+        organizationIndex: 0, // Hornsby Church
       },
       {
         name: 'ACS Leader Mary Johnson',
         email: 'acs@wahroongasda.org.au',
         password: 'AcsLeader123!@#',
         roleName: 'church_acs_leader',
-        organizationIndex: 1 // Wahroonga Church
-      }
+        organizationIndex: 1, // Wahroonga Church
+      },
     ];
-    
+
     for (const userData of users) {
       let user = await User.findOne({ email: userData.email });
       if (!user) {
         const role = await Role.findOne({ name: userData.roleName });
         let organization;
-        
+
         if (userData.organizationIndex === 'union') {
           organization = union;
         } else if (typeof userData.organizationIndex === 'number') {
@@ -206,20 +216,22 @@ async function initializeDatabase() {
             organization = createdChurches[userData.organizationIndex];
           }
         }
-        
+
         user = new User({
           name: userData.name,
           email: userData.email,
           password: userData.password,
           verified: true,
           primaryOrganization: organization._id,
-          organizations: [{
-            organization: organization._id,
-            role: role._id,
-            assignedAt: new Date()
-          }]
+          organizations: [
+            {
+              organization: organization._id,
+              role: role._id,
+              assignedAt: new Date(),
+            },
+          ],
         });
-        
+
         await user.save({ session });
         log(`User created: ${userData.name} (${userData.email})`);
       } else {
@@ -230,7 +242,7 @@ async function initializeDatabase() {
     // Commit transaction
     await session.commitTransaction();
     log('Database initialization transaction committed successfully');
-    
+
     // Verify data integrity
     await verifyDataIntegrity();
 
@@ -242,14 +254,13 @@ async function initializeDatabase() {
     log('Pastor: pastor@hornsbysda.org.au / Pastor123!@#');
     log('ACS Leader: acs@wahroongasda.org.au / AcsLeader123!@#');
     log('');
-    
   } catch (error) {
     // Rollback transaction on error
     if (session.inTransaction()) {
       await session.abortTransaction();
       log('Transaction aborted due to error');
     }
-    
+
     logError('Database initialization failed:', error);
     throw error;
   } finally {
@@ -263,26 +274,34 @@ async function initializeDatabase() {
 async function verifyDataIntegrity() {
   try {
     log('Verifying data integrity...');
-    
+
     const roleCount = await Role.countDocuments({ isSystem: true });
     const orgCount = await Organization.countDocuments({ isActive: true });
     const userCount = await User.countDocuments({ isActive: true });
-    
+
     log(`Data verification complete:`);
     log(`- System roles: ${roleCount}`);
     log(`- Organizations: ${orgCount}`);
     log(`- Users: ${userCount}`);
-    
+
     // Verify hierarchy
-    const unions = await Organization.countDocuments({ type: 'union', isActive: true });
-    const conferences = await Organization.countDocuments({ type: 'conference', isActive: true });
-    const churches = await Organization.countDocuments({ type: 'church', isActive: true });
-    
+    const unions = await Organization.countDocuments({
+      type: 'union',
+      isActive: true,
+    });
+    const conferences = await Organization.countDocuments({
+      type: 'conference',
+      isActive: true,
+    });
+    const churches = await Organization.countDocuments({
+      type: 'church',
+      isActive: true,
+    });
+
     log(`Organization hierarchy:`);
     log(`- Unions: ${unions}`);
     log(`- Conferences: ${conferences}`);
     log(`- Churches: ${churches}`);
-    
   } catch (error) {
     logError('Data integrity verification failed:', error);
     throw error;
@@ -294,18 +313,18 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const isForced = args.includes('--force');
   const isVerbose = args.includes('--verbose');
-  
+
   if (isVerbose) {
     log('Running in verbose mode');
   }
-  
+
   if (isForced) {
     log('Running in force mode - will recreate existing data');
   }
-  
+
   // Set environment
   process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-  
+
   initializeDatabase()
     .then(() => {
       log('Initialization completed successfully');

@@ -7,6 +7,7 @@ Comprehensive backend infrastructure for Adventist Community Services organizati
 ## 🏗️ Architecture
 
 ### Core Features
+
 - **Hierarchical Organizations**: Union → Conference → Church structure
 - **Role-Based Access Control (RBAC)**: Granular permissions with scope-based authorization
 - **JWT Authentication**: Secure token-based authentication
@@ -17,6 +18,7 @@ Comprehensive backend infrastructure for Adventist Community Services organizati
 - **Error Handling**: Global error handling with custom error classes
 
 ### Technology Stack
+
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: MongoDB with Mongoose ODM
@@ -29,6 +31,7 @@ Comprehensive backend infrastructure for Adventist Community Services organizati
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js >= 18.x
 - MongoDB >= 6.x
 - npm or pnpm
@@ -108,6 +111,7 @@ backend/
 ## 🔐 Authentication & Authorization
 
 ### Authentication Flow
+
 1. User provides email/password
 2. Server validates credentials
 3. JWT token issued with user ID and email
@@ -117,35 +121,39 @@ backend/
 ### Authorization System
 
 #### Permission Format
+
 ```
 resource.action[:scope]
 ```
 
 **Examples:**
+
 - `users.read` - Read users
 - `organizations.create:subordinate` - Create subordinate organizations
 - `users.update:own` - Update own user record
 - `*` - All permissions (system admin)
 
 #### Scope Hierarchy
+
 - `all` → `subordinate` → `own` → `acs_team` → `acs` → `self`
 - `assigned` → `self`
 - `public` (lowest level)
 
 ### System Roles
 
-| Role | Level | Description |
-|------|-------|-------------|
-| `union_admin` | Union | Full system access |
-| `conference_admin` | Conference | Administrative access for conference level |
-| `church_pastor` | Church | Full access within own church |
-| `church_acs_leader` | Church | ACS team leadership role |
-| `church_team_member` | Church | Basic team member access |
-| `church_viewer` | Church | Read-only access to public information |
+| Role                 | Level      | Description                                |
+| -------------------- | ---------- | ------------------------------------------ |
+| `union_admin`        | Union      | Full system access                         |
+| `conference_admin`   | Conference | Administrative access for conference level |
+| `church_pastor`      | Church     | Full access within own church              |
+| `church_acs_leader`  | Church     | ACS team leadership role                   |
+| `church_team_member` | Church     | Basic team member access                   |
+| `church_viewer`      | Church     | Read-only access to public information     |
 
 ## 🔗 API Endpoints
 
 ### Authentication
+
 ```
 POST /api/auth/signin          # User login
 GET  /api/auth/is-auth         # Verify authentication
@@ -155,6 +163,7 @@ POST /api/auth/reset-password  # Password reset
 ```
 
 ### Organizations
+
 ```
 GET    /api/organizations              # List organizations
 POST   /api/organizations              # Create organization
@@ -166,6 +175,7 @@ GET    /api/organizations/:id/subordinates # Get subordinates
 ```
 
 ### Users
+
 ```
 GET    /api/users                          # List users
 GET    /api/users/:id/roles               # Get user roles
@@ -175,6 +185,7 @@ GET    /api/users/:id/permissions         # Get permissions
 ```
 
 ### Roles
+
 ```
 GET    /api/roles                     # List roles
 POST   /api/roles                     # Create role
@@ -234,11 +245,13 @@ npm run health           # Health check
 ### Database Initialization
 
 The database initialization script creates:
+
 - System roles with predefined permissions
 - Sample organizational hierarchy (Union → Conference → Church)
 - Sample users with different roles
 
 **Default Login Credentials:**
+
 ```
 System Admin: admin@adventist.org.au / Admin123!@#
 Conference Admin: admin@gscsda.org.au / Conference123!@#
@@ -316,6 +329,7 @@ Health check endpoint: `GET /health`
 ## 🔒 Security Features
 
 ### Security Middleware
+
 - **Helmet**: Sets security headers
 - **CORS**: Configurable cross-origin resource sharing
 - **Rate Limiting**: Prevents abuse (100 requests/15min)
@@ -323,12 +337,14 @@ Health check endpoint: `GET /health`
 - **Request Size Limiting**: Prevents DoS attacks
 
 ### Security Monitoring
+
 - Failed authentication attempts
 - Unauthorized access attempts
 - Rate limit violations
 - Security events logging
 
 ### Password Security
+
 - bcrypt with 12 salt rounds
 - Password reset with secure tokens
 - Token expiration (1 hour for reset tokens)
@@ -336,6 +352,7 @@ Health check endpoint: `GET /health`
 ## 📊 Logging
 
 ### Log Levels
+
 - **ERROR**: System errors, exceptions
 - **WARN**: Security events, warnings
 - **INFO**: General information, API requests
@@ -343,6 +360,7 @@ Health check endpoint: `GET /health`
 - **DEBUG**: Development debugging
 
 ### Log Types
+
 - **Security**: Authentication, authorization events
 - **Audit**: User actions, data changes
 - **Performance**: Operation timing
@@ -350,6 +368,7 @@ Health check endpoint: `GET /health`
 - **Request**: HTTP request/response logging
 
 ### Log Rotation
+
 - Daily rotation or 10MB file size limit
 - 30-day retention
 - JSON format for structured logging
@@ -368,7 +387,7 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000
+  socketTimeoutMS: 45000,
 });
 ```
 
@@ -409,6 +428,7 @@ LOG_LEVEL=debug npm run dev
 ## 📝 API Documentation
 
 For detailed API documentation, visit:
+
 - Development: `http://localhost:5000/api`
 - Health Check: `http://localhost:5000/health`
 
@@ -421,6 +441,7 @@ For detailed API documentation, visit:
 5. Open Pull Request
 
 ### Code Standards
+
 - Follow ESLint configuration
 - Use Prettier for formatting
 - Write tests for new features
@@ -433,6 +454,7 @@ This project is licensed under the ISC License.
 ## 📞 Support
 
 For technical support or questions:
+
 - Email: support@adventist.org.au
 - Documentation: https://docs.adventist.org.au
 

@@ -1,61 +1,69 @@
 const mongoose = require('mongoose');
 
-const roleSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true
+const roleSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    displayName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    level: {
+      type: String,
+      required: true,
+      enum: ['union', 'conference', 'church'],
+      lowercase: true,
+    },
+    permissions: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    description: {
+      type: String,
+      trim: true,
+    },
+    isSystem: {
+      type: Boolean,
+      default: false,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
-  displayName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  level: {
-    type: String,
-    required: true,
-    enum: ['union', 'conference', 'church'],
-    lowercase: true
-  },
-  permissions: [{
-    type: String,
-    trim: true
-  }],
-  description: {
-    type: String,
-    trim: true
-  },
-  isSystem: {
-    type: Boolean,
-    default: false
-  },
-  isActive: {
-    type: Boolean,
-    default: true
+  {
+    timestamps: true,
   }
-}, {
-  timestamps: true
-});
+);
 
 // Pre-save middleware to validate permissions format
-roleSchema.pre('save', function(next) {
+roleSchema.pre('save', function (next) {
   if (this.permissions) {
-    const validPermissionPattern = /^[a-z_]+\.([a-z_]+|\*)(:([a-z_]+|self|own|subordinate|all|assigned|acs_team|acs|public))?$/;
-    const invalidPermissions = this.permissions.filter(perm => {
+    const validPermissionPattern =
+      /^[a-z_]+\.([a-z_]+|\*)(:([a-z_]+|self|own|subordinate|all|assigned|acs_team|acs|public))?$/;
+    const invalidPermissions = this.permissions.filter((perm) => {
       return perm !== '*' && !validPermissionPattern.test(perm);
     });
-    
+
     if (invalidPermissions.length > 0) {
-      return next(new Error(`Invalid permission format: ${invalidPermissions.join(', ')}`));
+      return next(
+        new Error(`Invalid permission format: ${invalidPermissions.join(', ')}`)
+      );
     }
   }
   next();
 });
 
 // Static method to create system roles
-roleSchema.statics.createSystemRoles = async function() {
+roleSchema.statics.createSystemRoles = async function () {
   const systemRoles = [
     {
       name: 'union_admin',
@@ -63,7 +71,7 @@ roleSchema.statics.createSystemRoles = async function() {
       level: 'union',
       permissions: ['*'],
       description: 'Full system access for union administrators',
-      isSystem: true
+      isSystem: true,
     },
     {
       name: 'conference_admin',
@@ -79,10 +87,10 @@ roleSchema.statics.createSystemRoles = async function() {
         'users.assign_role:subordinate',
         'roles.read',
         'reports.read:subordinate',
-        'services.manage:subordinate'
+        'services.manage:subordinate',
       ],
       description: 'Administrative access for conference level',
-      isSystem: true
+      isSystem: true,
     },
     {
       name: 'church_pastor',
@@ -97,10 +105,10 @@ roleSchema.statics.createSystemRoles = async function() {
         'users.assign_role:own',
         'roles.read',
         'reports.read:own',
-        'services.manage:own'
+        'services.manage:own',
       ],
       description: 'Full access within own church',
-      isSystem: true
+      isSystem: true,
     },
     {
       name: 'church_acs_leader',
@@ -111,10 +119,10 @@ roleSchema.statics.createSystemRoles = async function() {
         'users.create:acs_team',
         'users.update:acs_team',
         'reports.read:acs',
-        'services.manage:acs'
+        'services.manage:acs',
       ],
       description: 'ACS team leadership role',
-      isSystem: true
+      isSystem: true,
     },
     {
       name: 'church_team_member',
@@ -123,35 +131,31 @@ roleSchema.statics.createSystemRoles = async function() {
       permissions: [
         'users.read:acs_team',
         'reports.read:acs',
-        'services.read:acs'
+        'services.read:acs',
       ],
       description: 'Basic team member access',
-      isSystem: true
+      isSystem: true,
     },
     {
       name: 'church_viewer',
       displayName: 'Church Viewer',
       level: 'church',
-      permissions: [
-        'reports.read:public',
-        'services.read:public'
-      ],
+      permissions: ['reports.read:public', 'services.read:public'],
       description: 'Read-only access to public information',
-      isSystem: true
-    }
+      isSystem: true,
+    },
   ];
 
   for (const roleData of systemRoles) {
-    await this.findOneAndUpdate(
-      { name: roleData.name },
-      roleData,
-      { upsert: true, new: true }
-    );
+    await this.findOneAndUpdate({ name: roleData.name }, roleData, {
+      upsert: true,
+      new: true,
+    });
   }
 };
 
 // Method to check if user has permission
-roleSchema.methods.hasPermission = function(requiredPermission) {
+roleSchema.methods.hasPermission = function (requiredPermission) {
   if (!this.permissions || this.permissions.length === 0) {
     return false;
   }
@@ -173,12 +177,12 @@ roleSchema.methods.hasPermission = function(requiredPermission) {
   }
 
   // Check for scoped permissions (e.g., 'organizations.create:subordinate' matches 'organizations.create')
-  const matchesScoped = this.permissions.some(permission => {
+  const matchesScoped = this.permissions.some((permission) => {
     const [permResource, permActionWithScope] = permission.split('.');
     if (!permActionWithScope || !permActionWithScope.includes(':')) {
       return false;
     }
-    
+
     const [permAction] = permActionWithScope.split(':');
     return permResource === resource && permAction === action;
   });

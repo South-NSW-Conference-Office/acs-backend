@@ -12,14 +12,14 @@ class EmailService {
       },
       requireTLS: true,
       tls: {
-        rejectUnauthorized: false
-      }
+        rejectUnauthorized: false,
+      },
     });
   }
 
   async sendPasswordResetEmail(userEmail, resetToken) {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${resetToken}`;
-    
+
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
       to: userEmail,
@@ -90,7 +90,7 @@ class EmailService {
         Adventist Community Services Team
         
         © 2025 Adventist Community Services. All rights reserved.
-      `
+      `,
     };
 
     try {

@@ -6,10 +6,10 @@ const VolunteerRole = require('../models/VolunteerRole');
 const Story = require('../models/Story');
 const Organization = require('../models/Organization');
 const { authenticateToken } = require('../middleware/auth');
-const { 
+const {
   getManageableOrganizations,
   canManageService,
-  requireServicePermission
+  requireServicePermission,
 } = require('../middleware/serviceAuth');
 
 /**
@@ -25,11 +25,11 @@ router.use(authenticateToken);
 router.get('/permissions', async (req, res) => {
   try {
     const permissions = {};
-    
+
     for (const assignment of req.user.organizations) {
       const orgId = assignment.organization._id.toString();
       const role = assignment.role;
-      
+
       permissions[orgId] = {
         organizationName: assignment.organization.name,
         organizationType: assignment.organization.type,
@@ -40,13 +40,15 @@ router.get('/permissions', async (req, res) => {
         canManageServices: role.hasPermission('services.manage'),
         canCreateStories: role.hasPermission('stories.create'),
         canManageStories: role.hasPermission('stories.manage'),
-        servicePermissions: role.permissions.filter(p => p.startsWith('services.') || p.startsWith('stories.'))
+        servicePermissions: role.permissions.filter(
+          (p) => p.startsWith('services.') || p.startsWith('stories.')
+        ),
       };
     }
-    
+
     res.json({
       success: true,
-      permissions
+      permissions,
     });
   } catch (error) {
     console.error('Error fetching permissions:', error);
@@ -60,33 +62,39 @@ router.get('/permissions', async (req, res) => {
  */
 router.get('/dashboard-stats', async (req, res) => {
   try {
-    const manageableOrgIds = await getManageableOrganizations(req.user, 'services.read');
-    
+    const manageableOrgIds = await getManageableOrganizations(
+      req.user,
+      'services.read'
+    );
+
     const [
       totalServices,
       activeServices,
       upcomingEvents,
       openVolunteerRoles,
-      publishedStories
+      publishedStories,
     ] = await Promise.all([
       Service.countDocuments({ organization: { $in: manageableOrgIds } }),
-      Service.countDocuments({ organization: { $in: manageableOrgIds }, status: 'active' }),
-      ServiceEvent.countDocuments({ 
+      Service.countDocuments({
+        organization: { $in: manageableOrgIds },
+        status: 'active',
+      }),
+      ServiceEvent.countDocuments({
         organization: { $in: manageableOrgIds },
         start: { $gt: new Date() },
-        status: 'published'
+        status: 'published',
       }),
       VolunteerRole.countDocuments({
         organization: { $in: manageableOrgIds },
         status: 'open',
-        $expr: { $lt: ['$positionsFilled', '$numberOfPositions'] }
+        $expr: { $lt: ['$positionsFilled', '$numberOfPositions'] },
       }),
       Story.countDocuments({
         organization: { $in: manageableOrgIds },
-        status: 'published'
-      })
+        status: 'published',
+      }),
     ]);
-    
+
     res.json({
       success: true,
       stats: {
@@ -94,8 +102,8 @@ router.get('/dashboard-stats', async (req, res) => {
         activeServices,
         upcomingEvents,
         openVolunteerRoles,
-        publishedStories
-      }
+        publishedStories,
+      },
     });
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
@@ -109,38 +117,41 @@ router.get('/dashboard-stats', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const { 
-      organization, 
-      type, 
-      status, 
-      search, 
-      page = 1, 
+    const {
+      organization,
+      type,
+      status,
+      search,
+      page = 1,
       limit = 10,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = req.query;
-    
-    console.log('Admin services GET / - User:', req.user ? req.user.email : 'No user');
+
+    console.log(
+      'Admin services GET / - User:',
+      req.user ? req.user.email : 'No user'
+    );
     console.log('User organizations:', req.user?.organizations?.length || 0);
-    
+
     const manageableOrgIds = await getManageableOrganizations(req.user);
-    
-    let query = { organization: { $in: manageableOrgIds } };
-    
+
+    const query = { organization: { $in: manageableOrgIds } };
+
     if (organization && manageableOrgIds.includes(organization)) {
       query.organization = organization;
     }
-    
+
     if (type) query.type = type;
     if (status) query.status = status;
-    
+
     if (search) {
       query.$text = { $search: search };
     }
-    
+
     const skip = (page - 1) * limit;
     const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
-    
+
     const [services, total] = await Promise.all([
       Service.find(query)
         .populate('organization', 'name type parent')
@@ -148,9 +159,9 @@ router.get('/', async (req, res) => {
         .sort(sort)
         .skip(skip)
         .limit(parseInt(limit)),
-      Service.countDocuments(query)
+      Service.countDocuments(query),
     ]);
-    
+
     // Add permission info for each service
     const servicesWithPermissions = await Promise.all(
       services.map(async (service) => {
@@ -158,14 +169,26 @@ router.get('/', async (req, res) => {
         return {
           ...serviceObj,
           permissions: {
-            canUpdate: await canManageService(req.user, service.organization._id, 'services.update'),
-            canDelete: await canManageService(req.user, service.organization._id, 'services.delete'),
-            canManage: await canManageService(req.user, service.organization._id, 'services.manage')
-          }
+            canUpdate: await canManageService(
+              req.user,
+              service.organization._id,
+              'services.update'
+            ),
+            canDelete: await canManageService(
+              req.user,
+              service.organization._id,
+              'services.delete'
+            ),
+            canManage: await canManageService(
+              req.user,
+              service.organization._id,
+              'services.manage'
+            ),
+          },
         };
       })
     );
-    
+
     res.json({
       success: true,
       services: servicesWithPermissions,
@@ -173,8 +196,8 @@ router.get('/', async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error('Error fetching services:', error);
@@ -192,45 +215,61 @@ router.get('/:id/full', async (req, res) => {
       .populate('organization')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
-    
+
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
-    
+
     // Check if user can view this service
-    const canView = await canManageService(req.user, service.organization._id, 'services.read');
+    const canView = await canManageService(
+      req.user,
+      service.organization._id,
+      'services.read'
+    );
     if (!canView) {
-      return res.status(403).json({ error: 'Insufficient permissions to view this service' });
+      return res
+        .status(403)
+        .json({ error: 'Insufficient permissions to view this service' });
     }
-    
+
     // Fetch related data
     const [events, roles, stories] = await Promise.all([
-      ServiceEvent.find({ service: service._id })
-        .sort('-start')
-        .limit(10),
-      VolunteerRole.find({ service: service._id })
-        .sort('-createdAt')
-        .limit(10),
-      Story.find({ service: service._id })
-        .sort('-publishedAt')
-        .limit(10)
+      ServiceEvent.find({ service: service._id }).sort('-start').limit(10),
+      VolunteerRole.find({ service: service._id }).sort('-createdAt').limit(10),
+      Story.find({ service: service._id }).sort('-publishedAt').limit(10),
     ]);
-    
+
     // Check permissions
     const permissions = {
-      canUpdate: await canManageService(req.user, service.organization._id, 'services.update'),
-      canDelete: await canManageService(req.user, service.organization._id, 'services.delete'),
-      canManage: await canManageService(req.user, service.organization._id, 'services.manage'),
-      canCreateStories: await canManageService(req.user, service.organization._id, 'stories.create')
+      canUpdate: await canManageService(
+        req.user,
+        service.organization._id,
+        'services.update'
+      ),
+      canDelete: await canManageService(
+        req.user,
+        service.organization._id,
+        'services.delete'
+      ),
+      canManage: await canManageService(
+        req.user,
+        service.organization._id,
+        'services.manage'
+      ),
+      canCreateStories: await canManageService(
+        req.user,
+        service.organization._id,
+        'stories.create'
+      ),
     };
-    
+
     res.json({
       success: true,
       service: service.toObject(),
       events,
       roles,
       stories,
-      permissions
+      permissions,
     });
   } catch (error) {
     console.error('Error fetching service details:', error);
@@ -254,12 +293,12 @@ router.get('/types', (req, res) => {
     { value: 'counseling_service', label: 'Counseling Service' },
     { value: 'education_program', label: 'Education Program' },
     { value: 'community_garden', label: 'Community Garden' },
-    { value: 'other', label: 'Other' }
+    { value: 'other', label: 'Other' },
   ];
-  
+
   res.json({
     success: true,
-    types
+    types,
   });
 });
 
@@ -269,18 +308,24 @@ router.get('/types', (req, res) => {
  */
 router.get('/organizations', async (req, res) => {
   try {
-    console.log('Organizations endpoint - User:', req.user ? req.user.email : 'No user');
+    console.log(
+      'Organizations endpoint - User:',
+      req.user ? req.user.email : 'No user'
+    );
     console.log('User organizations:', req.user?.organizations);
-    
-    const orgIds = await getManageableOrganizations(req.user, 'services.create');
-    
-    const organizations = await Organization.find({ 
-      _id: { $in: orgIds } 
+
+    const orgIds = await getManageableOrganizations(
+      req.user,
+      'services.create'
+    );
+
+    const organizations = await Organization.find({
+      _id: { $in: orgIds },
     }).select('name type parent');
-    
+
     res.json({
       success: true,
-      organizations
+      organizations,
     });
   } catch (error) {
     console.error('Error fetching organizations:', error);
@@ -292,25 +337,26 @@ router.get('/organizations', async (req, res) => {
  * POST /api/admin/services/:id/toggle-status
  * Toggle service status between active and paused
  */
-router.post('/:id/toggle-status',
+router.post(
+  '/:id/toggle-status',
   requireServicePermission('services.update'),
   async (req, res) => {
     try {
       const service = await Service.findById(req.params.id);
-      
+
       if (!service) {
         return res.status(404).json({ error: 'Service not found' });
       }
-      
+
       // Toggle between active and paused
       service.status = service.status === 'active' ? 'paused' : 'active';
       service.updatedBy = req.user._id;
       await service.save();
-      
+
       res.json({
         success: true,
         message: `Service ${service.status === 'active' ? 'activated' : 'paused'}`,
-        service
+        service,
       });
     } catch (error) {
       console.error('Error toggling service status:', error);
@@ -325,27 +371,30 @@ router.post('/:id/toggle-status',
  */
 router.get('/stories', async (req, res) => {
   try {
-    const { 
+    const {
       organization,
       service,
       status = 'all',
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
-    
-    const manageableOrgIds = await getManageableOrganizations(req.user, 'stories.read');
-    
-    let query = { organization: { $in: manageableOrgIds } };
-    
+
+    const manageableOrgIds = await getManageableOrganizations(
+      req.user,
+      'stories.read'
+    );
+
+    const query = { organization: { $in: manageableOrgIds } };
+
     if (organization && manageableOrgIds.includes(organization)) {
       query.organization = organization;
     }
-    
+
     if (service) query.service = service;
     if (status !== 'all') query.status = status;
-    
+
     const skip = (page - 1) * limit;
-    
+
     const [stories, total] = await Promise.all([
       Story.find(query)
         .populate('service', 'name')
@@ -354,9 +403,9 @@ router.get('/stories', async (req, res) => {
         .sort('-createdAt')
         .skip(skip)
         .limit(parseInt(limit)),
-      Story.countDocuments(query)
+      Story.countDocuments(query),
     ]);
-    
+
     res.json({
       success: true,
       stories,
@@ -364,8 +413,8 @@ router.get('/stories', async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error('Error fetching stories:', error);

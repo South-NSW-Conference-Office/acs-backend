@@ -79,6 +79,7 @@ app.use('/api/admin/services', adminServiceRoutes);
 ## Permission System
 
 ### Service Permissions
+
 - `services.create` - Create new services
 - `services.read` - View services
 - `services.update` - Edit existing services
@@ -86,11 +87,13 @@ app.use('/api/admin/services', adminServiceRoutes);
 - `services.manage` - Full management (events, volunteers, etc.)
 
 ### Story Permissions
+
 - `stories.create` - Create stories
 - `stories.update` - Edit stories
 - `stories.manage` - Publish/unpublish stories
 
 ### Scope Modifiers
+
 - No scope - User must be in the same organization
 - `:own` - User must be directly assigned to that organization
 - `:subordinate` - User can manage child organizations
@@ -98,6 +101,7 @@ app.use('/api/admin/services', adminServiceRoutes);
 ## API Endpoints
 
 ### Public Endpoints (No Auth)
+
 - `GET /api/services` - List active services
 - `GET /api/services/:id` - Get service details
 - `GET /api/services/:id/events` - Get service events
@@ -105,6 +109,7 @@ app.use('/api/admin/services', adminServiceRoutes);
 - `GET /api/services/:id/stories` - Get service stories
 
 ### Protected Endpoints (Auth Required)
+
 - `POST /api/services` - Create service
 - `PUT /api/services/:id` - Update service
 - `DELETE /api/services/:id` - Archive service
@@ -112,6 +117,7 @@ app.use('/api/admin/services', adminServiceRoutes);
 - `POST /api/services/:id/upload-image` - Upload image
 
 ### Admin Endpoints
+
 - `GET /api/admin/services/permissions` - Get user permissions
 - `GET /api/admin/services/dashboard-stats` - Get statistics
 - `GET /api/admin/services` - List manageable services
@@ -121,18 +127,20 @@ app.use('/api/admin/services', adminServiceRoutes);
 ## Usage Examples
 
 ### Backend: Check Service Permissions
+
 ```javascript
 const { canManageService } = require('./middleware/serviceAuth');
 
 // Check if user can update a service
 const hasPermission = await canManageService(
-  user, 
-  service.organization, 
+  user,
+  service.organization,
   'services.update'
 );
 ```
 
 ### Frontend: Service Management
+
 ```typescript
 import { serviceManagement } from '@/lib/serviceManagement';
 
@@ -140,7 +148,7 @@ import { serviceManagement } from '@/lib/serviceManagement';
 const { services } = await serviceManagement.getServices({
   page: 1,
   limit: 10,
-  status: 'active'
+  status: 'active',
 });
 
 // Create new service
@@ -148,25 +156,25 @@ const service = await serviceManagement.createService({
   name: 'Food Pantry',
   type: 'food_pantry',
   organization: orgId,
-  descriptionShort: 'Weekly food distribution'
+  descriptionShort: 'Weekly food distribution',
 });
 ```
 
 ### Frontend: Permission-Based UI
+
 ```tsx
-<PermissionGate 
-  requiredPermission="services.create" 
+<PermissionGate
+  requiredPermission="services.create"
   organizationId={selectedOrgId}
 >
-  <Button onClick={handleCreateService}>
-    Add Service
-  </Button>
+  <Button onClick={handleCreateService}>Add Service</Button>
 </PermissionGate>
 ```
 
 ## Database Indexes
 
 Services are optimized with the following indexes:
+
 - Text search: `name`, `description`, `tags`
 - Geospatial: `locations.coordinates` (2dsphere)
 - Query optimization: `organization + status`, `type + status`
