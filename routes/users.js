@@ -256,6 +256,271 @@ router.delete('/:userId/roles/:organizationId', async (req, res) => {
   }
 });
 
+// POST /api/users - Create new user
+router.post(
+  '/',
+  [
+    body('name')
+      .isString()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('password')
+      .optional()
+      .isString()
+      .isLength({ min: 6 })
+      .withMessage('Password must be at least 6 characters'),
+    body('phone')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Phone must be a string'),
+    body('address')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Address must be a string'),
+    body('city')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('City must be a string'),
+    body('state')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('State must be a string'),
+    body('country')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Country must be a string'),
+    body('verified')
+      .optional()
+      .isBoolean()
+      .withMessage('Verified must be boolean'),
+    body('primaryOrganization')
+      .optional()
+      .isMongoId()
+      .withMessage('Valid organization ID required'),
+    body('organizations')
+      .optional()
+      .isArray()
+      .withMessage('Organizations must be an array'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const {
+        name,
+        email,
+        password,
+        phone,
+        address,
+        city,
+        state,
+        country,
+        verified,
+        primaryOrganization,
+        organizations,
+      } = req.body;
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'User with this email already exists',
+        });
+      }
+
+      // Generate default password if not provided
+      const userPassword =
+        password || `temp${Math.random().toString(36).slice(2)}!`;
+
+      // Create new user
+      const userData = {
+        name,
+        email,
+        password: userPassword,
+        phone,
+        address,
+        city,
+        state,
+        country,
+        verified: verified ?? false,
+        primaryOrganization,
+        organizations: organizations || [],
+        createdBy: req.user._id,
+      };
+
+      // Remove undefined fields
+      Object.keys(userData).forEach(
+        (key) => userData[key] === undefined && delete userData[key]
+      );
+
+      const user = new User(userData);
+      await user.save();
+
+      // Populate and return user data
+      await user.populate(
+        'organizations.organization organizations.role primaryOrganization'
+      );
+
+      const userResponse = user.toJSON();
+      delete userResponse.password;
+
+      res.status(201).json({
+        success: true,
+        message: 'User created successfully',
+        data: {
+          ...userResponse,
+          id: user._id,
+        },
+      });
+    } catch (error) {
+      console.error('Error creating user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        err: error.message,
+      });
+    }
+  }
+);
+
+// PUT /api/users/:userId - Update user
+router.put(
+  '/:userId',
+  [
+    body('name')
+      .optional()
+      .isString()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage('Name must be valid'),
+    body('email').optional().isEmail().withMessage('Valid email is required'),
+    body('phone')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Phone must be a string'),
+    body('address')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Address must be a string'),
+    body('city')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('City must be a string'),
+    body('state')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('State must be a string'),
+    body('country')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Country must be a string'),
+    body('verified')
+      .optional()
+      .isBoolean()
+      .withMessage('Verified must be boolean'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be boolean'),
+    body('primaryOrganization')
+      .optional()
+      .isMongoId()
+      .withMessage('Valid organization ID required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { userId } = req.params;
+      const updates = req.body;
+
+      // If email is being updated, check if it's already taken
+      if (updates.email) {
+        const existingUser = await User.findOne({
+          email: updates.email,
+          _id: { $ne: userId },
+        });
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email is already in use by another user',
+          });
+        }
+      }
+
+      // Remove fields that shouldn't be updated directly
+      delete updates.password;
+      delete updates.organizations;
+      delete updates._id;
+      delete updates.id;
+
+      // Add update metadata
+      updates.updatedAt = new Date();
+      updates.updatedBy = req.user._id;
+
+      const user = await User.findByIdAndUpdate(
+        userId,
+        { $set: updates },
+        { new: true, runValidators: true }
+      )
+        .populate(
+          'organizations.organization organizations.role primaryOrganization'
+        )
+        .select('-password');
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'User updated successfully',
+        data: {
+          ...user.toJSON(),
+          id: user._id,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        err: error.message,
+      });
+    }
+  }
+);
+
 // GET /api/users/:userId/permissions - Get user permissions for organization
 router.get(
   '/:userId/permissions',
