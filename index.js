@@ -72,8 +72,7 @@ mongoose
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
   })
-  .catch((error) => {
-    console.error('Database connection error:', error);
+  .catch(() => {
     process.exit(1);
   });
 
@@ -92,7 +91,7 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error, req, res, next) => {
+app.use((error, req, res) => {
   res.status(500).json({
     success: false,
     message: 'Internal server error',

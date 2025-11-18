@@ -168,10 +168,9 @@ class UserService {
         await this.validateOrganizationAssignments(organizations);
 
       // Create user
-      const user = new User({
+      const userFields = {
         name,
         email,
-        password,
         phone,
         address,
         city,
@@ -188,7 +187,14 @@ class UserService {
           validatedOrganizations.length > 0
             ? validatedOrganizations[0].organizationId
             : null,
-      });
+      };
+
+      // Only add password if provided (for users who need to set it later)
+      if (password) {
+        userFields.password = password;
+      }
+
+      const user = new User(userFields);
 
       // Generate verification token
       const verificationToken = emailService.generateVerificationToken();
