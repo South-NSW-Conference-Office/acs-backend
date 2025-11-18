@@ -11,8 +11,13 @@ const {
   canManageService,
 } = require('../middleware/serviceAuth');
 const { authenticateToken } = require('../middleware/auth');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/temp/' });
+const storageService = require('../services/storageService');
+const {
+  upload,
+  handleUploadError,
+  requireFile,
+  validateImageDimensions,
+} = require('../middleware/uploadMiddleware');
 
 // ============================================
 // AUTHENTICATED ROUTES (specific paths first)
@@ -337,14 +342,16 @@ router.delete(
 );
 
 /**
- * POST /services/:id/upload-image
- * Upload service image
+ * PUT /services/:id/banner
+ * Upload or update service banner image
  */
-router.post(
-  '/:id/upload-image',
+router.put(
+  '/:id/banner',
   authenticateToken,
   requireServicePermission('services.update'),
-  upload.single('image'),
+  upload.banner,
+  requireFile('banner'),
+  validateImageDimensions({ minWidth: 800, minHeight: 200 }),
   async (req, res) => {
     try {
       const service = await Service.findById(req.params.id);
@@ -363,37 +370,197 @@ router.post(
         return res.status(403).json({ error: 'Cannot update this service' });
       }
 
-      // TODO: Process and store image (S3, Cloudinary, etc.)
-      // For now, just return a placeholder
-      const imageUrl = `/uploads/services/${req.file.filename}`;
-
-      if (req.body.imageType === 'primary') {
-        service.primaryImage = {
-          url: imageUrl,
-          alt: req.body.alt || '',
-        };
-      } else {
-        service.gallery.push({
-          url: imageUrl,
-          alt: req.body.alt || '',
-          caption: req.body.caption || '',
-        });
+      // Delete old banner if exists
+      if (service.primaryImage?.key) {
+        await storageService.deleteImage(service.primaryImage.key);
       }
 
+      // Upload new banner
+      const uploadResult = await storageService.uploadImage(req.file.buffer, {
+        originalName: req.file.originalname,
+        type: 'banner',
+        serviceId: service._id,
+      });
+
+      // Update service
+      service.primaryImage = {
+        url: uploadResult.url,
+        key: uploadResult.key,
+        alt: req.body.alt || '',
+      };
       service.updatedBy = req.user._id;
       await service.save();
 
       res.json({
         success: true,
-        imageUrl,
-        service,
+        message: 'Banner image uploaded successfully',
+        image: service.primaryImage,
       });
     } catch (error) {
-      // Error uploading image
-      res.status(500).json({ error: 'Failed to upload image' });
+      res.status(500).json({ error: 'Failed to upload banner image' });
     }
   }
 );
+
+/**
+ * POST /services/:id/gallery
+ * Add images to service gallery
+ */
+router.post(
+  '/:id/gallery',
+  authenticateToken,
+  requireServicePermission('services.update'),
+  upload.gallery,
+  requireFile('images'),
+  async (req, res) => {
+    try {
+      const service = await Service.findById(req.params.id);
+
+      if (!service) {
+        return res.status(404).json({ error: 'Service not found' });
+      }
+
+      // Verify permission
+      const hasPermission = await canManageService(
+        req.user,
+        service.organization,
+        'services.update'
+      );
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Cannot update this service' });
+      }
+
+      // Check gallery limit
+      const currentGallerySize = service.gallery?.length || 0;
+      const newImagesCount = req.files.length;
+      if (currentGallerySize + newImagesCount > 20) {
+        return res.status(400).json({
+          error: `Gallery limit exceeded. Maximum 20 images allowed. Current: ${currentGallerySize}`,
+        });
+      }
+
+      // Upload all images
+      const uploadPromises = req.files.map(async (file, index) => {
+        const uploadResult = await storageService.uploadImage(file.buffer, {
+          originalName: file.originalname,
+          type: 'gallery',
+          serviceId: service._id,
+          generateThumbnail: true,
+        });
+
+        return {
+          url: uploadResult.url,
+          key: uploadResult.key,
+          thumbnailUrl: uploadResult.thumbnail?.url,
+          thumbnailKey: uploadResult.thumbnail?.key,
+          alt: req.body[`alt_${index}`] || '',
+          caption: req.body[`caption_${index}`] || '',
+        };
+      });
+
+      const uploadedImages = await Promise.all(uploadPromises);
+
+      // Add to gallery
+      service.gallery.push(...uploadedImages);
+      service.updatedBy = req.user._id;
+      await service.save();
+
+      res.json({
+        success: true,
+        message: `${uploadedImages.length} images added to gallery`,
+        images: uploadedImages,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to upload gallery images' });
+    }
+  }
+);
+
+/**
+ * DELETE /services/:id/gallery/:imageId
+ * Remove an image from service gallery
+ */
+router.delete(
+  '/:id/gallery/:imageId',
+  authenticateToken,
+  requireServicePermission('services.update'),
+  async (req, res) => {
+    try {
+      const service = await Service.findById(req.params.id);
+
+      if (!service) {
+        return res.status(404).json({ error: 'Service not found' });
+      }
+
+      // Verify permission
+      const hasPermission = await canManageService(
+        req.user,
+        service.organization,
+        'services.update'
+      );
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Cannot update this service' });
+      }
+
+      // Find image in gallery
+      const imageIndex = service.gallery.findIndex(
+        (img) => img._id.toString() === req.params.imageId
+      );
+
+      if (imageIndex === -1) {
+        return res.status(404).json({ error: 'Image not found in gallery' });
+      }
+
+      // Delete from storage
+      const image = service.gallery[imageIndex];
+      if (image.key) {
+        await storageService.deleteImage(image.key);
+      }
+      if (image.thumbnailKey) {
+        await storageService.deleteImage(image.thumbnailKey);
+      }
+
+      // Remove from gallery
+      service.gallery.splice(imageIndex, 1);
+      service.updatedBy = req.user._id;
+      await service.save();
+
+      res.json({
+        success: true,
+        message: 'Image removed from gallery',
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete gallery image' });
+    }
+  }
+);
+
+/**
+ * GET /services/:id/images
+ * Get all service images
+ */
+router.get('/:id/images', async (req, res) => {
+  try {
+    const service = await Service.findById(req.params.id).select(
+      'primaryImage gallery'
+    );
+
+    if (!service) {
+      return res.status(404).json({ error: 'Service not found' });
+    }
+
+    res.json({
+      success: true,
+      banner: service.primaryImage,
+      gallery: service.gallery || [],
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch service images' });
+  }
+});
+
+// Add error handling middleware at the end for upload errors
+router.use(handleUploadError);
 
 /**
  * POST /services/:id/events

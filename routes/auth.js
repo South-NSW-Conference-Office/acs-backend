@@ -77,6 +77,143 @@ router.post(
   }
 );
 
+// POST /api/auth/verify-email-and-set-password - Verify email and set initial password
+router.post(
+  '/verify-email-and-set-password',
+  [
+    body('token').notEmpty().withMessage('Verification token is required'),
+    body('password')
+      .isString()
+      .isLength({ min: 6 })
+      .withMessage('Password must be at least 6 characters'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { token, password } = req.body;
+
+      // Find user with matching verification token
+      const user = await User.findOne({
+        emailVerificationToken: token,
+        emailVerificationExpires: { $gt: Date.now() },
+      });
+
+      if (!user) {
+        // Check if token exists but is expired
+        const expiredUser = await User.findOne({
+          emailVerificationToken: token,
+        });
+        if (expiredUser) {
+          return res.status(400).json({
+            success: false,
+            message:
+              'Verification link has expired. Please contact your administrator to resend the verification email.',
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid verification token',
+        });
+      }
+
+      // Check if user already has a password set
+      if (user.passwordSet) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Password has already been set for this account. Please use the login page.',
+        });
+      }
+
+      // Verify the user and set password
+      user.verified = true;
+      user.password = password; // Will trigger pre-save hook to hash and set passwordSet
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save();
+
+      // Send welcome email
+      await emailService.sendWelcomeEmail(user);
+
+      res.json({
+        success: true,
+        message: 'Email verified and password set successfully',
+        data: {
+          email: user.email,
+          name: user.name,
+          passwordSet: user.passwordSet,
+        },
+      });
+    } catch (error) {
+      // Error verifying email and setting password
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+);
+
+// GET /api/auth/check-verification-token - Check token validity and password requirement
+router.get('/check-verification-token/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // Find user with matching verification token
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      // Check if token exists but is expired
+      const expiredUser = await User.findOne({
+        emailVerificationToken: token,
+      });
+      if (expiredUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification link has expired.',
+          expired: true,
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification token',
+        expired: false,
+      });
+    }
+
+    const responseData = {
+      email: user.email,
+      name: user.name,
+      verified: user.verified,
+      passwordSet: user.passwordSet,
+      requiresPasswordSetup: !user.passwordSet && !user.password,
+    };
+
+    res.json({
+      success: true,
+      data: responseData,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+});
+
 // POST /api/auth/resend-verification - Resend verification email
 router.post(
   '/resend-verification',
@@ -198,6 +335,16 @@ router.post(
           success: false,
           message: 'Invalid credentials',
           err: 'User not found or inactive',
+        });
+      }
+
+      // Check if user has set up their password
+      if (!user.passwordSet || !user.password) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Please complete your account setup by setting a password first',
+          err: 'Password not set',
         });
       }
 
