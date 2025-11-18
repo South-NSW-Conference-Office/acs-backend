@@ -1,11 +1,7 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const Organization = require('../models/Organization');
-const {
-  authenticateToken,
-  authorize,
-  rateLimit,
-} = require('../middleware/auth');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -15,6 +11,7 @@ router.use(authenticateToken);
 // GET /api/organizations - Get all organizations (authenticated users only)
 router.get(
   '/',
+  authorize('organizations.read'),
   [
     query('type')
       .optional()
@@ -59,7 +56,7 @@ router.get(
         data: organizations,
       });
     } catch (error) {
-      console.error('Error fetching organizations:', error);
+      // Error fetching organizations
       res.status(500).json({
         success: false,
         message: 'Failed to fetch organizations',
@@ -73,7 +70,7 @@ router.get(
 );
 
 // GET /api/organizations/:id - Get specific organization
-router.get('/:id', async (req, res) => {
+router.get('/:id', authorize('organizations.read'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -94,7 +91,7 @@ router.get('/:id', async (req, res) => {
       data: organization,
     });
   } catch (error) {
-    console.error('Error fetching organization:', error);
+    // Error fetching organization
     res.status(500).json({
       success: false,
       message: 'Failed to fetch organization',
@@ -109,6 +106,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/organizations - Create new organization
 router.post(
   '/',
+  authorize('organizations.create'),
   [
     body('name')
       .trim()
@@ -208,7 +206,7 @@ router.post(
         data: organization,
       });
     } catch (error) {
-      console.error('Error creating organization:', error);
+      // Error creating organization
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -221,6 +219,7 @@ router.post(
 // PUT /api/organizations/:id - Update organization
 router.put(
   '/:id',
+  authorize('organizations.update'),
   [
     body('name')
       .optional()
@@ -318,7 +317,7 @@ router.put(
         data: organization,
       });
     } catch (error) {
-      console.error('Error updating organization:', error);
+      // Error updating organization
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -329,7 +328,7 @@ router.put(
 );
 
 // DELETE /api/organizations/:id - Delete organization
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('organizations.delete'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -363,7 +362,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Organization deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting organization:', error);
+    // Error deleting organization
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -373,88 +372,59 @@ router.delete('/:id', async (req, res) => {
 });
 
 // GET /api/organizations/:id/hierarchy - Get organization hierarchy
-router.get('/:id/hierarchy', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const hierarchy = await Organization.getHierarchy(id);
-    res.json({
-      success: true,
-      message: 'Organization hierarchy retrieved successfully',
-      data: hierarchy,
-    });
-  } catch (error) {
-    console.error('Error fetching organization hierarchy:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch organization hierarchy',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
-    });
-  }
-});
-
-// GET /api/organizations/:id/subordinates - Get subordinate organizations
-router.get('/:id/subordinates', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const subordinates = await Organization.getSubordinates(id);
-    res.json({
-      success: true,
-      message: 'Subordinate organizations retrieved successfully',
-      data: subordinates,
-    });
-  } catch (error) {
-    console.error('Error fetching subordinate organizations:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch subordinate organizations',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
-    });
-  }
-});
-
-// Helper function to check organization access
-async function canAccessOrganization(user, userPermissions, organizationId) {
-  // System admins can access all organizations
-  if (userPermissions.permissions.includes('*')) {
-    return true;
-  }
-
-  // Users can access their assigned organizations
-  const hasDirectAccess = user.organizations.some(
-    (org) => org.organization.toString() === organizationId.toString()
-  );
-
-  if (hasDirectAccess) {
-    return true;
-  }
-
-  // Check if organization is a subordinate of user's organizations
-  for (const userOrg of user.organizations) {
+router.get(
+  '/:id/hierarchy',
+  authorize('organizations.read'),
+  async (req, res) => {
     try {
-      const subordinates = await Organization.getSubordinates(
-        userOrg.organization
-      );
-      const hasSubordinateAccess = subordinates.some(
-        (sub) => sub._id.toString() === organizationId.toString()
-      );
+      const { id } = req.params;
 
-      if (hasSubordinateAccess) {
-        return true;
-      }
+      const hierarchy = await Organization.getHierarchy(id);
+      res.json({
+        success: true,
+        message: 'Organization hierarchy retrieved successfully',
+        data: hierarchy,
+      });
     } catch (error) {
-      console.error('Error checking subordinate access:', error);
+      // Error fetching organization hierarchy
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch organization hierarchy',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
+      });
     }
   }
+);
 
-  return false;
-}
+// GET /api/organizations/:id/subordinates - Get subordinate organizations
+router.get(
+  '/:id/subordinates',
+  authorize('organizations.read'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const subordinates = await Organization.getSubordinates(id);
+      res.json({
+        success: true,
+        message: 'Subordinate organizations retrieved successfully',
+        data: subordinates,
+      });
+    } catch (error) {
+      // Error fetching subordinate organizations
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch subordinate organizations',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
+      });
+    }
+  }
+);
 
 module.exports = router;

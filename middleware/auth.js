@@ -31,8 +31,6 @@ const authenticateToken = async (req, res, next) => {
     req.token = token;
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
@@ -57,7 +55,7 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-const authorize = (requiredPermission, options = {}) => {
+const authorize = (requiredPermission = {}) => {
   return async (req, res, next) => {
     try {
       if (!req.user) {
@@ -67,10 +65,25 @@ const authorize = (requiredPermission, options = {}) => {
         });
       }
 
+      // For organization context, try multiple fallbacks
       const organizationId =
-        req.headers['x-organization-id'] || req.user.primaryOrganization;
+        req.headers['x-organization-id'] ||
+        req.user.primaryOrganization?._id ||
+        req.user.primaryOrganization;
 
-      if (!organizationId) {
+      // If still no organization context, try to use the user's first organization
+      let finalOrgId = organizationId;
+      if (
+        !finalOrgId &&
+        req.user.organizations &&
+        req.user.organizations.length > 0
+      ) {
+        finalOrgId =
+          req.user.organizations[0].organization._id ||
+          req.user.organizations[0].organization;
+      }
+
+      if (!finalOrgId) {
         return res.status(400).json({
           success: false,
           message: 'Organization context required',
@@ -78,7 +91,35 @@ const authorize = (requiredPermission, options = {}) => {
       }
 
       const userPermissions =
-        await req.user.getPermissionsForOrganization(organizationId);
+        await req.user.getPermissionsForOrganization(finalOrgId);
+
+      // If no role found for specific org, but user has any role assignments, use the primary one
+      if (
+        !userPermissions.role &&
+        req.user.organizations &&
+        req.user.organizations.length > 0
+      ) {
+        await req.user.populate('organizations.role');
+        const primaryAssignment =
+          req.user.organizations.find(
+            (org) =>
+              org.organization._id?.toString() ===
+                req.user.primaryOrganization?.toString() ||
+              org.organization?.toString() ===
+                req.user.primaryOrganization?.toString()
+          ) || req.user.organizations[0];
+
+        if (primaryAssignment && primaryAssignment.role) {
+          userPermissions.role = primaryAssignment.role;
+          userPermissions.permissions =
+            primaryAssignment.role.permissions || [];
+        } else {
+          return res.status(403).json({
+            success: false,
+            message: 'No role assigned in this organization',
+          });
+        }
+      }
 
       if (!userPermissions.role) {
         return res.status(403).json({
@@ -106,7 +147,6 @@ const authorize = (requiredPermission, options = {}) => {
       req.organizationId = organizationId;
       next();
     } catch (error) {
-      console.error('Authorization error:', error);
       return res.status(500).json({
         success: false,
         message: 'Authorization error',
@@ -151,8 +191,41 @@ const checkPermission = (userPermissions, requiredPermission) => {
   return matchesScoped;
 };
 
+// Middleware to ensure only super admins can access system-level operations
+const requireSuperAdmin = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    // Check if user has super admin role in any organization
+    const hasSuperAdminRole = req.user.organizations.some(
+      (org) => org.role && org.role.name === 'super_admin'
+    );
+
+    if (!hasSuperAdminRole) {
+      return res.status(403).json({
+        success: false,
+        message: 'Super admin access required',
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Authorization error',
+      err: error.message,
+    });
+  }
+};
+
 module.exports = {
   authenticateToken,
   authorize,
   checkPermission,
+  requireSuperAdmin,
 };

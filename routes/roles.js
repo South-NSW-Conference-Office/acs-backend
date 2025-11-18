@@ -1,11 +1,7 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const Role = require('../models/Role');
-const {
-  authenticateToken,
-  authorize,
-  rateLimit,
-} = require('../middleware/auth');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -15,6 +11,7 @@ router.use(authenticateToken);
 // GET /api/roles - Get all roles
 router.get(
   '/',
+  authorize('roles.read'),
   [
     query('includeSystem')
       .optional()
@@ -73,7 +70,7 @@ router.get(
         success: true,
       });
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      // Error fetching roles
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -84,7 +81,7 @@ router.get(
 );
 
 // GET /api/roles/:id - Get specific role
-router.get('/:id', async (req, res) => {
+router.get('/:id', authorize('roles.read'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -99,7 +96,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(role);
   } catch (error) {
-    console.error('Error fetching role:', error);
+    // Error fetching role
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -111,6 +108,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/roles - Create new role
 router.post(
   '/',
+  authorize('roles.create'),
   [
     body('name')
       .trim()
@@ -170,7 +168,7 @@ router.post(
 
       res.status(201).json(role);
     } catch (error) {
-      console.error('Error creating role:', error);
+      // Error creating role
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -183,6 +181,7 @@ router.post(
 // PUT /api/roles/:id - Update role
 router.put(
   '/:id',
+  authorize('roles.update'),
   [
     body('name')
       .optional()
@@ -263,7 +262,7 @@ router.put(
 
       res.json(role);
     } catch (error) {
-      console.error('Error updating role:', error);
+      // Error updating role
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -274,7 +273,7 @@ router.put(
 );
 
 // DELETE /api/roles/:id - Delete role
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('roles.delete'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -316,54 +315,7 @@ router.delete('/:id', async (req, res) => {
       message: 'Role deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting role:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message,
-    });
-  }
-});
-
-// GET /api/roles/permissions/available - Get available permissions
-router.get('/permissions/available', async (req, res) => {
-  try {
-    const permissions = {
-      resources: [
-        'organizations',
-        'users',
-        'roles',
-        'reports',
-        'services',
-        'settings',
-        'audit',
-        'notifications',
-      ],
-      actions: [
-        'create',
-        'read',
-        'update',
-        'delete',
-        'assign_role',
-        'revoke_role',
-        'export',
-        'manage',
-      ],
-      scopes: [
-        'self',
-        'own',
-        'subordinate',
-        'all',
-        'assigned',
-        'acs_team',
-        'acs',
-        'public',
-      ],
-    };
-
-    res.json(permissions);
-  } catch (error) {
-    console.error('Error fetching available permissions:', error);
+    // Error deleting role
     res.status(500).json({
       success: false,
       message: 'Internal server error',

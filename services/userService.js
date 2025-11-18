@@ -6,7 +6,7 @@ const {
   NotFoundError,
   ConflictError,
 } = require('../middleware/errorHandler');
-// const emailService = require('./emailService');
+const emailService = require('./emailService');
 
 class UserService {
   // Get users with filtering and pagination
@@ -190,17 +190,37 @@ class UserService {
             : null,
       });
 
+      // Generate verification token
+      const verificationToken = emailService.generateVerificationToken();
+      const expirationTime = emailService.getExpirationTime();
+
+      user.emailVerificationToken = verificationToken;
+      user.emailVerificationExpires = expirationTime;
+
       await user.save();
 
-      // Send welcome email (if not in development)
-      if (process.env.NODE_ENV !== 'development') {
-        await this.sendWelcomeEmail(user.email, user.name);
-      }
-
-      // Populate and return
+      // Populate for email details
       await user.populate(
         'organizations.organization organizations.role primaryOrganization'
       );
+
+      // Prepare user details for email
+      const userWithDetails = {
+        ...user.toObject(),
+        organizationName: user.organizations[0]?.organization?.name,
+        roleName: user.organizations[0]?.role?.displayName,
+      };
+
+      // Send verification email
+      try {
+        await emailService.sendVerificationEmail(
+          userWithDetails,
+          verificationToken
+        );
+      } catch (emailError) {
+        // Failed to send verification email
+        // Don't fail user creation if email fails
+      }
 
       const userObj = user.toObject();
       delete userObj.password;
@@ -430,7 +450,7 @@ class UserService {
 
       return [...new Set(accessibleIds)];
     } catch (error) {
-      console.error('Error getting user accessible organizations:', error);
+      // Error getting user accessible organizations
       return [];
     }
   }
@@ -459,13 +479,12 @@ class UserService {
     return requestingUserOrgs.some((orgId) => targetUserOrgs.includes(orgId));
   }
 
-  static async sendWelcomeEmail(email, name) {
+  static async sendWelcomeEmail() {
     try {
       // Implementation would depend on your email service
-      console.log(`Sending welcome email to ${name} (${email})`);
       // await emailService.sendWelcomeEmail(email, name);
     } catch (error) {
-      console.error('Failed to send welcome email:', error);
+      // Failed to send welcome email
       // Don't throw error - user creation should still succeed
     }
   }

@@ -51,7 +51,7 @@ router.get('/permissions', async (req, res) => {
       permissions,
     });
   } catch (error) {
-    console.error('Error fetching permissions:', error);
+    // Error fetching permissions
     res.status(500).json({ error: 'Failed to fetch permissions' });
   }
 });
@@ -106,7 +106,7 @@ router.get('/dashboard-stats', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    // Error fetching dashboard stats
     res.status(500).json({ error: 'Failed to fetch dashboard statistics' });
   }
 });
@@ -128,12 +128,6 @@ router.get('/', async (req, res) => {
       sortOrder = 'desc',
     } = req.query;
 
-    console.log(
-      'Admin services GET / - User:',
-      req.user ? req.user.email : 'No user'
-    );
-    console.log('User organizations:', req.user?.organizations?.length || 0);
-
     const manageableOrgIds = await getManageableOrganizations(req.user);
 
     const query = { organization: { $in: manageableOrgIds } };
@@ -143,7 +137,12 @@ router.get('/', async (req, res) => {
     }
 
     if (type) query.type = type;
-    if (status) query.status = status;
+    if (status) {
+      query.status = status;
+    } else {
+      // By default, exclude archived services unless explicitly requested
+      query.status = { $ne: 'archived' };
+    }
 
     if (search) {
       query.$text = { $search: search };
@@ -200,7 +199,7 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching services:', error);
+    // Error fetching services
     res.status(500).json({ error: 'Failed to fetch services' });
   }
 });
@@ -272,7 +271,7 @@ router.get('/:id/full', async (req, res) => {
       permissions,
     });
   } catch (error) {
-    console.error('Error fetching service details:', error);
+    // Error fetching service details
     res.status(500).json({ error: 'Failed to fetch service details' });
   }
 });
@@ -308,12 +307,6 @@ router.get('/types', (req, res) => {
  */
 router.get('/organizations', async (req, res) => {
   try {
-    console.log(
-      'Organizations endpoint - User:',
-      req.user ? req.user.email : 'No user'
-    );
-    console.log('User organizations:', req.user?.organizations);
-
     const orgIds = await getManageableOrganizations(
       req.user,
       'services.create'
@@ -328,7 +321,7 @@ router.get('/organizations', async (req, res) => {
       organizations,
     });
   } catch (error) {
-    console.error('Error fetching organizations:', error);
+    // Error fetching organizations
     res.status(500).json({ error: 'Failed to fetch organizations' });
   }
 });
@@ -359,7 +352,7 @@ router.post(
         service,
       });
     } catch (error) {
-      console.error('Error toggling service status:', error);
+      // Error toggling service status
       res.status(500).json({ error: 'Failed to toggle service status' });
     }
   }
@@ -417,7 +410,7 @@ router.get('/stories', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching stories:', error);
+    // Error fetching stories
     res.status(500).json({ error: 'Failed to fetch stories' });
   }
 });

@@ -7,7 +7,6 @@ const Story = require('../models/Story');
 const {
   requireServicePermission,
   requireStoryPermission,
-  filterServicesByPermission,
   getManageableOrganizations,
   canManageService,
 } = require('../middleware/serviceAuth');
@@ -40,7 +39,7 @@ router.get('/manageable', authenticateToken, async (req, res) => {
       organizations: manageableOrgIds,
     });
   } catch (error) {
-    console.error('Error fetching manageable services:', error);
+    // Error fetching manageable services
     res.status(500).json({ error: 'Failed to fetch manageable services' });
   }
 });
@@ -61,7 +60,7 @@ router.get('/organizations', authenticateToken, async (req, res) => {
       organizations,
     });
   } catch (error) {
-    console.error('Error fetching organizations:', error);
+    // Error fetching organizations
     res.status(500).json({ error: 'Failed to fetch organizations' });
   }
 });
@@ -110,7 +109,7 @@ router.get('/', async (req, res) => {
       services,
     });
   } catch (error) {
-    console.error('Error fetching services:', error);
+    // Error fetching services
     res.status(500).json({ error: 'Failed to fetch services' });
   }
 });
@@ -140,7 +139,7 @@ router.get('/:id', async (req, res) => {
       service,
     });
   } catch (error) {
-    console.error('Error fetching service:', error);
+    // Error fetching service
     res.status(500).json({ error: 'Failed to fetch service' });
   }
 });
@@ -162,7 +161,7 @@ router.get('/:id/events', async (req, res) => {
       events,
     });
   } catch (error) {
-    console.error('Error fetching events:', error);
+    // Error fetching events
     res.status(500).json({ error: 'Failed to fetch events' });
   }
 });
@@ -184,7 +183,7 @@ router.get('/:id/volunteer-roles', async (req, res) => {
       roles,
     });
   } catch (error) {
-    console.error('Error fetching volunteer roles:', error);
+    // Error fetching volunteer roles
     res.status(500).json({ error: 'Failed to fetch volunteer roles' });
   }
 });
@@ -206,7 +205,7 @@ router.get('/:id/stories', async (req, res) => {
       stories,
     });
   } catch (error) {
-    console.error('Error fetching stories:', error);
+    // Error fetching stories
     res.status(500).json({ error: 'Failed to fetch stories' });
   }
 });
@@ -242,7 +241,7 @@ router.post(
         service,
       });
     } catch (error) {
-      console.error('Error creating service:', error);
+      // Error creating service
       res.status(500).json({ error: 'Failed to create service' });
     }
   }
@@ -289,7 +288,7 @@ router.put(
         service,
       });
     } catch (error) {
-      console.error('Error updating service:', error);
+      // Error updating service
       res.status(500).json({ error: 'Failed to update service' });
     }
   }
@@ -331,7 +330,7 @@ router.delete(
         message: 'Service archived successfully',
       });
     } catch (error) {
-      console.error('Error deleting service:', error);
+      // Error deleting service
       res.status(500).json({ error: 'Failed to delete service' });
     }
   }
@@ -390,7 +389,7 @@ router.post(
         service,
       });
     } catch (error) {
-      console.error('Error uploading image:', error);
+      // Error uploading image
       res.status(500).json({ error: 'Failed to upload image' });
     }
   }
@@ -439,7 +438,7 @@ router.post(
         event,
       });
     } catch (error) {
-      console.error('Error creating event:', error);
+      // Error creating event
       res.status(500).json({ error: 'Failed to create event' });
     }
   }
@@ -479,7 +478,7 @@ router.post(
         story,
       });
     } catch (error) {
-      console.error('Error creating story:', error);
+      // Error creating story
       res.status(500).json({ error: 'Failed to create story' });
     }
   }
@@ -526,7 +525,7 @@ router.put(
         story,
       });
     } catch (error) {
-      console.error('Error updating story:', error);
+      // Error updating story
       res.status(500).json({ error: 'Failed to update story' });
     }
   }
@@ -564,7 +563,7 @@ router.post(
         story,
       });
     } catch (error) {
-      console.error('Error publishing story:', error);
+      // Error publishing story
       res.status(500).json({ error: 'Failed to publish story' });
     }
   }

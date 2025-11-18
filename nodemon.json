@@ -1,0 +1,17 @@
+{
+  "events": {
+    "restart": "kill-port 5001",
+    "crash": "kill-port 5001"
+  },
+  "delay": "1500",
+  "ignore": ["logs/*", "uploads/*", "*.test.js", "scripts/*"],
+  "watch": [
+    "*.js",
+    "routes/**/*.js",
+    "models/**/*.js",
+    "middleware/**/*.js",
+    "utils/**/*.js"
+  ],
+  "ext": "js,json",
+  "legacyWatch": true
+}

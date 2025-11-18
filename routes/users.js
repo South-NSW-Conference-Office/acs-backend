@@ -3,11 +3,8 @@ const { body, validationResult, query } = require('express-validator');
 const User = require('../models/User');
 const Role = require('../models/Role');
 const Organization = require('../models/Organization');
-const {
-  authenticateToken,
-  authorize,
-  rateLimit,
-} = require('../middleware/auth');
+const UserService = require('../services/userService');
+const { authenticateToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -17,6 +14,7 @@ router.use(authenticateToken);
 // GET /api/users - Get all users with pagination
 router.get(
   '/',
+  authorize('users.read'),
   [
     query('limit')
       .optional()
@@ -43,7 +41,7 @@ router.get(
       const skip = parseInt(req.query.skip) || 0;
       const search = req.query.search;
 
-      const query = { isActive: true };
+      const query = {};
 
       // Add search functionality
       if (search) {
@@ -79,7 +77,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('Error fetching users:', error);
+      // Error fetching users
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -90,7 +88,7 @@ router.get(
 );
 
 // GET /api/users/:userId/roles - Get user roles
-router.get('/:userId/roles', async (req, res) => {
+router.get('/:userId/roles', authorize('users.read'), async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -108,7 +106,7 @@ router.get('/:userId/roles', async (req, res) => {
 
     res.json(user.organizations);
   } catch (error) {
-    console.error('Error fetching user roles:', error);
+    // Error fetching user roles
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -120,6 +118,7 @@ router.get('/:userId/roles', async (req, res) => {
 // POST /api/users/:userId/roles - Assign role to user
 router.post(
   '/:userId/roles',
+  authorize('users.assign_role'),
   [
     body('organizationId')
       .isMongoId()
@@ -203,7 +202,7 @@ router.post(
         data: user.organizations,
       });
     } catch (error) {
-      console.error('Error assigning role:', error);
+      // Error assigning role
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -214,51 +213,56 @@ router.post(
 );
 
 // DELETE /api/users/:userId/roles/:organizationId - Revoke user role
-router.delete('/:userId/roles/:organizationId', async (req, res) => {
-  try {
-    const { userId, organizationId } = req.params;
+router.delete(
+  '/:userId/roles/:organizationId',
+  authorize('users.assign_role'),
+  async (req, res) => {
+    try {
+      const { userId, organizationId } = req.params;
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      // Remove organization assignment
+      user.organizations = user.organizations.filter(
+        (org) => org.organization.toString() !== organizationId
+      );
+
+      // Clear primary organization if it was removed
+      if (user.primaryOrganization?.toString() === organizationId) {
+        user.primaryOrganization =
+          user.organizations.length > 0
+            ? user.organizations[0].organization
+            : null;
+      }
+
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Role revoked successfully',
+        data: user.organizations,
+      });
+    } catch (error) {
+      // Error revoking role
+      res.status(500).json({
         success: false,
-        message: 'User not found',
+        message: 'Internal server error',
+        err: error.message,
       });
     }
-
-    // Remove organization assignment
-    user.organizations = user.organizations.filter(
-      (org) => org.organization.toString() !== organizationId
-    );
-
-    // Clear primary organization if it was removed
-    if (user.primaryOrganization?.toString() === organizationId) {
-      user.primaryOrganization =
-        user.organizations.length > 0
-          ? user.organizations[0].organization
-          : null;
-    }
-
-    await user.save();
-
-    res.json({
-      success: true,
-      message: 'Role revoked successfully',
-      data: user.organizations,
-    });
-  } catch (error) {
-    console.error('Error revoking role:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      err: error.message,
-    });
   }
-});
+);
 
 // POST /api/users - Create new user
 router.post(
   '/',
+  authorize('users.create'),
   [
     body('name')
       .isString()
@@ -308,6 +312,15 @@ router.post(
       .optional()
       .isArray()
       .withMessage('Organizations must be an array'),
+    body('organizationId')
+      .optional()
+      .isMongoId()
+      .withMessage('Valid organization ID required'),
+    body('role')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Role must be a string'),
   ],
   async (req, res) => {
     try {
@@ -330,65 +343,58 @@ router.post(
         state,
         country,
         verified,
-        primaryOrganization,
         organizations,
+        organizationId,
+        role,
       } = req.body;
 
-      // Check if user already exists
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'User with this email already exists',
-        });
+      // Prepare organizations array if role assignment is provided
+      let organizationsArray = organizations || [];
+
+      // If organizationId and role are provided, add to organizations array
+      if (organizationId && role) {
+        // Verify the role exists
+        const roleDoc = await Role.findOne({ name: role });
+        if (!roleDoc) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid role specified',
+          });
+        }
+
+        // Add to organizations array
+        organizationsArray = [
+          {
+            organizationId,
+            roleName: role,
+          },
+        ];
       }
 
-      // Generate default password if not provided
-      const userPassword =
-        password || `temp${Math.random().toString(36).slice(2)}!`;
-
-      // Create new user
+      // Create user data object
       const userData = {
         name,
         email,
-        password: userPassword,
+        password: password || `temp${Math.random().toString(36).slice(2)}!`,
         phone,
         address,
         city,
         state,
         country,
         verified: verified ?? false,
-        primaryOrganization,
-        organizations: organizations || [],
-        createdBy: req.user._id,
+        organizations: organizationsArray,
       };
 
-      // Remove undefined fields
-      Object.keys(userData).forEach(
-        (key) => userData[key] === undefined && delete userData[key]
-      );
-
-      const user = new User(userData);
-      await user.save();
-
-      // Populate and return user data
-      await user.populate(
-        'organizations.organization organizations.role primaryOrganization'
-      );
-
-      const userResponse = user.toJSON();
-      delete userResponse.password;
+      // Use UserService to create user with proper validation and role assignment
+      const user = await UserService.createUser(userData, req.user._id);
 
       res.status(201).json({
         success: true,
         message: 'User created successfully',
-        data: {
-          ...userResponse,
-          id: user._id,
-        },
+        data: user,
       });
     } catch (error) {
-      console.error('Error creating user:', error);
+      // Error creating user
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -401,6 +407,7 @@ router.post(
 // PUT /api/users/:userId - Update user
 router.put(
   '/:userId',
+  authorize('users.update'),
   [
     body('name')
       .optional()
@@ -511,7 +518,7 @@ router.put(
         },
       });
     } catch (error) {
-      console.error('Error updating user:', error);
+      // Error updating user
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -524,6 +531,7 @@ router.put(
 // GET /api/users/:userId/permissions - Get user permissions for organization
 router.get(
   '/:userId/permissions',
+  authorize('users.read'),
   [
     query('organizationId')
       .optional()
@@ -565,7 +573,7 @@ router.get(
 
       res.json(permissions);
     } catch (error) {
-      console.error('Error fetching user permissions:', error);
+      // Error fetching user permissions
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -574,5 +582,52 @@ router.get(
     }
   }
 );
+
+// DELETE /api/users/:userId - Delete user (soft delete)
+router.delete('/:userId', authorize('users.delete'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // No need to check isActive for hard delete
+
+    // Prevent self-deletion
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot delete your own account',
+      });
+    }
+
+    // Hard delete the user (permanent removal)
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully',
+      data: {
+        id: userId,
+        name: user.name,
+        email: user.email,
+        deleted: true,
+      },
+    });
+  } catch (error) {
+    // Error deleting user
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      err: error.message,
+    });
+  }
+});
 
 module.exports = router;

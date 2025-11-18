@@ -16,15 +16,7 @@ async function canManageService(
   serviceOrgId,
   permission = 'services.manage'
 ) {
-  console.log('canManageService called:', {
-    user: user?.email,
-    serviceOrgId,
-    permission,
-    userOrgs: user?.organizations?.length,
-  });
-
   if (!user || !serviceOrgId) {
-    console.log('canManageService: Missing user or serviceOrgId');
     return false;
   }
 
@@ -36,7 +28,6 @@ async function canManageService(
   );
 
   if (isSuperAdmin) {
-    console.log('canManageService: User is super admin - granting permission');
     return true;
   }
 
@@ -157,9 +148,6 @@ async function getManageableOrganizations(
 
   const manageableOrgs = new Set();
 
-  console.log('getManageableOrganizations - permission:', permission);
-  console.log('User organizations count:', user.organizations?.length || 0);
-
   // Check if user is a super admin
   const isSuperAdmin = user.organizations.some(
     (assignment) =>
@@ -168,18 +156,14 @@ async function getManageableOrganizations(
   );
 
   if (isSuperAdmin) {
-    console.log('User is super admin - returning all organizations');
     // Return all organizations for super admin
     const allOrgs = await Organization.find({}).select('_id');
     return allOrgs.map((org) => org._id.toString());
   }
 
   for (const assignment of user.organizations) {
-    console.log('Checking assignment:', assignment);
-
     // Skip null organizations (e.g., super admin assignments)
     if (!assignment.organization) {
-      console.log('Skipping assignment with null organization');
       continue;
     }
 
@@ -187,19 +171,16 @@ async function getManageableOrganizations(
     const userRole = assignment.role;
 
     if (!userRole) {
-      console.log('No role found for assignment');
       continue;
     }
 
     if (!userRole.hasPermission) {
-      console.log('Role missing hasPermission method:', userRole);
       continue;
     }
 
     const hasPermission =
       userRole.hasPermission(permission) ||
       userRole.hasPermission('services.*');
-    console.log('Has permission:', hasPermission);
     if (!hasPermission) continue;
 
     // Get the permission details
@@ -270,14 +251,7 @@ function requireServicePermission(permission) {
       req.authorizedOrgId = orgIdToCheck;
       next();
     } catch (error) {
-      console.error('Permission check error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        user: user?.email,
-        organizationId: orgIdToCheck,
-        permission: permission,
-      });
+      // Permission check error
       res
         .status(500)
         .json({ error: 'Permission check failed', details: error.message });
@@ -332,7 +306,7 @@ function requireStoryPermission(permission) {
       req.authorizedOrgId = orgIdToCheck;
       next();
     } catch (error) {
-      console.error('Permission check error:', error);
+      // Permission check error
       res.status(500).json({ error: 'Permission check failed' });
     }
   };

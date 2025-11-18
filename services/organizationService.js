@@ -340,7 +340,7 @@ class OrganizationService {
       // Remove duplicates
       return [...new Set(accessibleIds.map((id) => id.toString()))];
     } catch (error) {
-      console.error('Error getting user accessible organizations:', error);
+      // Error getting user accessible organizations
       return [];
     }
   }
