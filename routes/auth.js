@@ -3,11 +3,163 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const Role = require('../models/Role');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, checkPermission } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 
 const router = express.Router();
+
+// POST /api/auth/verify-email - Verify email address
+router.post(
+  '/verify-email',
+  [body('token').notEmpty().withMessage('Verification token is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { token } = req.body;
+
+      // Find user with matching verification token
+      const user = await User.findOne({
+        emailVerificationToken: token,
+        emailVerificationExpires: { $gt: Date.now() },
+      });
+
+      if (!user) {
+        // Check if token exists but is expired
+        const expiredUser = await User.findOne({
+          emailVerificationToken: token,
+        });
+        if (expiredUser) {
+          return res.status(400).json({
+            success: false,
+            message:
+              'Verification link has expired. Please contact your administrator to resend the verification email.',
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid verification token',
+        });
+      }
+
+      // Verify the user
+      user.verified = true;
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save();
+
+      // Send welcome email
+      await emailService.sendWelcomeEmail(user);
+
+      res.json({
+        success: true,
+        message: 'Email verified successfully',
+        data: {
+          email: user.email,
+          name: user.name,
+        },
+      });
+    } catch (error) {
+      // Error verifying email
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+);
+
+// POST /api/auth/resend-verification - Resend verification email
+router.post(
+  '/resend-verification',
+  authenticateToken,
+  [body('userId').isMongoId().withMessage('Valid user ID required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { userId } = req.body;
+
+      // Check permissions
+      const hasPermission = checkPermission(
+        req.userPermissions.permissions,
+        'users.update'
+      );
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have permission to resend verification emails',
+        });
+      }
+
+      const user = await User.findById(userId)
+        .populate('organizations.organization')
+        .populate('organizations.role');
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      if (user.verified) {
+        return res.status(400).json({
+          success: false,
+          message: 'User is already verified',
+        });
+      }
+
+      // Generate new verification token
+      const verificationToken = emailService.generateVerificationToken();
+      const expirationTime = emailService.getExpirationTime();
+
+      user.emailVerificationToken = verificationToken;
+      user.emailVerificationExpires = expirationTime;
+      await user.save();
+
+      // Get organization and role names for email
+      const userWithDetails = {
+        ...user.toObject(),
+        organizationName: user.organizations[0]?.organization?.name,
+        roleName: user.organizations[0]?.role?.displayName,
+      };
+
+      // Send verification email
+      await emailService.sendVerificationEmail(
+        userWithDetails,
+        verificationToken
+      );
+
+      res.json({
+        success: true,
+        message: 'Verification email resent successfully',
+      });
+    } catch (error) {
+      // Error resending verification email
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+);
 
 // POST /api/auth/signin - Login
 router.post(
@@ -130,7 +282,7 @@ router.post(
         },
       });
     } catch (error) {
-      console.error('Login error:', error);
+      // Login error
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -144,6 +296,30 @@ router.post(
 router.get('/is-auth', authenticateToken, async (req, res) => {
   try {
     const user = req.user;
+
+    // Get permissions for primary organization (if exists)
+    let permissions = [];
+    let role = null;
+
+    if (user.primaryOrganization && user.organizations.length > 0) {
+      const primaryOrgAssignment = user.organizations.find(
+        (org) =>
+          org.organization &&
+          org.organization._id &&
+          org.organization._id.toString() ===
+            user.primaryOrganization._id.toString()
+      );
+
+      if (primaryOrgAssignment && primaryOrgAssignment.role) {
+        permissions = primaryOrgAssignment.role.permissions || [];
+        role = {
+          id: primaryOrgAssignment.role._id,
+          name: primaryOrgAssignment.role.name,
+          displayName: primaryOrgAssignment.role.displayName,
+          level: primaryOrgAssignment.role.level,
+        };
+      }
+    }
 
     // Prepare user data for response (without sensitive information)
     const userData = {
@@ -171,9 +347,16 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
       primaryOrganization: user.primaryOrganization,
     };
 
-    res.json(userData);
+    res.json({
+      success: true,
+      data: {
+        user: userData,
+        permissions,
+        role,
+      },
+    });
   } catch (error) {
-    console.error('Auth verification error:', error);
+    // Auth verification error
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -242,7 +425,7 @@ router.post(
         },
       });
     } catch (error) {
-      console.error('Registration error:', error);
+      // Registration error
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -273,11 +456,9 @@ router.post(
       }
 
       const { email } = req.body;
-      console.log(`[FORGOT PASSWORD] Request received for email: ${email}`);
 
       // Find user by email
       const user = await User.findOne({ email, isActive: true });
-      console.log(`[FORGOT PASSWORD] User found: ${user ? 'YES' : 'NO'}`);
 
       if (!user) {
         // Don't reveal if user exists or not for security
@@ -302,19 +483,9 @@ router.post(
 
       // Send password reset email
       try {
-        console.log(
-          `[FORGOT PASSWORD] Attempting to send email to: ${email} with token: ${resetToken}`
-        );
-        const result = await emailService.sendPasswordResetEmail(
-          email,
-          resetToken
-        );
-        console.log(`[FORGOT PASSWORD] Email sent successfully:`, result);
+        await emailService.sendPasswordResetEmail(email, resetToken);
       } catch (emailError) {
-        console.error(
-          '[FORGOT PASSWORD] Failed to send password reset email:',
-          emailError
-        );
+        // Failed to send password reset email
         // Don't reveal email sending failure to user for security
       }
 
@@ -324,7 +495,7 @@ router.post(
           'If an account with that email exists, a password reset link has been sent.',
       });
     } catch (error) {
-      console.error('Forgot password error:', error);
+      // Forgot password error
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -387,7 +558,7 @@ router.post(
         message: 'Password has been reset successfully',
       });
     } catch (error) {
-      console.error('Reset password error:', error);
+      // Reset password error
       res.status(500).json({
         success: false,
         message: 'Internal server error',

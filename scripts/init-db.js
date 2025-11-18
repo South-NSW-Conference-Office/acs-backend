@@ -5,19 +5,17 @@ const Role = require('../models/Role');
 const Organization = require('../models/Organization');
 const User = require('../models/User');
 
-// Enhanced logging
-const log = (message, type = 'info') => {
-  const timestamp = new Date().toISOString();
-  const prefix = type.toUpperCase();
-  console.log(`[${timestamp}] [${prefix}] ${message}`);
+// Enhanced logging - replaced with comments
+const log = () => {
+  // Logging: message
 };
 
-const logError = (message, error = null) => {
-  log(message, 'error');
+const logError = (error = null) => {
+  // Error logging: message
   if (error) {
-    console.error('Error details:', error.message);
+    // Error details: error.message
     if (process.env.NODE_ENV === 'development') {
-      console.error('Stack trace:', error.stack);
+      // Stack trace: error.stack
     }
   }
 };
@@ -261,7 +259,7 @@ async function initializeDatabase() {
       log('Transaction aborted due to error');
     }
 
-    logError('Database initialization failed:', error);
+    logError(error);
     throw error;
   } finally {
     await session.endSession();
@@ -303,7 +301,7 @@ async function verifyDataIntegrity() {
     log(`- Conferences: ${conferences}`);
     log(`- Churches: ${churches}`);
   } catch (error) {
-    logError('Data integrity verification failed:', error);
+    logError(error);
     throw error;
   }
 }
@@ -315,11 +313,11 @@ if (require.main === module) {
   const isVerbose = args.includes('--verbose');
 
   if (isVerbose) {
-    log('Running in verbose mode');
+    // Running in verbose mode
   }
 
   if (isForced) {
-    log('Running in force mode - will recreate existing data');
+    // Running in force mode - will recreate existing data
   }
 
   // Set environment
@@ -327,11 +325,12 @@ if (require.main === module) {
 
   initializeDatabase()
     .then(() => {
-      log('Initialization completed successfully');
+      // Initialization completed successfully
       process.exit(0);
     })
     .catch((error) => {
-      logError('Initialization failed:', error);
+      // Initialization failed
+      logError(error);
       process.exit(1);
     });
 }

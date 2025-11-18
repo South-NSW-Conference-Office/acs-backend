@@ -95,7 +95,7 @@ const requestSizeLimiter = (maxSizeBytes = 10 * 1024 * 1024) => {
 // Input type validation
 const validateRequestTypes = (schema) => {
   return (req, res, next) => {
-    const validateType = (value, expectedType, path = '') => {
+    const validateType = (value, expectedType) => {
       switch (expectedType) {
         case 'string':
           return typeof value === 'string';
@@ -115,7 +115,7 @@ const validateRequestTypes = (schema) => {
             /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
           );
         case 'phone':
-          return typeof value === 'string' && /^\+?[\d\s\-\(\)]+$/.test(value);
+          return typeof value === 'string' && /^\+?[\d\s\-()]+$/.test(value);
         case 'url':
           try {
             new URL(value);

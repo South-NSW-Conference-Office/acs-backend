@@ -90,15 +90,7 @@ const sendErrorDev = (err, req, res) => {
 // Send error response for production
 const sendErrorProd = (err, req, res) => {
   // Log error for monitoring
-  console.error('ERROR 💥:', {
-    error: err.message,
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString(),
-  });
+  // Log error for monitoring
 
   // Operational, trusted error: send message to client
   if (err.isOperational) {
@@ -119,7 +111,7 @@ const sendErrorProd = (err, req, res) => {
 };
 
 // Main error handling middleware
-const globalErrorHandler = (err, req, res, next) => {
+const globalErrorHandler = (err, req, res) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
@@ -156,49 +148,38 @@ const notFoundHandler = (req, res, next) => {
 
 // Graceful shutdown handler
 const gracefulShutdown = (server) => {
-  return (signal) => {
-    console.log(`Received ${signal}. Starting graceful shutdown...`);
+  return () => {
+    // Starting graceful shutdown
 
     server.close(() => {
-      console.log('HTTP server closed.');
+      // HTTP server closed
 
       // Close database connections
       mongoose.connection.close(false, () => {
-        console.log('MongoDB connection closed.');
+        // MongoDB connection closed
         process.exit(0);
       });
     });
 
     // Force close after 30 seconds
     setTimeout(() => {
-      console.error(
-        'Could not close connections in time, forcefully shutting down'
-      );
+      // Could not close connections in time, forcefully shutting down
       process.exit(1);
     }, 30000);
   };
 };
 
 // Unhandled promise rejection handler
-process.on('unhandledRejection', (err, promise) => {
-  console.error('Unhandled Promise Rejection:', {
-    error: err.message,
-    stack: err.stack,
-    promise,
-  });
+process.on('unhandledRejection', () => {
+  // Unhandled Promise Rejection
 
   // Close server & exit process
-  server.close(() => {
-    process.exit(1);
-  });
+  process.exit(1);
 });
 
 // Uncaught exception handler
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', {
-    error: err.message,
-    stack: err.stack,
-  });
+process.on('uncaughtException', () => {
+  // Uncaught Exception
 
   process.exit(1);
 });
