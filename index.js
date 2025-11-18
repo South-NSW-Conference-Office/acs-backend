@@ -21,11 +21,33 @@ app.use(helmet());
 // CORS configuration
 app.use(
   cors({
-    origin: [
-      process.env.FRONTEND_URL,
-      'https://acs-admin.adventhub.org',
-      'https://admin.adventhub.org',
-    ], // Admin frontend URLs
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        process.env.ADMIN_URL,
+        'https://acs-admin.adventhub.org',
+        'https://admin.adventhub.org',
+      ].filter(Boolean); // Remove undefined values
+
+      // Allow any localhost port for development
+      const localhostRegex = /^http:\/\/localhost:\d+$/;
+      const localhostIPRegex = /^http:\/\/127\.0\.0\.1:\d+$/;
+      const localNetworkRegex = /^http:\/\/192\.168\.\d+\.\d+:\d+$/;
+
+      if (
+        allowedOrigins.includes(origin) ||
+        localhostRegex.test(origin) ||
+        localhostIPRegex.test(origin) ||
+        localNetworkRegex.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
@@ -42,15 +64,16 @@ app.use(express.urlencoded({ extended: true }));
 // Database connection
 mongoose
   .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 15000,
+    socketTimeoutMS: 45000,
   })
   .then(async () => {
     // Initialize database with system roles and permissions
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
   })
-  .catch(() => {
+  .catch((error) => {
+    console.error('Database connection error:', error);
     process.exit(1);
   });
 
@@ -64,12 +87,12 @@ app.use('/api/admin/services', adminServiceRoutes);
 app.use('/api/permissions', permissionRoutes);
 
 // Health check endpoint
-app.get('/health', (res) => {
+app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Error handling middleware
-app.use((error, res) => {
+app.use((error, req, res, next) => {
   res.status(500).json({
     success: false,
     message: 'Internal server error',
@@ -78,7 +101,7 @@ app.use((error, res) => {
 });
 
 // 404 handler
-app.use('*', (res) => {
+app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found',
