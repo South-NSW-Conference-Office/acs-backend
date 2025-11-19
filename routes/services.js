@@ -397,7 +397,12 @@ router.put(
         image: service.primaryImage,
       });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to upload banner image' });
+      // Banner upload error occurred
+      res.status(500).json({
+        error: 'Failed to upload banner image',
+        details:
+          process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
     }
   }
 );

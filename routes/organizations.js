@@ -1,12 +1,19 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const Organization = require('../models/Organization');
-const { authenticateToken, authorize } = require('../middleware/auth');
+const {
+  authenticateToken,
+  authorize,
+  validateOrganizationContext,
+} = require('../middleware/auth');
+const authorizationService = require('../services/authorizationService');
+const secureQueryBuilder = require('../utils/secureQueryBuilder');
 
 const router = express.Router();
 
 // Apply authentication to all routes
 router.use(authenticateToken);
+router.use(validateOrganizationContext);
 
 // GET /api/organizations - Get all organizations (authenticated users only)
 router.get(
@@ -37,13 +44,19 @@ router.get(
         });
       }
 
-      // Build query based on filters
-      const query = { isActive: true };
+      // Build base query with filters
+      const baseQuery = { isActive: true };
       const { type, parentOrganization, isActive } = req.query;
 
-      if (type) query.type = type;
-      if (parentOrganization) query.parentOrganization = parentOrganization;
-      if (isActive !== undefined) query.isActive = isActive === 'true';
+      if (type) baseQuery.type = type;
+      if (parentOrganization) baseQuery.parentOrganization = parentOrganization;
+      if (isActive !== undefined) baseQuery.isActive = isActive === 'true';
+
+      // Apply organization access filtering
+      const query = await secureQueryBuilder.buildOrganizationQuery(
+        req.user,
+        baseQuery
+      );
 
       const organizations = await Organization.find(query)
         .populate('parentOrganization', 'name type')
@@ -73,6 +86,19 @@ router.get(
 router.get('/:id', authorize('organizations.read'), async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Verify user has access to this organization
+    const hasAccess = await authorizationService.validateOrganizationAccess(
+      req.user,
+      id
+    );
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this organization',
+      });
+    }
 
     const organization = await Organization.findById(id)
       .populate('parentOrganization', 'name type')

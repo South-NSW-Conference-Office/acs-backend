@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const authorizationService = require('../services/authorizationService');
+const tokenService = require('../services/tokenService');
 
 const authenticateToken = async (req, res, next) => {
   try {
@@ -15,6 +17,17 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if token is blacklisted
+    const isBlacklisted = await tokenService.isBlacklisted(token);
+    if (isBlacklisted) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token has been revoked',
+        err: 'Token blacklisted',
+      });
+    }
+
     const user = await User.findById(decoded.userId).populate(
       'organizations.organization organizations.role'
     );
@@ -29,6 +42,7 @@ const authenticateToken = async (req, res, next) => {
 
     req.user = user;
     req.token = token;
+    req.decoded = decoded;
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -70,6 +84,22 @@ const authorize = (requiredPermission = {}) => {
         req.headers['x-organization-id'] ||
         req.user.primaryOrganization?._id ||
         req.user.primaryOrganization;
+
+      // Validate organization context if provided via header
+      if (req.headers['x-organization-id']) {
+        const validation =
+          await authorizationService.validateOrganizationContext(
+            req.user,
+            req.headers['x-organization-id']
+          );
+
+        if (!validation.valid) {
+          return res.status(403).json({
+            success: false,
+            message: validation.error,
+          });
+        }
+      }
 
       // If still no organization context, try to use the user's first organization
       let finalOrgId = organizationId;
@@ -223,9 +253,49 @@ const requireSuperAdmin = async (req, res, next) => {
   }
 };
 
+// Middleware to validate organization context
+const validateOrganizationContext = async (req, res, next) => {
+  try {
+    const organizationId = req.headers['x-organization-id'];
+
+    if (!organizationId) {
+      return next(); // No organization context is valid
+    }
+
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    const validation = await authorizationService.validateOrganizationContext(
+      req.user,
+      organizationId
+    );
+
+    if (!validation.valid) {
+      return res.status(403).json({
+        success: false,
+        message: validation.error,
+      });
+    }
+
+    req.organizationId = organizationId;
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Organization validation error',
+      err: error.message,
+    });
+  }
+};
+
 module.exports = {
   authenticateToken,
   authorize,
   checkPermission,
   requireSuperAdmin,
+  validateOrganizationContext,
 };

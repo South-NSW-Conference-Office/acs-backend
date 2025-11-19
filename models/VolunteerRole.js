@@ -25,18 +25,7 @@ const volunteerRoleSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: [
-        'administration',
-        'direct_service',
-        'fundraising',
-        'marketing',
-        'technology',
-        'education',
-        'health_support',
-        'logistics',
-        'other',
-      ],
-      default: 'other',
+      default: '',
     },
     requirements: {
       skills: [

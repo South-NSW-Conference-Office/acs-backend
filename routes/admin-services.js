@@ -280,25 +280,30 @@ router.get('/:id/full', async (req, res) => {
  * GET /api/admin/services/types
  * Get available service types
  */
-router.get('/types', (req, res) => {
-  const types = [
-    { value: 'op_shop', label: 'Op Shop' },
-    { value: 'food_pantry', label: 'Food Pantry' },
-    { value: 'soup_kitchen', label: 'Soup Kitchen' },
-    { value: 'disaster_response', label: 'Disaster Response' },
-    { value: 'health_program', label: 'Health Program' },
-    { value: 'youth_outreach', label: 'Youth Outreach' },
-    { value: 'emergency_shelter', label: 'Emergency Shelter' },
-    { value: 'counseling_service', label: 'Counseling Service' },
-    { value: 'education_program', label: 'Education Program' },
-    { value: 'community_garden', label: 'Community Garden' },
-    { value: 'other', label: 'Other' },
-  ];
+router.get('/types', async (req, res) => {
+  try {
+    const ServiceType = require('../models/ServiceType');
 
-  res.json({
-    success: true,
-    types,
-  });
+    const types = await ServiceType.findActive();
+
+    const formattedTypes = types.map((type) => ({
+      value: type.value,
+      label: type.name,
+      description: type.description,
+    }));
+
+    res.json({
+      success: true,
+      types: formattedTypes,
+    });
+  } catch (error) {
+    // Silently handle service types fetch error
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch service types',
+      error: error.message,
+    });
+  }
 });
 
 /**

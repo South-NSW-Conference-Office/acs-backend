@@ -4,12 +4,19 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const Organization = require('../models/Organization');
 const UserService = require('../services/userService');
-const { authenticateToken, authorize } = require('../middleware/auth');
+const {
+  authenticateToken,
+  authorize,
+  validateOrganizationContext,
+} = require('../middleware/auth');
+const authorizationService = require('../services/authorizationService');
+const secureQueryBuilder = require('../utils/secureQueryBuilder');
 
 const router = express.Router();
 
 // Apply authentication to all routes
 router.use(authenticateToken);
+router.use(validateOrganizationContext);
 
 // GET /api/users - Get all users with pagination
 router.get(
@@ -41,15 +48,17 @@ router.get(
       const skip = parseInt(req.query.skip) || 0;
       const search = req.query.search;
 
-      const query = {};
+      // Build base query with search
+      const searchConditions = search
+        ? secureQueryBuilder.buildSearchConditions(search, ['name', 'email'])
+        : {};
 
-      // Add search functionality
-      if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } },
-        ];
-      }
+      // Build secure query with organization filtering
+      const query = await secureQueryBuilder.buildUserQuery(
+        req.user,
+        searchConditions,
+        { includeOwnData: false } // Don't include own data in user list
+      );
 
       const users = await User.find(query)
         .populate('organizations.organization', 'name type')
@@ -91,6 +100,18 @@ router.get(
 router.get('/:userId/roles', authorize('users.read'), async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // Check if requesting user can access this user's data
+    const canAccess = await authorizationService.canAccessUser(
+      req.user,
+      userId
+    );
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to access this user',
+      });
+    }
 
     const user = await User.findById(userId)
       .populate('organizations.organization')
@@ -138,6 +159,32 @@ router.post(
 
       const { userId } = req.params;
       const { organizationId, roleName } = req.body;
+
+      // Check if requesting user can manage this user
+      const canAccess = await authorizationService.canAccessUser(
+        req.user,
+        userId
+      );
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have permission to manage this user',
+        });
+      }
+
+      // Check if requesting user can manage the target organization
+      const canManageOrg =
+        await authorizationService.validateOrganizationAccess(
+          req.user,
+          organizationId
+        );
+      if (!canManageOrg) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'You do not have permission to assign roles in this organization',
+        });
+      }
 
       // Find user
       const user = await User.findById(userId);
@@ -571,6 +618,34 @@ router.get(
         });
       }
 
+      // Only allow users to query their own permissions or if they have user.manage permission
+      if (userId !== req.user._id.toString()) {
+        const hasPermission =
+          req.userPermissions?.permissions?.includes('users.manage') ||
+          req.userPermissions?.permissions?.includes('users.*') ||
+          req.userPermissions?.permissions?.includes('*');
+
+        if (!hasPermission) {
+          return res.status(403).json({
+            success: false,
+            message: 'You can only view your own permissions',
+          });
+        }
+
+        // Even with permission, verify they can access this user
+        const canAccess = await authorizationService.canAccessUser(
+          req.user,
+          userId
+        );
+        if (!canAccess) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "You do not have permission to view this user's permissions",
+          });
+        }
+      }
+
       const user = await User.findById(userId);
       if (!user) {
         return res.status(404).json({
@@ -599,6 +674,18 @@ router.delete('/:userId', authorize('users.delete'), async (req, res) => {
   try {
     const { userId } = req.params;
 
+    // Check if requesting user can delete this user
+    const canAccess = await authorizationService.canAccessUser(
+      req.user,
+      userId
+    );
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to delete this user',
+      });
+    }
+
     // Find user
     const user = await User.findById(userId);
     if (!user) {
@@ -608,13 +695,28 @@ router.delete('/:userId', authorize('users.delete'), async (req, res) => {
       });
     }
 
-    // No need to check isActive for hard delete
-
     // Prevent self-deletion
     if (user._id.toString() === req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Cannot delete your own account',
+      });
+    }
+
+    // Prevent deletion of users with higher-level roles
+    const userHasHigherRole = user.organizations.some((org) => {
+      return (
+        org.role?.name === 'super_admin' &&
+        !req.user.organizations.some(
+          (reqOrg) => reqOrg.role?.name === 'super_admin'
+        )
+      );
+    });
+
+    if (userHasHigherRole) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot delete users with higher-level roles',
       });
     }
 

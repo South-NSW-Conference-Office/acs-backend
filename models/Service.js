@@ -59,21 +59,16 @@ const serviceSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: [
-        'op_shop',
-        'food_pantry',
-        'soup_kitchen',
-        'disaster_response',
-        'health_program',
-        'youth_outreach',
-        'emergency_shelter',
-        'counseling_service',
-        'education_program',
-        'community_garden',
-        'other',
-      ],
       required: true,
       index: true,
+      validate: {
+        validator: async function (value) {
+          const ServiceType = mongoose.model('ServiceType');
+          const type = await ServiceType.findByValue(value);
+          return !!type;
+        },
+        message: 'Invalid service type',
+      },
     },
     descriptionShort: {
       type: String,

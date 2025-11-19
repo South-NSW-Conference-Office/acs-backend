@@ -73,6 +73,12 @@ class StorageService {
         fit: 'cover',
         position: 'center',
       });
+    } else if (type === 'avatar') {
+      // Avatars: 400x400 with cover
+      processor = processor.resize(400, 400, {
+        fit: 'cover',
+        position: 'center',
+      });
     }
 
     // Convert to WebP with fallback to JPEG for compatibility
@@ -205,6 +211,57 @@ class StorageService {
     } catch (error) {
       throw new Error(`Failed to generate presigned URL: ${error.message}`);
     }
+  }
+
+  /**
+   * Upload profile avatar with processing
+   * @param {Object} file - Multer file object
+   * @param {string} userId - User ID for folder organization
+   * @returns {Promise<Object>} Upload result with URLs
+   */
+  async uploadProfileAvatar(file, userId) {
+    try {
+      // Process avatar image (400x400)
+      const processedBuffer = await this.processImage(file.buffer, {
+        type: 'avatar',
+      });
+      const fileName = this.generateFileName(
+        file.originalname,
+        `users/${userId}/avatar/`
+      );
+
+      // Upload avatar image
+      const upload = new Upload({
+        client: this.client,
+        params: {
+          Bucket: this.bucket,
+          Key: fileName,
+          Body: processedBuffer,
+          ContentType: 'image/webp',
+          CacheControl: 'max-age=31536000', // 1 year cache
+        },
+      });
+
+      await upload.done();
+
+      return {
+        key: fileName,
+        url: `${process.env.WASABI_ENDPOINT}/${this.bucket}/${fileName}`,
+        size: processedBuffer.length,
+        type: 'image/webp',
+      };
+    } catch (error) {
+      throw new Error(`Failed to upload profile avatar: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete file from Wasabi (alias for deleteImage for consistency)
+   * @param {string} key - S3 object key
+   * @returns {Promise<void>}
+   */
+  async deleteFile(key) {
+    return this.deleteImage(key);
   }
 
   /**
