@@ -96,7 +96,7 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error, req, res) => {
+app.use((error, req, res, next) => {
   res.status(500).json({
     success: false,
     message: 'Internal server error',
