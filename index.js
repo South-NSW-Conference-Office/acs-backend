@@ -54,6 +54,9 @@ app.use(
   })
 );
 
+// Handle preflight OPTIONS requests
+app.options('*', cors());
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -72,7 +75,9 @@ mongoose
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
   })
-  .catch(() => {
+  .catch((error) => {
+    const logger = require('./services/loggerService');
+    logger.error('Database connection failed:', { error: error.message });
     process.exit(1);
   });
 
@@ -107,6 +112,11 @@ app.use('*', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {});
+app.listen(PORT, () => {
+  const logger = require('./services/loggerService');
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Health check: http://localhost:${PORT}/health`);
+});
 
 module.exports = app;
