@@ -65,18 +65,23 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(morgan('combined'));
 
 // Database connection
+const logger = require('./services/loggerService');
+logger.info('Starting server...');
+logger.info('Connecting to database...');
 mongoose
   .connect(process.env.MONGO_URI, {
     serverSelectionTimeoutMS: 15000,
     socketTimeoutMS: 45000,
   })
   .then(async () => {
+    logger.info('Database connected successfully');
     // Initialize database with system roles and permissions
+    logger.info('Initializing database...');
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
+    logger.info('Database initialized successfully');
   })
   .catch((error) => {
-    const logger = require('./services/loggerService');
     logger.error('Database connection failed:', { error: error.message });
     process.exit(1);
   });
@@ -96,7 +101,7 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error, req, res) => {
+app.use((error, req, res, next) => {
   res.status(500).json({
     success: false,
     message: 'Internal server error',
@@ -113,7 +118,6 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  const logger = require('./services/loggerService');
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Health check: http://localhost:${PORT}/health`);

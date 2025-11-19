@@ -51,13 +51,15 @@ class LoggerService {
   }
 
   initLogRotation() {
-    // Rotate logs daily
-    setInterval(
-      () => {
-        this.rotateLogFile();
-      },
-      24 * 60 * 60 * 1000
-    ); // 24 hours
+    // Rotate logs daily - delay initialization to avoid blocking startup
+    process.nextTick(() => {
+      setInterval(
+        () => {
+          this.rotateLogFile();
+        },
+        24 * 60 * 60 * 1000
+      ); // 24 hours
+    });
   }
 
   rotateLogFile() {
