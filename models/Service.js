@@ -99,11 +99,15 @@ const serviceSchema = new mongoose.Schema(
     },
     primaryImage: {
       url: String,
+      key: String, // S3/Wasabi object key for deletion
       alt: String,
     },
     gallery: [
       {
         url: String,
+        key: String, // S3/Wasabi object key for deletion
+        thumbnailUrl: String,
+        thumbnailKey: String, // S3/Wasabi object key for thumbnail deletion
         alt: String,
         caption: String,
       },

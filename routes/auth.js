@@ -339,11 +339,11 @@ router.post(
       }
 
       // Check if user has set up their password
-      if (!user.passwordSet || !user.password) {
+      if (!user.password) {
         return res.status(400).json({
           success: false,
           message:
-            'Please complete your account setup by setting a password first',
+            'Please complete your account setup by setting a password first. Check your email for the verification link.',
           err: 'Password not set',
         });
       }

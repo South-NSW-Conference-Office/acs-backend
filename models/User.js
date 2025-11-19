@@ -41,8 +41,12 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
       minlength: 6,
+    },
+    passwordSet: {
+      type: Boolean,
+      default: false,
     },
     phone: {
       type: String,
@@ -115,11 +119,14 @@ userSchema.set('toJSON', {
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
 
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
+    if (this.password) {
+      this.passwordSet = true;
+    }
     next();
   } catch (error) {
     next(error);
