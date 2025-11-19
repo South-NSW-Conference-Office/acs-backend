@@ -1,10 +1,10 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { authenticateToken, checkPermission } = require('../middleware/auth');
 const emailService = require('../services/emailService');
+const tokenService = require('../services/tokenService');
 
 const router = express.Router();
 
@@ -358,15 +358,8 @@ router.post(
         });
       }
 
-      // Generate JWT token
-      const token = jwt.sign(
-        {
-          userId: user._id,
-          email: user.email,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      // Generate JWT token using token service
+      const token = tokenService.generateSingleToken(user);
 
       // Get permissions for primary organization (if exists)
       let permissions = [];
@@ -706,6 +699,110 @@ router.post(
       });
     } catch (error) {
       // Reset password error
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        err: error.message,
+      });
+    }
+  }
+);
+
+// POST /api/auth/logout - Logout and invalidate token
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    // Blacklist the current token
+    await tokenService.blacklistToken(req.token);
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    // Even if blacklisting fails, we should return success
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  }
+});
+
+// POST /api/auth/refresh - Refresh access token
+router.post(
+  '/refresh',
+  [body('refreshToken').notEmpty().withMessage('Refresh token is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { refreshToken } = req.body;
+      const result = await tokenService.refreshAccessToken(refreshToken);
+
+      if (!result.success) {
+        return res.status(401).json({
+          success: false,
+          message: result.error || 'Invalid refresh token',
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Token refreshed successfully',
+        data: {
+          accessToken: result.accessToken,
+          accessTokenExpiry: result.accessTokenExpiry,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        err: error.message,
+      });
+    }
+  }
+);
+
+// POST /api/auth/validate-org-access - Validate organization access
+router.post(
+  '/validate-org-access',
+  authenticateToken,
+  [
+    body('organizationId')
+      .isMongoId()
+      .withMessage('Valid organization ID required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { organizationId } = req.body;
+      const authorizationService = require('../services/authorizationService');
+
+      const hasAccess = await authorizationService.validateOrganizationAccess(
+        req.user,
+        organizationId
+      );
+
+      res.json({
+        success: true,
+        hasAccess,
+      });
+    } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Internal server error',

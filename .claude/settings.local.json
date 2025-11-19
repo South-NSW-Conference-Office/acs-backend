@@ -9,7 +9,8 @@
       "Bash(npm run validate:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(pnpm lint:*)"
     ],
     "deny": []
   }

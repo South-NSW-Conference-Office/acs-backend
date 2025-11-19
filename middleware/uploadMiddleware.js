@@ -49,6 +49,15 @@ const uploadConfigs = {
     },
     fileFilter: imageFileFilter,
   }).single('image'),
+
+  // Profile avatar upload
+  avatar: multer({
+    storage: storage,
+    limits: {
+      fileSize: 2 * 1024 * 1024, // 2MB limit for avatars
+    },
+    fileFilter: imageFileFilter,
+  }).single('avatar'),
 };
 
 // Error handling middleware

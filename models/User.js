@@ -74,7 +74,12 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
     avatar: {
-      type: String,
+      url: {
+        type: String,
+      },
+      key: {
+        type: String,
+      },
     },
     organizations: [organizationAssignmentSchema],
     primaryOrganization: {
@@ -160,7 +165,7 @@ userSchema.methods.getPermissionsForOrganization = async function (
       displayName: role.displayName,
       level: role.level,
     },
-    permissions: role.permissions || [],
+    permissions: Array.isArray(role.permissions) ? role.permissions : [],
     organization: organizationId,
   };
 };

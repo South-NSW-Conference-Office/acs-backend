@@ -186,6 +186,12 @@ const systemPermissions = {
       description: 'Archive and restore services',
       allowedScopes: ['own', 'subordinate', 'all', 'acs'],
     },
+    {
+      key: 'manage_service_types',
+      label: 'Manage Service Types',
+      description: 'Create, update, and delete service types',
+      allowedScopes: [],
+    },
   ],
   stories: [
     {

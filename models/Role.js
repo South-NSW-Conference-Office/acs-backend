@@ -206,7 +206,11 @@ roleSchema.statics.createSystemRoles = async function () {
 
 // Method to check if user has permission
 roleSchema.methods.hasPermission = function (requiredPermission) {
-  if (!this.permissions || this.permissions.length === 0) {
+  if (
+    !this.permissions ||
+    !Array.isArray(this.permissions) ||
+    this.permissions.length === 0
+  ) {
     return false;
   }
 
