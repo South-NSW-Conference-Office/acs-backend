@@ -10,6 +10,9 @@ const organizationRoutes = require('./routes/organizations');
 const roleRoutes = require('./routes/roles');
 const serviceRoutes = require('./routes/services');
 const adminServiceRoutes = require('./routes/admin-services');
+const adminEventRoutes = require('./routes/admin-events');
+const adminVolunteerOpportunityRoutes = require('./routes/admin-volunteer-opportunities');
+const serviceTypeRoutes = require('./routes/serviceTypes');
 const permissionRoutes = require('./routes/permissions');
 
 const app = express();
@@ -88,6 +91,9 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/admin/services', adminServiceRoutes);
+app.use('/api/admin/events', adminEventRoutes);
+app.use('/api/admin/volunteer-opportunities', adminVolunteerOpportunityRoutes);
+app.use('/api/admin/service-types', serviceTypeRoutes);
 app.use('/api/permissions', permissionRoutes);
 
 // Health check endpoint
