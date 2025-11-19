@@ -275,6 +275,10 @@ router.post(
       .isString()
       .isLength({ min: 6 })
       .withMessage('Password must be at least 6 characters'),
+    body('requirePasswordSetup')
+      .optional()
+      .isBoolean()
+      .withMessage('requirePasswordSetup must be boolean'),
     body('phone')
       .optional()
       .isString()
@@ -337,6 +341,7 @@ router.post(
         name,
         email,
         password,
+        requirePasswordSetup,
         phone,
         address,
         city,
@@ -375,7 +380,7 @@ router.post(
       const userData = {
         name,
         email,
-        password: password || `temp${Math.random().toString(36).slice(2)}!`,
+        requirePasswordSetup,
         phone,
         address,
         city,
@@ -384,6 +389,12 @@ router.post(
         verified: verified ?? false,
         organizations: organizationsArray,
       };
+
+      // Only add password if not requiring password setup
+      if (!requirePasswordSetup) {
+        userData.password =
+          password || `temp${Math.random().toString(36).slice(2)}!`;
+      }
 
       // Use UserService to create user with proper validation and role assignment
       const user = await UserService.createUser(userData, req.user._id);

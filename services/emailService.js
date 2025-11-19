@@ -139,6 +139,12 @@ class EmailService {
       (expirationTime - Date.now()) / (1000 * 60 * 60)
     );
 
+    // Check if user needs to set up password
+    const needsPasswordSetup = !user.passwordSet;
+    const actionText = needsPasswordSetup
+      ? 'verify your email address and set up your password'
+      : 'verify your email address';
+
     const mailOptions = {
       from:
         process.env.EMAIL_FROM ||
@@ -150,12 +156,19 @@ WELCOME TO ADVENTIST COMMUNITY SERVICES AUSTRALIA
 
 Hello ${user.name},
 
-You have been added to the Adventist Community Services Australia system. To complete your registration and access your account, please verify your email address.
+You have been added to the Adventist Community Services Australia system. To complete your registration and access your account, please ${actionText}.
 
-VERIFICATION REQUIRED
-Click the link below to verify your email address:
+${needsPasswordSetup ? 'VERIFICATION AND PASSWORD SETUP REQUIRED' : 'VERIFICATION REQUIRED'}
+Click the link below to ${actionText}:
 ${verificationUrl}
 
+${
+  needsPasswordSetup
+    ? `
+IMPORTANT: During verification, you will be asked to set up your password to complete your account setup. Please choose a secure password that is at least 6 characters long.
+`
+    : ''
+}
 IMPORTANT DEADLINE
 This verification link will expire in ${expirationHours} hours (${expirationTime.toLocaleDateString(
         'en-AU',
@@ -170,7 +183,7 @@ This verification link will expire in ${expirationHours} hours (${expirationTime
         }
       )} AEDT).
 
-If you do not verify your email within this timeframe, you will need to contact your administrator to resend the verification email.
+If you do not ${actionText} within this timeframe, you will need to contact your administrator to resend the verification email.
 
 ACCOUNT DETAILS
 Email: ${user.email}
