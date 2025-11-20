@@ -437,10 +437,10 @@ router.post(
         organizations: organizationsArray,
       };
 
-      // Only add password if not requiring password setup
-      if (!requirePasswordSetup) {
-        userData.password =
-          password || `temp${Math.random().toString(36).slice(2)}!`;
+      // Only add password if explicitly provided
+      // Users created without passwords will need to set them via email verification
+      if (password) {
+        userData.password = password;
       }
 
       // Use UserService to create user with proper validation and role assignment

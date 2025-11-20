@@ -13,7 +13,7 @@ async function assignSuperAdminRole() {
     // Connected to MongoDB
 
     // Find the user
-    const userEmail = 'bem@gyocc.org';
+    const userEmail = 'kylemorrison@adventist.org.au';
     const user = await User.findOne({ email: userEmail }).populate(
       'organizations.organization organizations.role'
     );

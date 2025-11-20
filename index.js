@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
+const logger = require('./services/loggerService');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -68,21 +69,42 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(morgan('combined'));
 
 // Database connection
+logger.info('Starting database connection...');
+logger.info('MongoDB URI:', process.env.MONGO_URI ? 'Set' : 'Not set');
+
 mongoose
   .connect(process.env.MONGO_URI, {
     serverSelectionTimeoutMS: 15000,
     socketTimeoutMS: 45000,
+    bufferCommands: false,
+    maxPoolSize: 10,
+    minPoolSize: 5,
+    connectTimeoutMS: 10000,
   })
   .then(async () => {
+    logger.info('Database connected successfully');
     // Initialize database with system roles and permissions
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
+    logger.info('Database initialization completed');
   })
   .catch((error) => {
-    const logger = require('./services/loggerService');
+    logger.error('Database connection failed:', error.message);
+    logger.error('Full error:', error);
     logger.error('Database connection failed:', { error: error.message });
     process.exit(1);
   });
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -102,7 +124,7 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((error, req, res, next) => {
+app.use((error, req, res) => {
   res.status(500).json({
     success: false,
     message: 'Internal server error',
@@ -119,7 +141,6 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  const logger = require('./services/loggerService');
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Health check: http://localhost:${PORT}/health`);
