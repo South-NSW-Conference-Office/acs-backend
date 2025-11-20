@@ -213,6 +213,18 @@ router.post(
         });
       }
 
+      // Security check: Only super admins can assign super admin roles
+      if (role.name === 'super_admin') {
+        const requesterIsSuperAdmin = await authorizationService.isUserSuperAdmin(req.user);
+        
+        if (!requesterIsSuperAdmin) {
+          return res.status(403).json({
+            success: false,
+            message: 'Only super administrators can assign super admin roles',
+          });
+        }
+      }
+
       // Check if user already has a role in this organization
       const existingAssignment = user.organizations.find(
         (org) => org.organization.toString() === organizationId

@@ -68,6 +68,49 @@ app.use(express.urlencoded({ extended: true }));
 // Logging middleware (disabled for cleaner terminal output)
 // app.use(morgan('combined'));
 
+// Function to start the server after database connection
+const startServer = () => {
+  // Routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/organizations', organizationRoutes);
+  app.use('/api/roles', roleRoutes);
+  app.use('/api/services', serviceRoutes);
+  app.use('/api/admin/services', adminServiceRoutes);
+  app.use('/api/admin/events', adminEventRoutes);
+  app.use('/api/admin/volunteer-opportunities', adminVolunteerOpportunityRoutes);
+  app.use('/api/admin/service-types', serviceTypeRoutes);
+  app.use('/api/permissions', permissionRoutes);
+
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+  });
+
+  // Error handling middleware
+  app.use((error, req, res, next) => {
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  });
+
+  // 404 handler
+  app.use('*', (req, res) => {
+    res.status(404).json({
+      success: false,
+      message: 'Route not found',
+    });
+  });
+
+  app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Health check: http://localhost:${PORT}/health`);
+  });
+};
+
 // Database connection
 logger.info('Starting database connection...');
 logger.info('MongoDB URI:', process.env.MONGO_URI ? 'Set' : 'Not set');
@@ -87,6 +130,9 @@ mongoose
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
     logger.info('Database initialization completed');
+    
+    // Start the server only after database is fully ready
+    startServer();
   })
   .catch((error) => {
     logger.error('Database connection failed:', error.message);
@@ -104,46 +150,6 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
-});
-
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/organizations', organizationRoutes);
-app.use('/api/roles', roleRoutes);
-app.use('/api/services', serviceRoutes);
-app.use('/api/admin/services', adminServiceRoutes);
-app.use('/api/admin/events', adminEventRoutes);
-app.use('/api/admin/volunteer-opportunities', adminVolunteerOpportunityRoutes);
-app.use('/api/admin/service-types', serviceTypeRoutes);
-app.use('/api/permissions', permissionRoutes);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-  });
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-  });
-});
-
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`Health check: http://localhost:${PORT}/health`);
 });
 
 module.exports = app;
