@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const logger = require('./loggerService');
 
 class EmailService {
   constructor() {
@@ -44,24 +45,24 @@ class EmailService {
           </style>
         </head>
         <body>
-          <h2>Password Reset Request</h2>
+          <h1>Password Reset Request</h1>
+          <h2>Adventist Community Services</h2>
           
           <p>Hello,</p>
           
           <p>We received a request to reset your password for your Adventist Community Services admin account.</p>
           
+          <h3>Reset Your Password:</h3>
           <p>If you made this request, click the link below to reset your password:</p>
           
-          <p><a href="${resetUrl}">Reset Password</a></p>
+          <p><a href="${resetUrl}">${resetUrl}</a></p>
           
-          <p>Or copy and paste this link into your browser:</p>
-          <p>${resetUrl}</p>
-          
-          <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
+          <h3>Security Information:</h3>
+          <p><strong>IMPORTANT:</strong> This link will expire in 1 hour for security reasons.</p>
           
           <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
           
-          <p>For security reasons, if you continue to receive these emails without requesting them, please contact our support team immediately.</p>
+          <p><strong>Security Notice:</strong> If you continue to receive these emails without requesting them, please contact our support team immediately.</p>
           
           <p>Best regards,<br>
           Adventist Community Services Team</p>
@@ -211,6 +212,44 @@ This is an automated message. Please do not reply to this email.
         '"Adventist Community Services Australia" <noreply@acs.org.au>',
       to: user.email,
       subject: 'Welcome to Adventist Community Services Australia',
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to Adventist Community Services</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Account Verified - Welcome!</h1>
+          <h2>Adventist Community Services Australia</h2>
+
+          <p>Hello ${user.name},</p>
+
+          <p>Your email has been successfully verified. You now have full access to the Adventist Community Services Australia system.</p>
+
+          <h3>Next Steps:</h3>
+          <p>You can log in at: <a href="${process.env.FRONTEND_URL}/login">${process.env.FRONTEND_URL}/login</a></p>
+
+          <p>Best regards,<br>
+          Adventist Community Services Australia</p>
+
+          <hr>
+          
+          <p><small>© ${new Date().getFullYear()} Adventist Community Services Australia. All rights reserved.</small></p>
+        </body>
+        </html>
+      `,
       text: `
 ACCOUNT VERIFIED - WELCOME!
 
@@ -240,6 +279,127 @@ Adventist Community Services Australia
     } catch (error) {
       // Email service connection failed
       return false;
+    }
+  }
+
+  // Send organization setup invitation email
+  async sendOrganizationSetupInvitation(user, organization, invitedBy) {
+    const verificationToken = user.emailVerificationToken;
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const expirationTime = user.emailVerificationExpires;
+    const expirationDays = Math.round(
+      (expirationTime - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+
+    const mailOptions = {
+      from:
+        process.env.EMAIL_FROM ||
+        '"Adventist Community Services Australia" <noreply@acs.org.au>',
+      to: user.email,
+      subject: `Admin Invitation - ${organization.name} - Adventist Community Services`,
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Organization Admin Invitation</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Welcome to Adventist Community Services!</h1>
+          <h2>You've been invited to be an administrator</h2>
+          
+          <p>Hello ${user.name},</p>
+          
+          <p>${invitedBy.name} has invited you to be an administrator for <strong>${organization.name}</strong>.</p>
+          
+          <h3>Organization Details:</h3>
+          <p>
+            <strong>Name:</strong> ${organization.name}<br>
+            <strong>Type:</strong> ${organization.type.charAt(0).toUpperCase() + organization.type.slice(1)}<br>
+            <strong>Your Role:</strong> Administrator
+          </p>
+          
+          <h3>Administrator Privileges:</h3>
+          <p>As an administrator, you will be able to:</p>
+          <ul>
+            <li>Manage users and their permissions</li>
+            <li>Create and manage sub-organizations</li>
+            <li>Access administrative features and reports</li>
+            <li>Configure organization settings</li>
+          </ul>
+          
+          <h3>Getting Started:</h3>
+          <p>To set up your account, please click the following link:</p>
+          
+          <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+          
+          <p><strong>IMPORTANT SECURITY NOTICE:</strong></p>
+          <p>This invitation link will expire in ${expirationDays} days for security reasons. After clicking the link, you'll be asked to create a secure password for your account.</p>
+          
+          <p>If you have any questions or need assistance, please contact ${invitedBy.name} or your system administrator.</p>
+          
+          <p>Best regards,<br>
+          Adventist Community Services Team</p>
+          
+          <hr>
+          
+          <p><small>© ${new Date().getFullYear()} Adventist Community Services. All rights reserved.</small></p>
+          <p><small>This invitation was sent by ${invitedBy.name} (${invitedBy.email})</small></p>
+        </body>
+        </html>
+      `,
+      text: `
+Welcome to Adventist Community Services!
+
+Hello ${user.name},
+
+${invitedBy.name} has invited you to be an administrator for ${organization.name}.
+
+ORGANIZATION DETAILS:
+- Name: ${organization.name}
+- Type: ${organization.type.charAt(0).toUpperCase() + organization.type.slice(1)}
+- Your Role: Administrator
+
+As an administrator, you will be able to:
+- Manage users and their permissions
+- Create and manage sub-organizations
+- Access administrative features and reports
+- Configure organization settings
+
+TO GET STARTED:
+Click the following link to set up your account and create your password:
+${verificationUrl}
+
+IMPORTANT: This invitation link will expire in ${expirationDays} days for security reasons.
+
+If you have any questions or need assistance, please contact ${invitedBy.name} or your system administrator.
+
+Best regards,
+Adventist Community Services Team
+
+---
+This invitation was sent by ${invitedBy.name} (${invitedBy.email})
+© ${new Date().getFullYear()} Adventist Community Services. All rights reserved.
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      logger.error('Failed to send organization setup invitation:', error);
+      throw new Error('Failed to send invitation email');
     }
   }
 }

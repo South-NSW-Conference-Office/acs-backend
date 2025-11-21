@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
 const logger = require('./services/loggerService');
+const { applyRateLimiters } = require('./middleware/rateLimiter');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -15,6 +16,11 @@ const adminEventRoutes = require('./routes/admin-events');
 const adminVolunteerOpportunityRoutes = require('./routes/admin-volunteer-opportunities');
 const serviceTypeRoutes = require('./routes/serviceTypes');
 const permissionRoutes = require('./routes/permissions');
+const teamRoutes = require('./routes/teams');
+const teamTypeRoutes = require('./routes/teamTypes');
+const quotaRoutes = require('./routes/quota');
+const profileRoutes = require('./routes/profile');
+const roleLimitsRoutes = require('./routes/admin/role-limits');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,7 +60,12 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Organization-Id',
+      'X-Team-Id',
+    ],
   })
 );
 
@@ -64,6 +75,9 @@ app.options('*', cors());
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Apply rate limiters
+applyRateLimiters(app);
 
 // Logging middleware (disabled for cleaner terminal output)
 // app.use(morgan('combined'));
@@ -78,9 +92,17 @@ const startServer = () => {
   app.use('/api/services', serviceRoutes);
   app.use('/api/admin/services', adminServiceRoutes);
   app.use('/api/admin/events', adminEventRoutes);
-  app.use('/api/admin/volunteer-opportunities', adminVolunteerOpportunityRoutes);
+  app.use(
+    '/api/admin/volunteer-opportunities',
+    adminVolunteerOpportunityRoutes
+  );
   app.use('/api/admin/service-types', serviceTypeRoutes);
+  app.use('/api/admin/role-limits', roleLimitsRoutes);
   app.use('/api/permissions', permissionRoutes);
+  app.use('/api/teams', teamRoutes);
+  app.use('/api/team-types', teamTypeRoutes);
+  app.use('/api/quota', quotaRoutes);
+  app.use('/api/profile', profileRoutes);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
@@ -88,6 +110,7 @@ const startServer = () => {
   });
 
   // Error handling middleware
+  // eslint-disable-next-line no-unused-vars
   app.use((error, req, res, next) => {
     res.status(500).json({
       success: false,
@@ -130,7 +153,7 @@ mongoose
     const initializeDatabase = require('./utils/initializeDatabase');
     await initializeDatabase();
     logger.info('Database initialization completed');
-    
+
     // Start the server only after database is fully ready
     startServer();
   })

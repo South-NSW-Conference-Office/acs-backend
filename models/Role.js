@@ -30,6 +30,34 @@ const roleSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    roleCategory: {
+      type: String,
+      enum: [
+        'super_admin',
+        'conference_admin',
+        'team_leader',
+        'team_member',
+        'communications',
+      ],
+      required: false,
+    },
+    quotaLimits: {
+      maxUsers: {
+        type: Number,
+        default: null,
+      },
+      scope: {
+        type: String,
+        enum: ['system', 'organization', 'region', 'team'],
+        default: 'organization',
+      },
+      warningThreshold: {
+        type: Number,
+        default: 0.8,
+        min: 0,
+        max: 1,
+      },
+    },
     isSystem: {
       type: Boolean,
       default: false,
@@ -48,7 +76,7 @@ const roleSchema = new mongoose.Schema(
 roleSchema.pre('save', function (next) {
   if (this.permissions) {
     const validPermissionPattern =
-      /^[a-z_]+\.([a-z_]+|\*)(:([a-z_]+|self|own|subordinate|all|assigned|acs_team|acs|public))?$/;
+      /^[a-z_]+\.([a-z_]+|\*)(:([a-z_]+|self|own|subordinate|all|assigned|acs_team|acs|public|team|team_subordinate|service|region))?$/;
     const invalidPermissions = this.permissions.filter((perm) => {
       return perm !== '*' && !validPermissionPattern.test(perm);
     });
@@ -71,6 +99,12 @@ roleSchema.statics.createSystemRoles = async function () {
       level: 'union',
       permissions: ['*'],
       description: 'Full system access including system administration',
+      roleCategory: 'super_admin',
+      quotaLimits: {
+        maxUsers: 5,
+        scope: 'system',
+        warningThreshold: 0.8,
+      },
       isSystem: true,
     },
     {
@@ -89,6 +123,12 @@ roleSchema.statics.createSystemRoles = async function () {
       ],
       description:
         'Administrative access for union level without system permissions',
+      roleCategory: 'conference_admin',
+      quotaLimits: {
+        maxUsers: 10,
+        scope: 'region',
+        warningThreshold: 0.8,
+      },
       isSystem: true,
     },
     {
@@ -118,8 +158,15 @@ roleSchema.statics.createSystemRoles = async function () {
         'stories.manage:subordinate',
         'dashboard.view',
         'analytics.read:subordinate',
+        'teams.*:region',
       ],
       description: 'Administrative access for conference level',
+      roleCategory: 'conference_admin',
+      quotaLimits: {
+        maxUsers: 20,
+        scope: 'region',
+        warningThreshold: 0.8,
+      },
       isSystem: true,
     },
     {
@@ -148,8 +195,15 @@ roleSchema.statics.createSystemRoles = async function () {
         'stories.manage:own',
         'dashboard.view',
         'analytics.read:own',
+        'teams.*:own',
       ],
       description: 'Full access within own church',
+      roleCategory: 'team_leader',
+      quotaLimits: {
+        maxUsers: 500,
+        scope: 'organization',
+        warningThreshold: 0.8,
+      },
       isSystem: true,
     },
     {
@@ -170,8 +224,17 @@ roleSchema.statics.createSystemRoles = async function () {
         'stories.update:acs',
         'stories.manage:acs',
         'dashboard.view',
+        'teams.read:team',
+        'teams.update:team',
+        'teams.manage_members:team',
       ],
       description: 'ACS team leadership role',
+      roleCategory: 'team_member',
+      quotaLimits: {
+        maxUsers: 900,
+        scope: 'organization',
+        warningThreshold: 0.8,
+      },
       isSystem: true,
     },
     {
@@ -182,8 +245,42 @@ roleSchema.statics.createSystemRoles = async function () {
         'users.read:acs_team',
         'services.read:acs',
         'stories.read:acs',
+        'teams.read:team',
       ],
       description: 'Basic team member access',
+      roleCategory: 'team_member',
+      quotaLimits: {
+        maxUsers: 900,
+        scope: 'organization',
+        warningThreshold: 0.8,
+      },
+      isSystem: true,
+    },
+    {
+      name: 'church_communications',
+      displayName: 'Church Communications',
+      level: 'church',
+      permissions: [
+        'users.read:team',
+        'services.read:team',
+        'stories.create:team',
+        'stories.read:team',
+        'stories.update:team',
+        'stories.manage:team',
+        'messages.create:team',
+        'messages.read:team',
+        'messages.update:team',
+        'messages.toggle:team',
+        'teams.read:team',
+        'dashboard.view',
+      ],
+      description: 'Communications team member with message management',
+      roleCategory: 'communications',
+      quotaLimits: {
+        maxUsers: 900,
+        scope: 'organization',
+        warningThreshold: 0.8,
+      },
       isSystem: true,
     },
     {
@@ -242,6 +339,112 @@ roleSchema.methods.hasPermission = function (requiredPermission) {
   });
 
   return matchesScoped;
+};
+
+// Method to check if role has reached user quota
+roleSchema.methods.checkQuota = async function (organizationId = null) {
+  if (!this.quotaLimits || !this.quotaLimits.maxUsers) {
+    return { allowed: true, current: 0, max: null };
+  }
+
+  const User = mongoose.model('User');
+  let query = {};
+
+  // Build query based on quota scope
+  switch (this.quotaLimits.scope) {
+    case 'system':
+      // Count all users with this role system-wide
+      query = { 'organizations.role': this._id };
+      break;
+
+    case 'region': {
+      // Count users with this role in the same region/conference
+      if (!organizationId) {
+        throw new Error(
+          'Organization ID required for region scope quota check'
+        );
+      }
+      const Organization = mongoose.model('Organization');
+      const org = await Organization.findById(organizationId);
+      const regionOrgs = await Organization.find({
+        parent: org.parent || org._id,
+      }).select('_id');
+      const orgIds = regionOrgs.map((o) => o._id);
+      query = {
+        'organizations.role': this._id,
+        'organizations.organization': { $in: orgIds },
+      };
+      break;
+    }
+
+    case 'organization':
+      // Count users with this role in specific organization
+      if (!organizationId) {
+        throw new Error(
+          'Organization ID required for organization scope quota check'
+        );
+      }
+      query = {
+        'organizations.role': this._id,
+        'organizations.organization': organizationId,
+      };
+      break;
+
+    case 'team':
+      // This would need team context - for now treat as organization
+      if (!organizationId) {
+        throw new Error('Organization ID required for team scope quota check');
+      }
+      query = {
+        'organizations.role': this._id,
+        'organizations.organization': organizationId,
+      };
+      break;
+  }
+
+  const currentCount = await User.countDocuments(query);
+  const allowed = currentCount < this.quotaLimits.maxUsers;
+  const nearLimit =
+    currentCount >=
+    this.quotaLimits.maxUsers * this.quotaLimits.warningThreshold;
+
+  return {
+    allowed,
+    current: currentCount,
+    max: this.quotaLimits.maxUsers,
+    remaining: Math.max(0, this.quotaLimits.maxUsers - currentCount),
+    nearLimit,
+    percentage: (currentCount / this.quotaLimits.maxUsers) * 100,
+  };
+};
+
+// Static method to get quota status for all roles
+roleSchema.statics.getQuotaStatus = async function (organizationId = null) {
+  const roles = await this.find({
+    isActive: true,
+    'quotaLimits.maxUsers': { $ne: null },
+  });
+  const quotaStatuses = [];
+
+  for (const role of roles) {
+    try {
+      const status = await role.checkQuota(organizationId);
+      quotaStatuses.push({
+        role: {
+          id: role._id,
+          name: role.name,
+          displayName: role.displayName,
+          category: role.roleCategory,
+        },
+        quota: status,
+      });
+    } catch (error) {
+      // Skip roles that can't be checked in this context
+      continue;
+    }
+  }
+
+  return quotaStatuses;
 };
 
 module.exports = mongoose.model('Role', roleSchema);

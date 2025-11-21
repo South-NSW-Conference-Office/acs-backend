@@ -1,10 +1,15 @@
 const Organization = require('../models/Organization');
+const User = require('../models/User');
+const Role = require('../models/Role');
+const mongoose = require('mongoose');
+const logger = require('./loggerService');
 const {
   AppError,
   NotFoundError,
   ValidationError,
   ConflictError,
 } = require('../middleware/errorHandler');
+const EmailService = require('./emailService');
 
 class OrganizationService {
   // Get organizations with filtering and permission-based access
@@ -353,6 +358,245 @@ class OrganizationService {
 
     const accessibleIds = await this.getUserAccessibleOrganizations(userId);
     return accessibleIds.includes(orgId.toString());
+  }
+
+  // Quick Setup: Create organization with admin user
+  static async quickSetup(setupData, currentUser, userPermissions) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const {
+        organization: orgData,
+        adminUser: userData,
+        sendInvitation = true,
+      } = setupData;
+
+      // Validate permissions using the authorization service approach
+      const permissions = userPermissions?.permissions || [];
+      const hasPermission =
+        permissions.includes('*') ||
+        permissions.includes('organizations.create') ||
+        permissions.includes('organizations.*');
+
+      if (!hasPermission) {
+        logger.debug('Permission check failed for quick setup:', {
+          userPermissions: permissions,
+          requiredPermission: 'organizations.create',
+          fullUserPermissions: userPermissions,
+        });
+        throw new AppError(
+          'Insufficient permissions to create organizations',
+          403
+        );
+      }
+
+      // Validate hierarchy rules
+      await this.validateOrganizationHierarchy(
+        orgData.type,
+        orgData.parentOrganization
+      );
+
+      // Check for duplicate organization name
+      await this.checkDuplicateName(
+        orgData.name,
+        orgData.parentOrganization,
+        orgData.type
+      );
+
+      // Check for duplicate user email
+      const existingUser = await User.findOne({ email: userData.email });
+      if (existingUser) {
+        throw new ConflictError('User with this email already exists');
+      }
+
+      // Create organization
+      const organization = new Organization({
+        ...orgData,
+        createdBy: currentUser.id,
+        setupCompleted: false,
+      });
+      await organization.save({ session });
+
+      // Get appropriate admin role based on organization type and user input
+      let roleName = userData.role;
+
+      // If no role specified, determine based on organization type
+      if (!roleName) {
+        switch (orgData.type) {
+          case 'union':
+            roleName = 'union_admin';
+            break;
+          case 'conference':
+            roleName = 'conference_admin';
+            break;
+          case 'church':
+            roleName = 'church_pastor';
+            break;
+          default:
+            roleName = 'church_pastor';
+        }
+      }
+
+      let adminRole = await Role.findOne({ name: roleName });
+      if (!adminRole) {
+        // Fallback to appropriate admin role for organization type
+        const fallbackRoleName =
+          orgData.type === 'union'
+            ? 'union_admin'
+            : orgData.type === 'conference'
+              ? 'conference_admin'
+              : 'church_pastor';
+        adminRole = await Role.findOne({ name: fallbackRoleName });
+        if (!adminRole) {
+          throw new ValidationError(
+            `Admin role '${roleName}' not found in system`
+          );
+        }
+      }
+
+      // Create admin user
+      const user = new User({
+        name: `${userData.firstName} ${userData.lastName}`.trim(),
+        email: userData.email,
+        organizations: [
+          {
+            organization: organization._id,
+            role: adminRole._id,
+            assignedAt: new Date(),
+            assignedBy: currentUser.id,
+          },
+        ],
+        primaryOrganization: organization._id,
+        verified: false,
+        passwordSet: false,
+        invitedBy: currentUser.id,
+        invitedAt: new Date(),
+        invitationStatus: 'pending',
+      });
+
+      // Generate email verification token
+      const crypto = require('crypto');
+      user.emailVerificationToken = crypto.randomBytes(32).toString('hex');
+      user.emailVerificationExpires = new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000
+      ); // 7 days
+
+      await user.save({ session });
+
+      // Update organization setupCompleted flag
+      organization.setupCompleted = true;
+      await organization.save({ session });
+
+      await session.commitTransaction();
+
+      // Send invitation email (outside of transaction)
+      let invitationSent = false;
+      if (sendInvitation) {
+        try {
+          await EmailService.sendOrganizationSetupInvitation(
+            user,
+            organization,
+            currentUser
+          );
+          invitationSent = true;
+        } catch (emailError) {
+          logger.error('Failed to send invitation email:', emailError);
+        }
+      }
+
+      // Populate necessary fields for response
+      await organization.populate('parentOrganization', 'name type');
+      await user.populate('organizations.role', 'name displayName');
+
+      return {
+        organization: organization.toObject(),
+        user: user.toObject(),
+        invitationSent,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  // Bulk create organizations with optional users
+  static async bulkCreate(organizations, currentUser, userPermissions) {
+    const results = {
+      successful: [],
+      failed: [],
+    };
+
+    for (const orgData of organizations) {
+      try {
+        if (orgData.includeAdminUser && orgData.adminUser) {
+          // Use quick setup for orgs with admin users
+          const result = await this.quickSetup(
+            {
+              organization: orgData.organization,
+              adminUser: orgData.adminUser,
+              sendInvitation: orgData.sendInvitation ?? true,
+            },
+            currentUser,
+            userPermissions
+          );
+          results.successful.push({
+            organization: result.organization,
+            user: result.user,
+          });
+        } else {
+          // Regular organization creation
+          const org = await this.createOrganization(
+            orgData.organization,
+            currentUser.id
+          );
+          results.successful.push({ organization: org });
+        }
+      } catch (error) {
+        results.failed.push({
+          data: orgData,
+          error: error.message,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  // Get organizations user can create children for
+  static async getSuggestedParents(userId, organizationType) {
+    try {
+      const userOrgIds = await this.getUserAccessibleOrganizations(userId);
+      if (userOrgIds.length === 0) return [];
+
+      // Determine valid parent types based on organization type
+      let validParentTypes;
+      switch (organizationType) {
+        case 'conference':
+          validParentTypes = ['union'];
+          break;
+        case 'church':
+          validParentTypes = ['conference'];
+          break;
+        default:
+          return []; // Unions don't have parents
+      }
+
+      // Find organizations of valid parent types
+      const parents = await Organization.find({
+        _id: { $in: userOrgIds },
+        type: { $in: validParentTypes },
+        isActive: true,
+      })
+        .sort({ name: 1 })
+        .lean();
+
+      return parents;
+    } catch (error) {
+      throw new AppError('Failed to get suggested parent organizations', 500);
+    }
   }
 }
 

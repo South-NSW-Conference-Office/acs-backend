@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 
 // Note: Redis store setup commented out to avoid dependency issues
 // Uncomment when Redis is available in production
@@ -11,6 +12,74 @@ const rateLimit = require('express-rate-limit');
  * Creates rate limiters for different endpoints
  */
 class RateLimiterFactory {
+  // Pre-created limiters for role-based access
+  static userEnumerationLimiters = new Map();
+  static searchLimiters = new Map();
+  static dynamicLimiters = new Map();
+
+  /**
+   * Initialize all role-based limiters
+   */
+  static initializeRoleBasedLimiters() {
+    // Define role configurations
+    const roles = [
+      {
+        name: 'super_admin',
+        userEnum: { max: 1000, windowMs: 15 * 60 * 1000 },
+        search: { max: 300, windowMs: 60 * 1000 },
+      },
+      {
+        name: 'union_admin',
+        userEnum: { max: 100, windowMs: 15 * 60 * 1000 },
+        search: { max: 150, windowMs: 60 * 1000 },
+      },
+      {
+        name: 'conference_admin',
+        userEnum: { max: 100, windowMs: 15 * 60 * 1000 },
+        search: { max: 150, windowMs: 60 * 1000 },
+      },
+      {
+        name: 'church_pastor',
+        userEnum: { max: 50, windowMs: 15 * 60 * 1000 },
+        search: { max: 60, windowMs: 60 * 1000 },
+      },
+      {
+        name: 'default',
+        userEnum: { max: 100, windowMs: 15 * 60 * 1000 },
+        search: { max: 60, windowMs: 60 * 1000 },
+      },
+    ];
+
+    // Pre-create user enumeration limiters
+    roles.forEach((role) => {
+      this.userEnumerationLimiters.set(
+        role.name,
+        this.createLimiter({
+          windowMs: role.userEnum.windowMs,
+          max: role.userEnum.max,
+          message: 'Too many user queries, please try again later.',
+          keyGenerator: (req) => {
+            const ip = ipKeyGenerator(req);
+            return `users:${req.user?._id?.toString() || ip}`;
+          },
+        })
+      );
+
+      this.searchLimiters.set(
+        role.name,
+        this.createLimiter({
+          windowMs: role.search.windowMs,
+          max: role.search.max,
+          message: 'Too many search requests, please slow down.',
+          keyGenerator: (req) => {
+            const ip = ipKeyGenerator(req);
+            return `search:${req.user?._id?.toString() || ip}`;
+          },
+        })
+      );
+    });
+  }
+
   /**
    * Create a basic rate limiter
    * @param {Object} options - Rate limiter options
@@ -53,7 +122,8 @@ class RateLimiterFactory {
     keyGenerator: (req) => {
       // Rate limit by IP + email combo for auth endpoints
       const email = req.body?.email || 'unknown';
-      return `auth:${req.ip}:${email}`;
+      const ip = ipKeyGenerator(req);
+      return `auth:${ip}:${email}`;
     },
   });
 
@@ -67,17 +137,27 @@ class RateLimiterFactory {
   });
 
   /**
-   * User enumeration limiter - prevent data scraping
+   * User enumeration limiter - prevent data scraping (role-aware)
    */
-  static userEnumerationLimiter = this.createLimiter({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 requests per window
-    message: 'Too many user queries, please try again later.',
-    keyGenerator: (req) => {
-      // Rate limit by authenticated user ID
-      return `users:${req.user?._id?.toString() || req.ip}`;
-    },
-  });
+  static userEnumerationLimiter = (req, res, next) => {
+    // Initialize limiters if not already done
+    if (this.userEnumerationLimiters.size === 0) {
+      this.initializeRoleBasedLimiters();
+    }
+
+    // Determine rate limiter based on user role
+    let limiterKey = 'default';
+
+    if (req.user) {
+      const userRole = req.user.organizations?.[0]?.role?.name;
+      if (this.userEnumerationLimiters.has(userRole)) {
+        limiterKey = userRole;
+      }
+    }
+
+    const limiter = this.userEnumerationLimiters.get(limiterKey);
+    return limiter(req, res, next);
+  };
 
   /**
    * API general limiter - standard rate limiting
@@ -117,34 +197,121 @@ class RateLimiterFactory {
   });
 
   /**
+   * File upload limiter - prevent storage exhaustion
+   */
+  static fileUploadLimiter = this.createLimiter({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // 10 uploads per hour
+    message: 'Too many file uploads, please try again later.',
+    keyGenerator: (req) => {
+      const ip = ipKeyGenerator(req);
+      return `upload:${req.user?._id?.toString() || ip}`;
+    },
+  });
+
+  /**
+   * Search/query limiter - for data-intensive operations (role-aware)
+   */
+  static searchLimiter = (req, res, next) => {
+    // Initialize limiters if not already done
+    if (this.searchLimiters.size === 0) {
+      this.initializeRoleBasedLimiters();
+    }
+
+    // Determine rate limiter based on user role
+    let limiterKey = 'default';
+
+    if (req.user) {
+      const userRole = req.user.organizations?.[0]?.role?.name;
+      if (this.searchLimiters.has(userRole)) {
+        limiterKey = userRole;
+      }
+    }
+
+    const limiter = this.searchLimiters.get(limiterKey);
+    return limiter(req, res, next);
+  };
+
+  /**
+   * Admin operation limiter - for sensitive admin actions
+   */
+  static adminOperationLimiter = this.createLimiter({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 50, // 50 admin operations per hour
+    message: 'Admin operation limit exceeded.',
+    keyGenerator: (req) => {
+      const ip = ipKeyGenerator(req);
+      return `admin:${req.user?._id?.toString() || ip}:${req.method}`;
+    },
+  });
+
+  /**
+   * Public endpoint limiter - for unauthenticated access
+   */
+  static publicLimiter = this.createLimiter({
+    windowMs: 60 * 1000, // 1 minute
+    max: 60, // 60 requests per minute
+    message: 'Too many requests from this IP, please try again later.',
+    skipSuccessfulRequests: true,
+  });
+
+  /**
+   * Email operation limiter - prevent email bombing
+   */
+  static emailLimiter = this.createLimiter({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // 5 emails per hour per recipient
+    message: 'Too many email requests, please try again later.',
+    keyGenerator: (req) => {
+      const email = req.body?.email || req.params?.email || 'unknown';
+      return `email:${email}`;
+    },
+  });
+
+  /**
    * Dynamic rate limiter based on user role
    */
   static createDynamicLimiter(baseOptions = {}) {
+    // Pre-create limiters for each role if not already done
+    const optionsKey = JSON.stringify(baseOptions);
+    if (!this.dynamicLimiters.has(optionsKey)) {
+      const roleLimiters = new Map();
+
+      const roles = [
+        { name: 'super_admin', max: 1000 },
+        { name: 'union_admin', max: 500 },
+        { name: 'conference_admin', max: 500 },
+        { name: 'church_admin', max: 200 },
+        { name: 'default', max: 50 },
+      ];
+
+      roles.forEach((role) => {
+        roleLimiters.set(
+          role.name,
+          this.createLimiter({
+            ...baseOptions,
+            max: role.max,
+            keyGenerator: (req) =>
+              req.user?._id?.toString() || ipKeyGenerator(req),
+          })
+        );
+      });
+
+      this.dynamicLimiters.set(optionsKey, roleLimiters);
+    }
+
     return (req, res, next) => {
-      // Determine rate limit based on user role
-      let maxRequests = 50; // Default for regular users
+      const roleLimiters = this.dynamicLimiters.get(optionsKey);
+      let limiterKey = 'default';
 
       if (req.user) {
         const userRole = req.user.organizations?.[0]?.role?.name;
-
-        if (userRole === 'super_admin') {
-          maxRequests = 1000; // Higher limit for super admins
-        } else if (
-          userRole === 'union_admin' ||
-          userRole === 'conference_admin'
-        ) {
-          maxRequests = 500; // Medium limit for admins
-        } else if (userRole === 'church_admin') {
-          maxRequests = 200; // Lower limit for church admins
+        if (roleLimiters.has(userRole)) {
+          limiterKey = userRole;
         }
       }
 
-      const limiter = this.createLimiter({
-        ...baseOptions,
-        max: maxRequests,
-        keyGenerator: (req) => req.user?._id?.toString() || req.ip,
-      });
-
+      const limiter = roleLimiters.get(limiterKey);
       return limiter(req, res, next);
     };
   }
@@ -202,24 +369,44 @@ class RateLimiterFactory {
  * @param {Express.Application} app - Express app
  */
 function applyRateLimiters(app) {
-  // Auth routes
+  // Initialize role-based limiters at app startup
+  RateLimiterFactory.initializeRoleBasedLimiters();
+  // Health check endpoint can have basic rate limiting to prevent abuse
+  app.use('/health', RateLimiterFactory.publicLimiter);
+
+  // Auth routes - most restrictive limits
   app.use('/api/auth/signin', RateLimiterFactory.authLimiter);
   app.use('/api/auth/register', RateLimiterFactory.authLimiter);
   app.use('/api/auth/forgot-password', RateLimiterFactory.passwordResetLimiter);
   app.use('/api/auth/reset-password', RateLimiterFactory.passwordResetLimiter);
+  app.use('/api/auth/verify-email', RateLimiterFactory.emailLimiter);
+  app.use(
+    '/api/auth/verify-email-and-set-password',
+    RateLimiterFactory.emailLimiter
+  );
 
-  // User enumeration protection
-  app.use('/api/users', RateLimiterFactory.userEnumerationLimiter);
-  app.use('/api/organizations', RateLimiterFactory.userEnumerationLimiter);
+  // File upload endpoints
+  app.use('/api/profile/avatar', RateLimiterFactory.fileUploadLimiter);
+  app.use('/api/services/:id/images', RateLimiterFactory.fileUploadLimiter);
+
+  // Admin routes
+  app.use('/api/admin/*', RateLimiterFactory.adminOperationLimiter);
+  app.use('/api/users/:userId/roles', RateLimiterFactory.adminOperationLimiter);
+  app.delete(
+    '/api/organizations/:id',
+    RateLimiterFactory.adminOperationLimiter
+  );
+  app.delete('/api/users/:userId', RateLimiterFactory.adminOperationLimiter);
+
+  // No rate limiting for GET/read operations - users should be able to browse data freely
 
   // Organization context switching
   app.use('/api/auth/validate-org-access', RateLimiterFactory.orgSwitchLimiter);
 
-  // Create operations
+  // Write operations (POST, PUT, PATCH requests) - protect against abuse
   app.post('/api/*', RateLimiterFactory.createOperationLimiter);
-
-  // General API rate limiting
-  app.use('/api/', RateLimiterFactory.apiLimiter);
+  app.put('/api/*', RateLimiterFactory.createOperationLimiter);
+  app.patch('/api/*', RateLimiterFactory.createOperationLimiter);
 }
 
 module.exports = {

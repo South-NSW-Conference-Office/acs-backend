@@ -25,6 +25,33 @@ const organizationAssignmentSchema = new mongoose.Schema({
   },
 });
 
+const teamAssignmentSchema = new mongoose.Schema({
+  teamId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Team',
+    required: true,
+  },
+  role: {
+    type: String,
+    enum: ['leader', 'member', 'communications'],
+    default: 'member',
+    required: true,
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  permissions: [
+    {
+      type: String,
+    },
+  ], // Team-specific permission overrides
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -86,6 +113,11 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
     },
+    teamAssignments: [teamAssignmentSchema],
+    primaryTeam: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Team',
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -100,6 +132,22 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
     emailVerificationExpires: {
+      type: Date,
+    },
+    invitationStatus: {
+      type: String,
+      enum: ['pending', 'accepted', 'expired'],
+      default: 'pending',
+    },
+    invitedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    invitedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    lastLoginAt: {
       type: Date,
     },
   },
@@ -168,6 +216,89 @@ userSchema.methods.getPermissionsForOrganization = async function (
     permissions: Array.isArray(role.permissions) ? role.permissions : [],
     organization: organizationId,
   };
+};
+
+// Get user permissions for a specific team
+userSchema.methods.getPermissionsForTeam = async function (teamId) {
+  const assignment = this.teamAssignments.find(
+    (team) => team.teamId.toString() === teamId.toString()
+  );
+
+  if (!assignment) {
+    return { role: null, permissions: [] };
+  }
+
+  // Get organization permissions first
+  await this.populate({
+    path: 'teamAssignments.teamId',
+    populate: { path: 'organizationId' },
+  });
+
+  const team = assignment.teamId;
+  const orgPermissions = await this.getPermissionsForOrganization(
+    team.organizationId
+  );
+
+  // Combine org permissions with team-specific overrides
+  const teamPermissions = [
+    ...orgPermissions.permissions,
+    ...assignment.permissions,
+  ];
+
+  return {
+    teamRole: assignment.role,
+    orgRole: orgPermissions.role,
+    permissions: [...new Set(teamPermissions)], // Remove duplicates
+    team: teamId,
+    organization: team.organizationId,
+  };
+};
+
+// Get all teams for user
+userSchema.methods.getTeams = async function () {
+  await this.populate({
+    path: 'teamAssignments.teamId',
+    populate: { path: 'organizationId', select: 'name' },
+  });
+
+  return this.teamAssignments.map((assignment) => ({
+    team: assignment.teamId,
+    role: assignment.role,
+    assignedAt: assignment.assignedAt,
+    permissions: assignment.permissions,
+  }));
+};
+
+// Check if user has specific team role
+userSchema.methods.hasTeamRole = function (teamId, role) {
+  const assignment = this.teamAssignments.find(
+    (team) => team.teamId.toString() === teamId.toString()
+  );
+
+  return assignment && assignment.role === role;
+};
+
+// Check if user is team leader for any team
+userSchema.methods.isTeamLeader = function () {
+  return this.teamAssignments.some(
+    (assignment) => assignment.role === 'leader'
+  );
+};
+
+// Get teams where user is leader
+userSchema.methods.getLeadingTeams = async function () {
+  const leadingAssignments = this.teamAssignments.filter(
+    (assignment) => assignment.role === 'leader'
+  );
+
+  if (!leadingAssignments.length) return [];
+
+  const Team = mongoose.model('Team');
+  const teamIds = leadingAssignments.map((a) => a.teamId);
+
+  return Team.find({ _id: { $in: teamIds } })
+    .populate('organizationId', 'name')
+    .lean();
 };
 
 module.exports = mongoose.model('User', userSchema);

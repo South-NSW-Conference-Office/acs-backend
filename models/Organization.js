@@ -43,6 +43,32 @@ const organizationSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    setupCompleted: {
+      type: Boolean,
+      default: false,
+    },
+    defaultRoles: {
+      type: [String],
+      default: ['admin', 'member'],
+    },
+    inviteSettings: {
+      autoApprove: {
+        type: Boolean,
+        default: false,
+      },
+      defaultRole: {
+        type: String,
+        default: 'member',
+      },
+      requiresApproval: {
+        type: Boolean,
+        default: true,
+      },
+    },
   },
   {
     timestamps: true,

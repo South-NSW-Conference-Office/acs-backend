@@ -29,7 +29,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.userId).populate(
-      'organizations.organization organizations.role'
+      'organizations.organization organizations.role teamAssignments.teamId'
     );
 
     if (!user || !user.isActive) {
@@ -292,10 +292,137 @@ const validateOrganizationContext = async (req, res, next) => {
   }
 };
 
+// New middleware to authorize with team context
+const authorizeWithTeam = (requiredPermission = {}) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
+
+      const teamId =
+        req.headers['x-team-id'] || req.params.teamId || req.body.teamId;
+
+      // If team context is provided
+      if (teamId) {
+        const teamPermissions = await req.user.getPermissionsForTeam(teamId);
+
+        if (!teamPermissions.orgRole) {
+          return res.status(403).json({
+            success: false,
+            message: 'No access to this team',
+          });
+        }
+
+        // Check team-scoped permissions
+        const hasPermission = checkPermissionWithScope(
+          teamPermissions.permissions,
+          requiredPermission,
+          'team',
+          { teamId, teamRole: teamPermissions.teamRole }
+        );
+
+        if (!hasPermission) {
+          return res.status(403).json({
+            success: false,
+            message: 'Insufficient team permissions',
+            required: requiredPermission,
+          });
+        }
+
+        req.teamPermissions = teamPermissions;
+        req.teamId = teamId;
+        req.organizationId = teamPermissions.organization;
+        next();
+      } else {
+        // Fall back to organization authorization
+        return authorize(requiredPermission)(req, res, next);
+      }
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Team authorization error',
+        err: error.message,
+      });
+    }
+  };
+};
+
+// Enhanced permission check with scope support
+const checkPermissionWithScope = (
+  userPermissions,
+  requiredPermission,
+  scope,
+  context = {}
+) => {
+  if (!userPermissions || userPermissions.length === 0) {
+    return false;
+  }
+
+  // Check for wildcard permissions
+  if (userPermissions.includes('*') || userPermissions.includes('all')) {
+    return true;
+  }
+
+  // Parse required permission
+  const [reqResource, reqAction] = requiredPermission.split('.');
+
+  // Check each user permission
+  for (const permission of userPermissions) {
+    const [permResource, permActionWithScope] = permission.split('.');
+
+    if (!permActionWithScope) continue;
+
+    // Check resource match or wildcard
+    if (permResource !== reqResource && permResource !== '*') continue;
+
+    // Parse action and scope
+    let permAction, permScope;
+    if (permActionWithScope.includes(':')) {
+      [permAction, permScope] = permActionWithScope.split(':');
+    } else {
+      permAction = permActionWithScope;
+      permScope = null;
+    }
+
+    // Check action match or wildcard
+    if (permAction !== reqAction && permAction !== '*') continue;
+
+    // Check scope compatibility
+    if (scope && permScope) {
+      // Team scope checks
+      if (scope === 'team') {
+        if (permScope === 'team' || permScope === 'all') return true;
+        if (permScope === 'team_subordinate' && context.teamRole === 'leader')
+          return true;
+      }
+      // Region scope checks
+      else if (scope === 'region') {
+        if (
+          permScope === 'region' ||
+          permScope === 'all' ||
+          permScope === 'subordinate'
+        )
+          return true;
+      }
+    } else if (!permScope) {
+      // Permission has no scope restriction
+      return true;
+    }
+  }
+
+  return false;
+};
+
 module.exports = {
   authenticateToken,
   authorize,
+  authorizeWithTeam,
   checkPermission,
+  checkPermissionWithScope,
   requireSuperAdmin,
   validateOrganizationContext,
 };

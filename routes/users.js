@@ -9,6 +9,7 @@ const {
   authorize,
   validateOrganizationContext,
 } = require('../middleware/auth');
+const { checkRoleQuota } = require('../middleware/quotaCheck');
 const authorizationService = require('../services/authorizationService');
 const secureQueryBuilder = require('../utils/secureQueryBuilder');
 
@@ -215,8 +216,9 @@ router.post(
 
       // Security check: Only super admins can assign super admin roles
       if (role.name === 'super_admin') {
-        const requesterIsSuperAdmin = await authorizationService.isUserSuperAdmin(req.user);
-        
+        const requesterIsSuperAdmin =
+          await authorizationService.isUserSuperAdmin(req.user);
+
         if (!requesterIsSuperAdmin) {
           return res.status(403).json({
             success: false,
@@ -322,6 +324,7 @@ router.delete(
 router.post(
   '/',
   authorize('users.create'),
+  checkRoleQuota, // Check role quota before creating user
   [
     body('name')
       .isString()
@@ -754,5 +757,244 @@ router.delete('/:userId', authorize('users.delete'), async (req, res) => {
     });
   }
 });
+
+// GET /api/users/team/:teamId - Get users by team
+router.get(
+  '/team/:teamId',
+  authorize('teams.read'),
+  [
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage('Limit must be between 1 and 100'),
+    query('skip')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Skip must be a non-negative integer'),
+    query('role')
+      .optional()
+      .isIn(['leader', 'member', 'communications'])
+      .withMessage('Invalid team role'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { teamId } = req.params;
+      const { role, limit = 50, skip = 0 } = req.query;
+
+      // Verify team exists and user has access
+      const Team = require('../models/Team');
+      const team = await Team.findById(teamId);
+
+      if (!team) {
+        return res.status(404).json({
+          success: false,
+          message: 'Team not found',
+        });
+      }
+
+      // Check if user can access this team
+      const hasAccess = await authorizationService.canAccessOrganization(
+        req.user,
+        team.organizationId,
+        'teams.read'
+      );
+
+      const isMember = req.user.teamAssignments?.some(
+        (assignment) => assignment.teamId.toString() === teamId
+      );
+
+      if (!hasAccess && !isMember) {
+        return res.status(403).json({
+          success: false,
+          message: 'No permission to view team members',
+        });
+      }
+
+      // Build query for team members
+      const query = { 'teamAssignments.teamId': teamId };
+      if (role) {
+        query['teamAssignments.role'] = role;
+      }
+
+      const users = await User.find(query)
+        .populate('organizations.organization', 'name type')
+        .populate('organizations.role', 'name displayName level')
+        .select('-password')
+        .limit(parseInt(limit))
+        .skip(parseInt(skip))
+        .sort({ 'teamAssignments.assignedAt': -1 });
+
+      const total = await User.countDocuments(query);
+
+      // Add team role to each user
+      const usersWithTeamRole = users.map((user) => {
+        const teamAssignment = user.teamAssignments.find(
+          (a) => a.teamId.toString() === teamId
+        );
+        return {
+          ...user.toJSON(),
+          teamRole: teamAssignment?.role || 'member',
+          teamAssignedAt: teamAssignment?.assignedAt,
+        };
+      });
+
+      res.json({
+        success: true,
+        message: 'Team members retrieved successfully',
+        data: usersWithTeamRole,
+        pagination: {
+          total,
+          limit: parseInt(limit),
+          skip: parseInt(skip),
+          hasMore: parseInt(skip) + parseInt(limit) < total,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        err: error.message,
+      });
+    }
+  }
+);
+
+// GET /api/users/:userId/teams - Get user's team assignments
+router.get('/:userId/teams', authorize('users.read'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if requester can access this user's data
+    const canAccess = await authorizationService.canAccessUser(
+      req.user,
+      userId
+    );
+
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        message: "Insufficient permissions to view this user's teams",
+      });
+    }
+
+    const user = await User.findById(userId).populate({
+      path: 'teamAssignments.teamId',
+      populate: {
+        path: 'organizationId',
+        select: 'name type',
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const teams = user.teamAssignments.map((assignment) => ({
+      team: assignment.teamId,
+      role: assignment.role,
+      assignedAt: assignment.assignedAt,
+      assignedBy: assignment.assignedBy,
+      permissions: assignment.permissions,
+    }));
+
+    res.json({
+      success: true,
+      message: 'User teams retrieved successfully',
+      data: teams,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      err: error.message,
+    });
+  }
+});
+
+// PUT /api/users/:userId/primary-team - Update user's primary team
+router.put(
+  '/:userId/primary-team',
+  authorize('users.update'),
+  [body('teamId').isMongoId().withMessage('Valid team ID is required')],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { userId } = req.params;
+      const { teamId } = req.body;
+
+      // Check if requester can update this user
+      const canAccess = await authorizationService.canAccessUser(
+        req.user,
+        userId
+      );
+
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to update this user',
+        });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      // Verify user is member of the team
+      const isMember = user.teamAssignments.some(
+        (assignment) => assignment.teamId.toString() === teamId
+      );
+
+      if (!isMember) {
+        return res.status(400).json({
+          success: false,
+          message: 'User is not a member of this team',
+        });
+      }
+
+      // Update primary team
+      user.primaryTeam = teamId;
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Primary team updated successfully',
+        data: {
+          userId: user._id,
+          primaryTeam: teamId,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        err: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;
