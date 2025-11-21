@@ -11,18 +11,62 @@ router.get(
   authenticateToken,
   authorize('teams.read'),
   async (req, res) => {
+    console.log('🚀 [BACKEND] GET /api/team-types/organization/:organizationId called');
+    console.log('📍 Organization ID from params:', req.params.organizationId);
+    console.log('👤 User ID:', req.user?._id);
+    console.log('👤 User name:', req.user?.name);
+    console.log('🏢 User organizations:', req.user?.organizations?.map(o => o.organization || o._id));
+    console.log('🔐 User permissions:', req.user?.permissions?.slice(0, 10), req.user?.permissions?.length > 10 ? '...' : '');
+    
     try {
       const { organizationId } = req.params;
       const { includeInactive } = req.query;
 
+      console.log('⚙️ Query parameters:');
+      console.log('  includeInactive:', includeInactive);
+
       const filter = { organizationId };
       if (includeInactive !== 'true') {
         filter.isActive = true;
+        console.log('🔍 Filter: Only active team types');
+      } else {
+        console.log('👻 Filter: Including inactive team types');
       }
 
+      console.log('📋 MongoDB filter:', filter);
+      console.log('🗄️ Executing TeamType.find() query...');
+      
       const teamTypes = await TeamType.find(filter)
         .populate('teamCount')
         .sort({ isDefault: -1, name: 1 }); // Default types first
+
+      console.log('✅ TeamType.find() returned:', teamTypes?.length || 0, 'team types');
+      
+      if (teamTypes && teamTypes.length > 0) {
+        console.log('🏷️ Team types found:');
+        teamTypes.forEach((teamType, index) => {
+          console.log(`  ${index + 1}. ${teamType.name} - Active: ${teamType.isActive} - Default: ${teamType.isDefault} - OrgId: ${teamType.organizationId}`);
+        });
+      } else {
+        console.warn('⚠️ No team types found in database');
+        console.log('🔍 Debugging: Let\'s check what exists...');
+        
+        // Debug: Check all team types regardless of organization
+        const allTeamTypes = await TeamType.find({}).select('name organizationId isActive isDefault');
+        console.log('🌐 All team types in database:');
+        allTeamTypes.forEach((type, index) => {
+          console.log(`  ${index + 1}. ${type.name} - OrgId: ${type.organizationId} - Active: ${type.isActive} - Default: ${type.isDefault}`);
+        });
+        
+        // Check if organization exists
+        const Organization = require('../models/Organization');
+        const org = await Organization.findById(organizationId);
+        if (org) {
+          console.log('✅ Organization exists:', org.name);
+        } else {
+          console.error('❌ Organization not found with ID:', organizationId);
+        }
+      }
 
       // Debug: Let's also manually count teams for each team type
       const Team = require('../models/Team');
@@ -31,6 +75,7 @@ router.get(
           type: teamType.name,
           organizationId: teamType.organizationId,
         });
+        console.log(`📊 TeamType "${teamType.name}": virtual count = ${teamType.teamCount}, manual count = ${manualCount}`);
         logger.debug(
           `TeamType "${teamType.name}": virtual count = ${teamType.teamCount}, manual count = ${manualCount}`
         );
@@ -41,6 +86,10 @@ router.get(
         data: teamTypes,
       });
     } catch (error) {
+      console.error('❌ Error in team types route:', error);
+      console.error('📝 Error message:', error.message);
+      console.error('📚 Error stack:', error.stack);
+      
       logger.error('Error fetching team types:', error);
       res.status(500).json({
         success: false,

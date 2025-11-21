@@ -226,10 +226,22 @@ teamSchema.statics.getTeamsByOrganization = async function (
   const { includeInactive = false, type } = options;
 
   const query = { organizationId };
-  if (!includeInactive) query.isActive = true;
-  if (type) query.type = type;
+  
+  if (!includeInactive) {
+    query.isActive = true;
+  }
+  
+  if (type) {
+    query.type = type;
+  }
 
-  return this.find(query).populate('leaderId', 'name email avatar').lean();
+  const teams = await this.find(query)
+    .populate('leaderId', 'name email avatar')
+    .populate('organizationId', 'name type')
+    .populate('createdBy', 'name email')
+    .lean();
+
+  return teams;
 };
 
 teamSchema.statics.getTeamsByUser = async function (userId) {
@@ -241,8 +253,9 @@ teamSchema.statics.getTeamsByUser = async function (userId) {
   const teamIds = user.teamAssignments.map((a) => a.teamId);
 
   return this.find({ _id: { $in: teamIds } })
-    .populate('organizationId', 'name')
+    .populate('organizationId', 'name type')
     .populate('leaderId', 'name email')
+    .populate('createdBy', 'name email')
     .lean();
 };
 

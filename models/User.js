@@ -220,6 +220,39 @@ userSchema.methods.getPermissionsForOrganization = async function (
 
 // Get user permissions for a specific team
 userSchema.methods.getPermissionsForTeam = async function (teamId) {
+  // Check if user is super admin first - avoid importing models here
+  const hasSuperAdminRole = this.organizations && this.organizations.some((org) => {
+    const roleName = org.role?.name || org.role;
+    return roleName === 'super_admin';
+  });
+
+  // Check for wildcard permissions across organizations
+  let hasWildcardPermissions = false;
+  if (this.organizations && this.organizations.length > 0) {
+    for (const org of this.organizations) {
+      try {
+        const orgPermissions = await this.getPermissionsForOrganization(org.organization || org._id);
+        if (orgPermissions.permissions.includes('*') || orgPermissions.permissions.includes('all')) {
+          hasWildcardPermissions = true;
+          break;
+        }
+      } catch (error) {
+        // Continue checking other organizations
+      }
+    }
+  }
+
+  // If user is super admin, grant full access
+  if (hasSuperAdminRole || hasWildcardPermissions) {
+    return {
+      teamRole: 'super_admin',
+      orgRole: 'super_admin', 
+      permissions: ['*'],
+      team: teamId,
+      organization: null, // Will be set by calling code if needed
+    };
+  }
+
   const assignment = this.teamAssignments.find(
     (team) => team.teamId.toString() === teamId.toString()
   );
