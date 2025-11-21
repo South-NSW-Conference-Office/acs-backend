@@ -196,6 +196,7 @@ class TeamService {
     if (!hasPermission) {
       // Check if user is member of any team in this org
       const userTeams = await Team.getTeamsByUser(user._id);
+      
       const orgTeams = userTeams.filter(
         (team) => team.organizationId.toString() === organizationId.toString()
       );
@@ -209,7 +210,9 @@ class TeamService {
     }
 
     // Return all teams for organization
-    return Team.getTeamsByOrganization(organizationId, options);
+    const allTeams = await Team.getTeamsByOrganization(organizationId, options);
+    
+    return allTeams;
   }
 
   /**
@@ -217,8 +220,9 @@ class TeamService {
    */
   static async getTeamDetails(teamId, user) {
     const team = await Team.findById(teamId)
-      .populate('organizationId', 'name')
+      .populate('organizationId', 'name type')
       .populate('leaderId', 'name email avatar')
+      .populate('createdBy', 'name email')
       .populate('serviceIds', 'name');
 
     if (!team) {

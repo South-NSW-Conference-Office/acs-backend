@@ -32,6 +32,53 @@ router.get(
         data: teams,
       });
     } catch (error) {
+      
+      res.status(error.message.includes('permission') ? 403 : 400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+// Get all teams for super admins
+router.get(
+  '/all',
+  authenticateToken,
+  authorize('teams.read'),
+  async (req, res) => {
+    try {
+      // Check if user is super admin
+      const isSuperAdmin = await authorizationService.isUserSuperAdmin(req.user);
+      
+      if (!isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'Super admin access required',
+        });
+      }
+      
+      // Get all accessible organizations
+      const accessibleOrgs = await authorizationService.getAccessibleOrganizations(req.user);
+      
+      // Fetch teams from all accessible organizations with enhanced population
+      const teams = await Team.find({ 
+        organizationId: { $in: accessibleOrgs },
+        isActive: true 
+      })
+        .populate('createdBy', 'name email')
+        .populate('organizationId', 'name type')
+        .populate('leaderId', 'name email avatar')
+        .sort({ createdAt: -1 })
+        .lean();
+      
+      // Teams already have memberCount field from schema
+      
+      res.json({
+        success: true,
+        data: teams,
+      });
+    } catch (error) {
       res.status(error.message.includes('permission') ? 403 : 400).json({
         success: false,
         message: error.message,
