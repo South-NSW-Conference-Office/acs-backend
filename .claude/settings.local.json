@@ -12,7 +12,8 @@
       "Bash(git push:*)",
       "Bash(pnpm lint:*)",
       "Bash(pnpm build:*)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }
