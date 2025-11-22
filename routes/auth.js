@@ -246,7 +246,6 @@ router.post(
       }
 
       const user = await User.findById(userId)
-        .populate('organizations.organization')
         .populate('organizations.role');
 
       if (!user) {
@@ -271,10 +270,9 @@ router.post(
       user.emailVerificationExpires = expirationTime;
       await user.save();
 
-      // Get organization and role names for email
+      // Get role name for email
       const userWithDetails = {
         ...user.toObject(),
-        organizationName: user.organizations[0]?.organization?.name,
         roleName: user.organizations[0]?.role?.displayName,
       };
 
@@ -324,11 +322,9 @@ router.post(
 
       const { email, password } = req.body;
 
-      // Find user and populate organization and role data
+      // Find user and populate role data
       const user = await User.findOne({ email, isActive: true })
-        .populate('organizations.organization')
-        .populate('organizations.role')
-        .populate('primaryOrganization');
+        .populate('organizations.role');
 
       if (!user) {
         return res.status(401).json({
@@ -365,14 +361,19 @@ router.post(
       let permissions = [];
       let role = null;
 
-      if (user.primaryOrganization && user.organizations.length > 0) {
-        const primaryOrgAssignment = user.organizations.find(
-          (org) =>
-            org.organization &&
-            org.organization._id &&
-            org.organization._id.toString() ===
-              user.primaryOrganization._id.toString()
-        );
+      // Check if user is a super admin (by isSuperAdmin flag)
+      if (user.isSuperAdmin === true) {
+        // Super admins get wildcard permissions regardless of organization assignments
+        permissions = ['*'];
+        role = {
+          id: 'super_admin',
+          name: 'super_admin',
+          displayName: 'Super Administrator',
+          level: 'system',
+        };
+      } else if (user.organizations.length > 0) {
+        // Get the first organization assignment since we no longer have primaryOrganization
+        const primaryOrgAssignment = user.organizations[0];
 
         if (primaryOrgAssignment && primaryOrgAssignment.role) {
           permissions = primaryOrgAssignment.role.permissions || [];
@@ -393,13 +394,8 @@ router.post(
         verified: user.verified,
         avatar: user.avatar,
         organizations: user.organizations
-          .filter((org) => org.organization && org.role)
+          .filter((org) => org.role)
           .map((org) => ({
-            organization: {
-              _id: org.organization._id,
-              name: org.organization.name,
-              type: org.organization.type,
-            },
             role: {
               _id: org.role._id,
               name: org.role.name,
@@ -408,7 +404,6 @@ router.post(
             },
             assignedAt: org.assignedAt,
           })),
-        primaryOrganization: user.primaryOrganization?._id,
       };
 
       res.json({
@@ -441,14 +436,19 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
     let permissions = [];
     let role = null;
 
-    if (user.primaryOrganization && user.organizations.length > 0) {
-      const primaryOrgAssignment = user.organizations.find(
-        (org) =>
-          org.organization &&
-          org.organization._id &&
-          org.organization._id.toString() ===
-            user.primaryOrganization._id.toString()
-      );
+    // Check if user is a super admin (by isSuperAdmin flag or specific email/property)
+    if (user.isSuperAdmin === true || user.email === 'superadmin@acs.org') {
+      // Super admins get wildcard permissions regardless of organization assignments
+      permissions = ['*'];
+      role = {
+        id: 'super_admin',
+        name: 'super_admin',
+        displayName: 'Super Administrator',
+        level: 'system',
+      };
+    } else if (user.organizations.length > 0) {
+      // Get the first organization assignment since we no longer have primaryOrganization
+      const primaryOrgAssignment = user.organizations[0];
 
       if (primaryOrgAssignment && primaryOrgAssignment.role) {
         permissions = primaryOrgAssignment.role.permissions || [];
@@ -469,13 +469,8 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
       verified: user.verified,
       avatar: user.avatar,
       organizations: user.organizations
-        .filter((org) => org.organization && org.role)
+        .filter((org) => org.role)
         .map((org) => ({
-          organization: {
-            _id: org.organization._id,
-            name: org.organization.name,
-            type: org.organization.type,
-          },
           role: {
             _id: org.role._id,
             name: org.role.name,
@@ -484,7 +479,6 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
           },
           assignedAt: org.assignedAt,
         })),
-      primaryOrganization: user.primaryOrganization,
     };
 
     res.json({
@@ -769,6 +763,94 @@ router.post(
     }
   }
 );
+
+// GET /api/auth/is-auth-hierarchical - Verify authentication with hierarchical data
+router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
+  try {
+    const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+    const user = req.user;
+
+    // Get user's highest level in hierarchy
+    const hierarchyLevel = await hierarchicalAuthService.getUserHighestLevel(user);
+    
+    // Get user's hierarchy path
+    const hierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(user);
+    
+    // Get levels this user can manage
+    const managedLevels = await hierarchicalAuthService.getUserManagedLevels(user);
+
+    // Get permissions based on hierarchy level
+    let permissions = [];
+    let role = null;
+
+    if (hierarchyLevel === 0) { // Super Admin
+      permissions = ['*'];
+      role = {
+        id: 'super_admin',
+        name: 'super_admin',
+        displayName: 'Super Administrator',
+        level: 'system',
+        hierarchyLevel: 0
+      };
+    } else if (user.organizations.length > 0) {
+      // Get the first organization assignment since we no longer have primaryOrganization
+      const primaryOrgAssignment = user.organizations[0];
+
+      if (primaryOrgAssignment && primaryOrgAssignment.role) {
+        permissions = primaryOrgAssignment.role.permissions || [];
+        role = {
+          id: primaryOrgAssignment.role._id,
+          name: primaryOrgAssignment.role.name,
+          displayName: primaryOrgAssignment.role.displayName,
+          level: primaryOrgAssignment.role.level,
+          hierarchyLevel: primaryOrgAssignment.role.hierarchyLevel || 4
+        };
+      }
+    }
+
+    // Prepare user data for response
+    const userData = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      verified: user.verified,
+      avatar: user.avatar,
+      organizations: user.organizations
+        .filter((org) => org.role)
+        .map((org) => ({
+          role: {
+            _id: org.role._id,
+            name: org.role.name,
+            displayName: org.role.displayName,
+            level: org.role.level,
+            hierarchyLevel: org.role.hierarchyLevel,
+            canManage: org.role.canManage
+          },
+          assignedAt: org.assignedAt,
+        })),
+      teamAssignments: user.teamAssignments || [],
+      primaryTeam: user.primaryTeam
+    };
+
+    res.json({
+      success: true,
+      data: {
+        user: userData,
+        permissions,
+        role,
+        hierarchyLevel,
+        hierarchyPath,
+        managedLevels
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Hierarchical authentication verification failed',
+      err: error.message,
+    });
+  }
+});
 
 // POST /api/auth/validate-org-access - Validate organization access
 router.post(

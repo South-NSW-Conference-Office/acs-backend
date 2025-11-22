@@ -4,7 +4,10 @@ const Service = require('../models/Service');
 const ServiceEvent = require('../models/ServiceEvent');
 const VolunteerRole = require('../models/VolunteerRole');
 const Story = require('../models/Story');
-const Organization = require('../models/Organization');
+// const Organization = require('../models/Organization'); // REMOVED - Using hierarchical models
+const Union = require('../models/Union');
+const Conference = require('../models/Conference');
+const Church = require('../models/Church');
 const { authenticateToken } = require('../middleware/auth');
 const {
   getManageableOrganizations,
@@ -317,9 +320,17 @@ router.get('/organizations', async (req, res) => {
       'services.create'
     );
 
-    const organizations = await Organization.find({
-      _id: { $in: orgIds },
-    }).select('name type parent');
+    // Get organizations from hierarchical models
+    const unions = await Union.find({ _id: { $in: orgIds } }).select('name');
+    const conferences = await Conference.find({ _id: { $in: orgIds } }).select('name unionId');
+    const churches = await Church.find({ _id: { $in: orgIds } }).select('name conferenceId unionId');
+    
+    // Combine into legacy format for compatibility
+    const organizations = [
+      ...unions.map(u => ({ _id: u._id, name: u.name, type: 'union', parent: null })),
+      ...conferences.map(c => ({ _id: c._id, name: c.name, type: 'conference', parent: c.unionId })),
+      ...churches.map(c => ({ _id: c._id, name: c.name, type: 'church', parent: c.conferenceId }))
+    ];
 
     res.json({
       success: true,

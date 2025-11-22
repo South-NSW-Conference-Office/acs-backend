@@ -8,6 +8,82 @@ const router = express.Router();
 // Apply authentication to all routes
 router.use(authenticateToken);
 
+// POST /api/roles/:id/reset - Reset system role to defaults
+router.post('/:id/reset', authorize('*'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const role = await Role.findById(id);
+    if (!role) {
+      return res.status(404).json({
+        success: false,
+        message: 'Role not found',
+      });
+    }
+
+    // Only allow resetting system roles
+    if (!role.isSystem) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot reset non-system roles',
+        error: 'Only system roles can be reset to defaults',
+      });
+    }
+
+    // Find the original role definition by name
+    const originalRoleDefinition = Role.defaultRoles.find(def => def.name === role.name);
+    if (!originalRoleDefinition) {
+      return res.status(404).json({
+        success: false,
+        message: 'Original role definition not found',
+        error: 'Cannot find default definition for this system role',
+      });
+    }
+
+    // Reset role to original definition (excluding _id, createdAt, updatedAt)
+    const resetData = {
+      name: originalRoleDefinition.name,
+      displayName: originalRoleDefinition.displayName,
+      level: originalRoleDefinition.level,
+      hierarchyLevel: originalRoleDefinition.hierarchyLevel,
+      canManage: originalRoleDefinition.canManage,
+      permissions: originalRoleDefinition.permissions,
+      description: originalRoleDefinition.description,
+      roleCategory: originalRoleDefinition.roleCategory,
+      quotaLimits: originalRoleDefinition.quotaLimits,
+      isSystem: originalRoleDefinition.isSystem,
+      isActive: true, // Ensure role is active after reset
+    };
+
+    Object.assign(role, resetData);
+    await role.save();
+
+    // Log system role reset
+    console.log(`[AUDIT] System role reset to defaults by super admin: ${req.user.email}`, {
+      roleId: id,
+      roleName: role.name,
+      timestamp: new Date().toISOString(),
+      userEmail: req.user.email,
+      userId: req.user._id
+    });
+
+    // Add warning header
+    res.set('X-System-Role-Reset', 'true');
+
+    res.json({
+      success: true,
+      message: 'System role reset to default configuration',
+      data: role,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message,
+    });
+  }
+});
+
 // GET /api/roles - Get all roles
 router.get(
   '/',
@@ -229,16 +305,44 @@ router.put(
         });
       }
 
-      // Prevent modification of system roles
-      if (
-        role.isSystem &&
-        Object.keys(updates).some((key) => key !== 'isActive')
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: 'System roles cannot be modified',
-          error: 'Cannot modify system role',
-        });
+      // Allow super admins to modify system roles with restrictions
+      if (role.isSystem) {
+        const { user } = req;
+        const isSuperAdmin = user.permissions?.includes('*') || user.permissions?.includes('all');
+        
+        if (!isSuperAdmin) {
+          // Non-super admins can only modify isActive
+          if (Object.keys(updates).some((key) => key !== 'isActive')) {
+            return res.status(403).json({
+              success: false,
+              message: 'System roles cannot be modified by non-super admins',
+              error: 'Insufficient privileges to modify system role',
+            });
+          }
+        } else {
+          // Super admins can modify system roles, but prevent certain critical changes
+          const restrictedFields = ['isSystem']; // Prevent toggling system status
+          if (Object.keys(updates).some((key) => restrictedFields.includes(key))) {
+            return res.status(403).json({
+              success: false,
+              message: 'Cannot modify system role status',
+              error: 'The isSystem property cannot be changed',
+            });
+          }
+          
+          // Log system role modification
+          console.log(`[AUDIT] System role modified by super admin: ${user.email}`, {
+            roleId: id,
+            roleName: role.name,
+            changes: updates,
+            timestamp: new Date().toISOString(),
+            userEmail: user.email,
+            userId: user._id
+          });
+          
+          // Add warning header for system role modifications
+          res.set('X-System-Role-Warning', 'true');
+        }
       }
 
       // Check for duplicate role name if name is being updated
@@ -285,13 +389,30 @@ router.delete('/:id', authorize('roles.delete'), async (req, res) => {
       });
     }
 
-    // Prevent deletion of system roles
+    // Allow only super admins to delete system roles
     if (role.isSystem) {
-      return res.status(403).json({
-        success: false,
-        message: 'System roles cannot be deleted',
-        error: 'Cannot delete system role',
+      const { user } = req;
+      const isSuperAdmin = user.permissions?.includes('*') || user.permissions?.includes('all');
+      
+      if (!isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'System roles cannot be deleted by non-super admins',
+          error: 'Insufficient privileges to delete system role',
+        });
+      }
+      
+      // Log system role deletion
+      console.log(`[AUDIT] System role deleted by super admin: ${user.email}`, {
+        roleId: id,
+        roleName: role.name,
+        timestamp: new Date().toISOString(),
+        userEmail: user.email,
+        userId: user._id
       });
+      
+      // Add warning header for system role deletion
+      res.set('X-System-Role-Warning', 'true');
     }
 
     // Check if role is assigned to any users

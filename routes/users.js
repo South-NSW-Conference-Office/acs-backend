@@ -2,7 +2,10 @@ const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const User = require('../models/User');
 const Role = require('../models/Role');
-const Organization = require('../models/Organization');
+// const Organization = require('../models/Organization') // REMOVED - Using hierarchical models
+const Union = require('../models/Union');
+const Conference = require('../models/Conference');
+const Church = require('../models/Church');;
 const UserService = require('../services/userService');
 const {
   authenticateToken,
@@ -196,8 +199,20 @@ router.post(
         });
       }
 
-      // Find organization
-      const organization = await Organization.findById(organizationId);
+      // Find organization (try all hierarchical types)
+      let organization = null;
+      
+      // Try as Union first
+      organization = await Union.findById(organizationId);
+      if (!organization) {
+        // Try as Conference
+        organization = await Conference.findById(organizationId);
+      }
+      if (!organization) {
+        // Try as Church
+        organization = await Church.findById(organizationId);
+      }
+      
       if (!organization) {
         return res.status(404).json({
           success: false,
@@ -666,6 +681,20 @@ router.get(
         return res.status(404).json({
           success: false,
           message: 'User not found',
+        });
+      }
+
+      // Check if user is super admin
+      if (user.isSuperAdmin) {
+        return res.json({
+          role: {
+            id: 'super_admin',
+            name: 'super_admin',
+            displayName: 'Super Administrator',
+            level: 'system',
+          },
+          permissions: ['*'],
+          organization: organizationId,
         });
       }
 

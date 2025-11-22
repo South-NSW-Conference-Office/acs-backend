@@ -29,7 +29,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.userId).populate(
-      'organizations.organization organizations.role teamAssignments.teamId'
+      'organizations.role teamAssignments.teamId'
     );
 
     if (!user || !user.isActive) {
@@ -79,11 +79,24 @@ const authorize = (requiredPermission = {}) => {
         });
       }
 
-      // For organization context, try multiple fallbacks
-      const organizationId =
-        req.headers['x-organization-id'] ||
-        req.user.primaryOrganization?._id ||
-        req.user.primaryOrganization;
+      // Check if user is super admin first
+      if (req.user.isSuperAdmin) {
+        // Super admins have all permissions regardless of organization
+        req.userPermissions = {
+          role: {
+            id: 'super_admin',
+            name: 'super_admin',
+            displayName: 'Super Administrator',
+            level: 'system',
+          },
+          permissions: ['*'],
+        };
+        req.organizationId = req.headers['x-organization-id'] || null;
+        return next();
+      }
+
+      // For organization context, try to get from header or use first organization
+      const organizationId = req.headers['x-organization-id'];
 
       // Validate organization context if provided via header
       if (req.headers['x-organization-id']) {
@@ -101,43 +114,20 @@ const authorize = (requiredPermission = {}) => {
         }
       }
 
-      // If still no organization context, try to use the user's first organization
+      // If no organization context in header, we'll work without specific org context
       let finalOrgId = organizationId;
-      if (
-        !finalOrgId &&
-        req.user.organizations &&
-        req.user.organizations.length > 0
-      ) {
-        finalOrgId =
-          req.user.organizations[0].organization._id ||
-          req.user.organizations[0].organization;
-      }
-
-      if (!finalOrgId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Organization context required',
-        });
-      }
 
       const userPermissions =
         await req.user.getPermissionsForOrganization(finalOrgId);
 
-      // If no role found for specific org, but user has any role assignments, use the primary one
+      // If no role found for specific org, but user has any role assignments, use the first one
       if (
         !userPermissions.role &&
         req.user.organizations &&
         req.user.organizations.length > 0
       ) {
         await req.user.populate('organizations.role');
-        const primaryAssignment =
-          req.user.organizations.find(
-            (org) =>
-              org.organization._id?.toString() ===
-                req.user.primaryOrganization?.toString() ||
-              org.organization?.toString() ===
-                req.user.primaryOrganization?.toString()
-          ) || req.user.organizations[0];
+        const primaryAssignment = req.user.organizations[0];
 
         if (primaryAssignment && primaryAssignment.role) {
           userPermissions.role = primaryAssignment.role;
@@ -146,7 +136,7 @@ const authorize = (requiredPermission = {}) => {
         } else {
           return res.status(403).json({
             success: false,
-            message: 'No role assigned in this organization',
+            message: 'No role assigned',
           });
         }
       }
@@ -154,7 +144,7 @@ const authorize = (requiredPermission = {}) => {
       if (!userPermissions.role) {
         return res.status(403).json({
           success: false,
-          message: 'No role assigned in this organization',
+          message: 'No role assigned',
         });
       }
 

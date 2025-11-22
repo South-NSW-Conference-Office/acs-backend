@@ -2,28 +2,30 @@ const express = require('express');
 const router = express.Router();
 const {
   authenticateToken,
-  authorize,
-  authorizeWithTeam,
-} = require('../middleware/auth');
+  authorizeHierarchical,
+  authorizeTeamAccess,
+  requireSuperAdmin
+} = require('../middleware/hierarchicalAuth');
+const { authorize, authorizeWithTeam } = require('../middleware/auth');
 const { checkRoleQuota } = require('../middleware/quotaCheck');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const TeamService = require('../services/teamService');
 const Team = require('../models/Team');
-const authorizationService = require('../services/authorizationService');
+const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 
-// Get teams for an organization
+// Get teams for an organization (church)
 router.get(
   '/organization/:organizationId',
   authenticateToken,
-  authorize('teams.read'),
+  authorizeHierarchical('read', 'organization'),
   async (req, res) => {
     try {
       const { organizationId } = req.params;
       const { type, includeInactive } = req.query;
 
-      const teams = await TeamService.getOrganizationTeams(
+      // Use new hierarchical method - only get teams for churches
+      const teams = await Team.getTeamsByChurch(
         organizationId,
-        req.user,
         { type, includeInactive: includeInactive === 'true' }
       );
 
@@ -32,7 +34,6 @@ router.get(
         data: teams,
       });
     } catch (error) {
-      
       res.status(error.message.includes('permission') ? 403 : 400).json({
         success: false,
         message: error.message,
@@ -41,38 +42,24 @@ router.get(
   }
 );
 
-// Get all teams for super admins
+// Get all teams accessible to user (hierarchical)
 router.get(
   '/all',
   authenticateToken,
-  authorize('teams.read'),
   async (req, res) => {
     try {
-      // Check if user is super admin
-      const isSuperAdmin = await authorizationService.isUserSuperAdmin(req.user);
+      // Get teams accessible based on user's hierarchy level
+      const userHierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
       
-      if (!isSuperAdmin) {
+      if (!userHierarchyPath) {
         return res.status(403).json({
           success: false,
-          message: 'Super admin access required',
+          message: 'No hierarchy access found',
         });
       }
       
-      // Get all accessible organizations
-      const accessibleOrgs = await authorizationService.getAccessibleOrganizations(req.user);
-      
-      // Fetch teams from all accessible organizations with enhanced population
-      const teams = await Team.find({ 
-        organizationId: { $in: accessibleOrgs },
-        isActive: true 
-      })
-        .populate('createdBy', 'name email')
-        .populate('organizationId', 'name type')
-        .populate('leaderId', 'name email avatar')
-        .sort({ createdAt: -1 })
-        .lean();
-      
-      // Teams already have memberCount field from schema
+      // Get accessible teams using hierarchical path
+      const teams = await Team.getAccessibleTeams(userHierarchyPath);
       
       res.json({
         success: true,
@@ -189,21 +176,15 @@ router.get(
   }
 );
 
-// Create new team
+// Create new team (HIERARCHICAL - must be under church)
 router.post(
   '/',
   authenticateToken,
-  authorize('teams.create'),
+  authorizeHierarchical('create', 'team'),
   auditLog('team.create'),
   async (req, res) => {
     try {
-      const { name, type, leaderId, description, maxMembers } = req.body;
-
-      // Get organization from authenticated user context
-      const organizationId =
-        req.authorizedOrgId ||
-        req.user.primaryOrganization?._id ||
-        req.user.primaryOrganization;
+      const { name, type, leaderId, description, maxMembers, churchId } = req.body;
 
       if (!name) {
         return res.status(400).json({
@@ -212,17 +193,57 @@ router.post(
         });
       }
 
-      if (!organizationId) {
+      // Get user's church or use provided churchId (must be validated by middleware)
+      let targetChurchId = churchId;
+      
+      if (!targetChurchId) {
+        // Get user's church assignment
+        const userChurch = await hierarchicalAuthService.getUserChurch(req.user);
+        
+        if (!userChurch) {
+          return res.status(403).json({
+            success: false,
+            message: 'No church assignment found. Teams must be created under a church.',
+          });
+        }
+        
+        targetChurchId = userChurch._id;
+      }
+
+      // Validate user can create team in this church
+      const userHierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
+      const church = await hierarchicalAuthService.getEntity('organization', targetChurchId);
+      
+      if (!church || church.hierarchyLevel !== 'church') {
         return res.status(400).json({
           success: false,
-          message: 'No organization context available',
+          message: 'Teams can only be created under church organizations',
         });
       }
 
-      const team = await TeamService.createTeam(
-        { name, organizationId, type, leaderId, description, maxMembers },
-        req.user
+      const canCreate = await hierarchicalAuthService.canUserManageEntity(
+        req.user,
+        church.hierarchyPath,
+        'create'
       );
+
+      if (!canCreate) {
+        return res.status(403).json({
+          success: false,
+          message: 'Insufficient permissions to create team in this church',
+        });
+      }
+
+      // Create team with church binding
+      const team = await Team.createTeam({
+        name,
+        churchId: targetChurchId,
+        type: type || 'other',
+        leaderId,
+        description,
+        maxMembers: maxMembers || 50,
+        createdBy: req.user._id
+      });
 
       res.status(201).json({
         success: true,

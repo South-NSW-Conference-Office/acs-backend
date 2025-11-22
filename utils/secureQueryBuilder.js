@@ -1,4 +1,5 @@
 const authorizationService = require('../services/authorizationService');
+const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 
 /**
  * Secure Query Builder
@@ -60,12 +61,40 @@ class SecureQueryBuilder {
   }
 
   /**
-   * Build a secure query for organization data
+   * Build a secure query for organization data using hierarchical permissions
    * @param {Object} user - User making the request
    * @param {Object} baseQuery - Initial query parameters
    * @returns {Promise<Object>} - Secure query object
    */
   async buildOrganizationQuery(user, baseQuery = {}) {
+    // Check if user is superadmin - if so, return unrestricted query
+    const userLevel = await hierarchicalAuthService.getUserHighestLevel(user);
+    if (userLevel === 0) {
+      return { ...baseQuery, isActive: true }; // Only filter for active organizations
+    }
+
+    // Get user's hierarchy path for filtering
+    const userPath = await hierarchicalAuthService.getUserHierarchyPath(user);
+    if (!userPath) {
+      return { _id: null }; // No access
+    }
+
+    // Filter organizations in user's subtree using hierarchy path
+    return {
+      ...baseQuery,
+      hierarchyPath: { $regex: `^${userPath}` },
+      isActive: true
+    };
+  }
+
+  /**
+   * Build a secure query for organization data (legacy method - kept for backward compatibility)
+   * @deprecated Use buildOrganizationQuery instead
+   * @param {Object} user - User making the request
+   * @param {Object} baseQuery - Initial query parameters
+   * @returns {Promise<Object>} - Secure query object
+   */
+  async buildLegacyOrganizationQuery(user, baseQuery = {}) {
     // Check if user is superadmin - if so, return unrestricted query
     if (await authorizationService.isUserSuperAdmin(user)) {
       return { ...baseQuery, isActive: true }; // Only filter for active organizations
@@ -143,6 +172,62 @@ class SecureQueryBuilder {
     const conditions = fields.map((field) => ({ [field]: regex }));
 
     return conditions.length === 1 ? conditions[0] : { $or: conditions };
+  }
+
+  /**
+   * Build a secure query for teams using hierarchical permissions
+   * @param {Object} user - User making the request
+   * @param {Object} baseQuery - Initial query parameters
+   * @returns {Promise<Object>} - Secure query object
+   */
+  async buildTeamQuery(user, baseQuery = {}) {
+    const userLevel = await hierarchicalAuthService.getUserHighestLevel(user);
+    
+    // Super admin sees all teams
+    if (userLevel === 0) {
+      return { ...baseQuery, isActive: true };
+    }
+
+    // Get user's accessible teams based on hierarchy
+    const accessibleTeams = await hierarchicalAuthService.getAccessibleEntities(user, 'teams');
+    const teamIds = accessibleTeams.map(team => team._id);
+
+    if (teamIds.length === 0) {
+      return { _id: null }; // No access
+    }
+
+    return {
+      ...baseQuery,
+      _id: { $in: teamIds }
+    };
+  }
+
+  /**
+   * Build a secure query for services using hierarchical permissions
+   * @param {Object} user - User making the request
+   * @param {Object} baseQuery - Initial query parameters
+   * @returns {Promise<Object>} - Secure query object
+   */
+  async buildServiceQuery(user, baseQuery = {}) {
+    const userLevel = await hierarchicalAuthService.getUserHighestLevel(user);
+    
+    // Super admin sees all services
+    if (userLevel === 0) {
+      return { ...baseQuery, status: { $ne: 'archived' } };
+    }
+
+    // Get user's accessible services based on hierarchy
+    const accessibleServices = await hierarchicalAuthService.getAccessibleEntities(user, 'services');
+    const serviceIds = accessibleServices.map(service => service._id);
+
+    if (serviceIds.length === 0) {
+      return { _id: null }; // No access
+    }
+
+    return {
+      ...baseQuery,
+      _id: { $in: serviceIds }
+    };
   }
 
   /**

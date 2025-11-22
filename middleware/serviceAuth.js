@@ -1,4 +1,7 @@
-const Organization = require('../models/Organization');
+// const Organization = require('../models/Organization'); // REMOVED - Using hierarchical models
+const Union = require('../models/Union');
+const Conference = require('../models/Conference');
+const Church = require('../models/Church');
 const Service = require('../models/Service');
 // const ServiceEvent = require('../models/ServiceEvent');
 // const VolunteerRole = require('../models/VolunteerRole');
@@ -69,11 +72,23 @@ async function canManageService(
 
     // Check :subordinate scope - service org must be a subordinate of user's org
     if (permissionDetails && permissionDetails.endsWith(':subordinate')) {
-      const subordinateOrgs =
-        await Organization.getSubordinateOrganizations(userOrgId);
-      const subordinateOrgIds = subordinateOrgs.map((org) =>
-        org._id.toString()
-      );
+      // Use hierarchical system to get subordinates
+      let subordinateOrgIds = [];
+      
+      // Try as union - get all conferences and churches
+      const union = await Union.findById(userOrgId);
+      if (union) {
+        const conferences = await Conference.find({ unionId: union._id });
+        const churches = await Church.find({ unionId: union._id });
+        subordinateOrgIds = [...conferences.map(c => c._id.toString()), ...churches.map(c => c._id.toString())];
+      } else {
+        // Try as conference - get all churches
+        const conference = await Conference.findById(userOrgId);
+        if (conference) {
+          const churches = await Church.find({ conferenceId: conference._id });
+          subordinateOrgIds = churches.map(c => c._id.toString());
+        }
+      }
 
       if (subordinateOrgIds.includes(serviceOrgId.toString())) {
         return true;
@@ -156,9 +171,15 @@ async function getManageableOrganizations(
   );
 
   if (isSuperAdmin) {
-    // Return all organizations for super admin
-    const allOrgs = await Organization.find({}).select('_id');
-    return allOrgs.map((org) => org._id.toString());
+    // Return all organizations for super admin - from hierarchical models
+    const unions = await Union.find({}).select('_id');
+    const conferences = await Conference.find({}).select('_id');
+    const churches = await Church.find({}).select('_id');
+    return [
+      ...unions.map(u => u._id.toString()),
+      ...conferences.map(c => c._id.toString()),
+      ...churches.map(c => c._id.toString())
+    ];
   }
 
   for (const assignment of user.organizations) {
@@ -194,9 +215,20 @@ async function getManageableOrganizations(
 
     // If they have subordinate scope, add all subordinate organizations
     if (permissionDetails && permissionDetails.endsWith(':subordinate')) {
-      const subordinateOrgs =
-        await Organization.getSubordinateOrganizations(userOrgId);
-      subordinateOrgs.forEach((org) => manageableOrgs.add(org._id.toString()));
+      // Use hierarchical system to get subordinates
+      const union = await Union.findById(userOrgId);
+      if (union) {
+        const conferences = await Conference.find({ unionId: union._id });
+        const churches = await Church.find({ unionId: union._id });
+        conferences.forEach(c => manageableOrgs.add(c._id.toString()));
+        churches.forEach(c => manageableOrgs.add(c._id.toString()));
+      } else {
+        const conference = await Conference.findById(userOrgId);
+        if (conference) {
+          const churches = await Church.find({ conferenceId: conference._id });
+          churches.forEach(c => manageableOrgs.add(c._id.toString()));
+        }
+      }
     }
   }
 

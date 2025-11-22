@@ -1,6 +1,9 @@
 const User = require('../models/User');
 const Role = require('../models/Role');
-const Organization = require('../models/Organization');
+// const Organization = require('../models/Organization'); // REMOVED - Using hierarchical models
+const Union = require('../models/Union');
+const Conference = require('../models/Conference');
+const Church = require('../models/Church');
 const {
   AppError,
   NotFoundError,
@@ -309,7 +312,14 @@ class UserService {
         throw new NotFoundError('User');
       }
 
-      const organization = await Organization.findById(organizationId);
+      // Find organization (try all hierarchical types)
+      let organization = await Union.findById(organizationId);
+      if (!organization) {
+        organization = await Conference.findById(organizationId);
+      }
+      if (!organization) {
+        organization = await Church.findById(organizationId);
+      }
       if (!organization) {
         throw new NotFoundError('Organization');
       }
@@ -406,7 +416,14 @@ class UserService {
     const validated = [];
 
     for (const assignment of assignments) {
-      const org = await Organization.findById(assignment.organizationId);
+      // Find organization (try all hierarchical types)
+      let org = await Union.findById(assignment.organizationId);
+      if (!org) {
+        org = await Conference.findById(assignment.organizationId);
+      }
+      if (!org) {
+        org = await Church.findById(assignment.organizationId);
+      }
       if (!org) {
         throw new NotFoundError(
           `Organization with ID ${assignment.organizationId}`
@@ -432,31 +449,11 @@ class UserService {
 
   static async getUserAccessibleOrganizations(userId) {
     try {
-      const user = await User.findById(userId).populate(
-        'organizations.organization'
-      );
-      if (!user) return [];
-
-      let accessibleIds = [];
-
-      // Add user's direct organizations
-      accessibleIds = user.organizations
-        .filter((org) => org.organization)
-        .map((org) => org.organization._id.toString());
-
-      // Add subordinate organizations
-      for (const userOrg of user.organizations) {
-        if (userOrg.organization) {
-          const subordinates = await Organization.getSubordinates(
-            userOrg.organization._id
-          );
-          accessibleIds.push(...subordinates.map((sub) => sub._id.toString()));
-        }
-      }
-
-      return [...new Set(accessibleIds)];
+      // Legacy method - now returns empty array since organizations are replaced by hierarchical system
+      // Use AuthorizationService.getUserUnionAccess, getUserConferenceAccess, or getUserChurchAccess instead
+      console.warn('getUserAccessibleOrganizations is deprecated. Use hierarchical access methods instead.');
+      return [];
     } catch (error) {
-      // Error getting user accessible organizations
       return [];
     }
   }

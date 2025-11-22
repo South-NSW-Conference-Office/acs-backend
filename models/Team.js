@@ -9,17 +9,48 @@ const teamSchema = new mongoose.Schema(
       maxlength: [100, 'Team name must be less than 100 characters'],
     },
 
+    // MANDATORY church relationship - STRICT HIERARCHY ENFORCEMENT
+    churchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Church',
+      required: [true, 'Church is required'],
+      index: true,
+      validate: {
+        validator: async function(churchId) {
+          const Church = mongoose.model('Church');
+          const church = await Church.findById(churchId);
+          return church && church.isActive;
+        },
+        message: 'Team must belong to an active church'
+      }
+    },
+    
+    // Legacy field for backward compatibility
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
-      required: [true, 'Organization is required'],
       index: true,
+    },
+
+    // TEAM HIERARCHY PATH  
+    hierarchyPath: {
+      type: String, // church's path + team ID
+      required: true,
+      index: true,
+    },
+    
+    // TEAM LEVEL = 3 (church is 2)
+    hierarchyDepth: {
+      type: Number,
+      default: 3,
+      immutable: true,
     },
 
     type: {
       type: String,
       required: true,
       trim: true,
+      enum: ['acs', 'youth', 'music', 'outreach', 'education', 'other'], // Standardize
     },
 
     leaderId: {
@@ -96,12 +127,14 @@ const teamSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for performance
-teamSchema.index({ organizationId: 1, type: 1 });
+// Indexes for performance - HIERARCHICAL OPTIMIZATION
+teamSchema.index({ churchId: 1, type: 1 });
+teamSchema.index({ hierarchyPath: 1 });
 teamSchema.index({ leaderId: 1 });
 teamSchema.index({ name: 'text' });
-teamSchema.index({ 'metadata.conference': 1 });
 teamSchema.index({ createdAt: -1 });
+// Legacy index for backward compatibility
+teamSchema.index({ organizationId: 1, type: 1 });
 
 // Virtual for member assignments (will be stored in User model)
 teamSchema.virtual('members', {
@@ -199,17 +232,37 @@ teamSchema.methods.getMembers = async function (options = {}) {
     .lean();
 };
 
-// Statics
+// Statics - HIERARCHICAL TEAM MANAGEMENT
 teamSchema.statics.createTeam = async function (data) {
-  const { organizationId, leaderId } = data;
+  const { churchId, organizationId, leaderId } = data;
+  
+  // Support both new churchId and legacy organizationId
+  const actualChurchId = churchId || organizationId;
+  
+  if (!actualChurchId) {
+    throw new Error('Church ID is required');
+  }
 
-  // Validate organization exists
-  const Organization = mongoose.model('Organization');
-  const org = await Organization.findById(organizationId);
-  if (!org) throw new Error('Organization not found');
+  // Validate church exists
+  const Church = mongoose.model('Church');
+  const church = await Church.findById(actualChurchId);
+  
+  if (!church) {
+    throw new Error('Church not found');
+  }
+  
+  if (!church.isActive) {
+    throw new Error('Cannot create team under inactive church');
+  }
 
-  // Create team
-  const team = await this.create(data);
+  // Create team with church binding
+  const teamData = {
+    ...data,
+    churchId: actualChurchId,
+    organizationId: actualChurchId // For backward compatibility
+  };
+
+  const team = await this.create(teamData);
 
   // If leader is specified, add them as team leader
   if (leaderId) {
@@ -219,13 +272,14 @@ teamSchema.statics.createTeam = async function (data) {
   return team;
 };
 
-teamSchema.statics.getTeamsByOrganization = async function (
-  organizationId,
+// Get teams by church (updated method name for clarity)
+teamSchema.statics.getTeamsByChurch = async function (
+  churchId,
   options = {}
 ) {
   const { includeInactive = false, type } = options;
 
-  const query = { organizationId };
+  const query = { churchId };
   
   if (!includeInactive) {
     query.isActive = true;
@@ -237,11 +291,30 @@ teamSchema.statics.getTeamsByOrganization = async function (
 
   const teams = await this.find(query)
     .populate('leaderId', 'name email avatar')
-    .populate('organizationId', 'name type')
+    .populate('churchId', 'name hierarchyLevel hierarchyPath')
     .populate('createdBy', 'name email')
     .lean();
 
   return teams;
+};
+
+// Legacy method for backward compatibility
+teamSchema.statics.getTeamsByOrganization = async function (
+  organizationId,
+  options = {}
+) {
+  return this.getTeamsByChurch(organizationId, options);
+};
+
+// NEW: Get teams accessible to a user based on hierarchy
+teamSchema.statics.getAccessibleTeams = async function (userHierarchyPath) {
+  return this.find({
+    hierarchyPath: { $regex: `^${userHierarchyPath}` },
+    isActive: true
+  })
+  .populate('churchId', 'name hierarchyLevel')
+  .populate('leaderId', 'name email')
+  .sort('name');
 };
 
 teamSchema.statics.getTeamsByUser = async function (userId) {
@@ -259,16 +332,51 @@ teamSchema.statics.getTeamsByUser = async function (userId) {
     .lean();
 };
 
-// Middleware
-teamSchema.pre('save', function (next) {
-  if (this.isModified('memberCount')) {
-    // Ensure member count doesn't exceed max
-    if (this.memberCount > this.maxMembers) {
-      this.memberCount = this.maxMembers;
+// Middleware - HIERARCHICAL ENFORCEMENT
+teamSchema.pre('save', async function (next) {
+  try {
+    // Build hierarchy path if modified
+    if (this.isModified('churchId') || !this.hierarchyPath) {
+      await this.buildHierarchyPath();
     }
+    
+    // Sync organizationId for backward compatibility
+    if (this.isModified('churchId')) {
+      this.organizationId = this.churchId;
+    }
+    
+    // Ensure member count doesn't exceed max
+    if (this.isModified('memberCount')) {
+      if (this.memberCount > this.maxMembers) {
+        this.memberCount = this.maxMembers;
+      }
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
+
+// Build hierarchy path automatically
+teamSchema.methods.buildHierarchyPath = async function() {
+  if (!this.churchId) {
+    throw new Error('Team must have a church assignment');
+  }
+  
+  const Church = mongoose.model('Church');
+  const church = await Church.findById(this.churchId);
+  
+  if (!church) {
+    throw new Error('Church not found');
+  }
+  
+  if (!church.isActive) {
+    throw new Error('Cannot assign team to inactive church');
+  }
+  
+  this.hierarchyPath = `${church.hierarchyPath}/team_${this._id}`;
+};
 
 teamSchema.pre('remove', async function (next) {
   // Remove all team assignments when team is deleted

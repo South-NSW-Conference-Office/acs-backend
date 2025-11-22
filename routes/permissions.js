@@ -219,12 +219,37 @@ router.get('/available-for-role', authorize('roles.read'), async (req, res) => {
     // Get all permissions grouped
     const groupedPermissions = await Permission.getGroupedPermissions();
 
-    // Filter system permissions based on role level
+    // Define hierarchical access rules
+    const getHierarchyLevel = (level) => {
+      switch (level) {
+        case 'union': return 0;      // Highest level
+        case 'conference': return 1; // Middle level  
+        case 'church': return 2;     // Lowest level
+        default: return 2;           // Default to most restrictive
+      }
+    };
+
+    const categoryHierarchyRequirements = {
+      'system': 0,        // Union level only
+      'organizations': 0, // Union level only (manage organizational hierarchy)
+      'users': 1,         // Conference level and above (manage users across organizations)
+      'roles': 1,         // Conference level and above (manage roles)
+      'teams': 2,         // Church level and above (all levels can manage teams)
+      'services': 2,      // Church level and above (all levels can manage services) 
+      'stories': 2,       // Church level and above (all levels can manage stories)
+      'dashboard': 2,     // Church level and above (all levels can view dashboards)
+    };
+
+    const userHierarchyLevel = getHierarchyLevel(roleLevel);
+
+    // Filter permissions based on role hierarchy level
     const filteredPermissions = {};
 
     for (const [categoryName, data] of Object.entries(groupedPermissions)) {
-      // Skip system category for non-super-admin roles
-      if (categoryName === 'system' && roleLevel !== 'union') {
+      const requiredLevel = categoryHierarchyRequirements[categoryName];
+      
+      // Skip categories that require higher hierarchy level
+      if (requiredLevel !== undefined && userHierarchyLevel > requiredLevel) {
         continue;
       }
 

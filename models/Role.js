@@ -17,8 +17,33 @@ const roleSchema = new mongoose.Schema(
     level: {
       type: String,
       required: true,
-      enum: ['union', 'conference', 'church'],
+      enum: ['union', 'conference', 'church', 'team', 'service'],
       lowercase: true,
+    },
+    
+    // HIERARCHICAL LEVEL NUMBER (0=highest, 4=lowest)
+    hierarchyLevel: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 4,
+      default: function() {
+        const levelMap = { 'union': 0, 'conference': 1, 'church': 2, 'team': 3, 'service': 4 };
+        return levelMap[this.level] || 2;
+      }
+    },
+    
+    // LEVELS THIS ROLE CAN MANAGE
+    canManage: {
+      type: [Number],
+      default: function() {
+        // Each level can manage levels below it
+        const manageLevels = [];
+        for (let i = this.hierarchyLevel + 1; i <= 4; i++) {
+          manageLevels.push(i);
+        }
+        return manageLevels;
+      }
     },
     permissions: [
       {
@@ -34,10 +59,12 @@ const roleSchema = new mongoose.Schema(
       type: String,
       enum: [
         'super_admin',
+        'union_admin',
         'conference_admin',
         'team_leader',
         'team_member',
         'communications',
+        'viewer',
       ],
       required: false,
     },
@@ -48,8 +75,8 @@ const roleSchema = new mongoose.Schema(
       },
       scope: {
         type: String,
-        enum: ['system', 'organization', 'region', 'team'],
-        default: 'organization',
+        enum: ['system', 'union', 'conference', 'church', 'team', 'service'],
+        default: 'church',
       },
       warningThreshold: {
         type: Number,
@@ -90,14 +117,17 @@ roleSchema.pre('save', function (next) {
   next();
 });
 
-// Static method to create system roles
+// Static method to create HIERARCHICAL system roles
 roleSchema.statics.createSystemRoles = async function () {
   const systemRoles = [
+    // LEVEL 0: SUPER ADMIN
     {
       name: 'super_admin',
       displayName: 'Super Administrator',
       level: 'union',
-      permissions: ['*'],
+      hierarchyLevel: 0,
+      canManage: [1, 2, 3, 4],
+      permissions: ['*'], // All permissions
       description: 'Full system access including system administration',
       roleCategory: 'super_admin',
       quotaLimits: {
@@ -107,188 +137,179 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
+    
+    // LEVEL 0: UNION ADMIN (between super_admin and conference)
     {
       name: 'union_admin',
-      displayName: 'Union Administrator',
+      displayName: 'Union Administrator', 
       level: 'union',
+      hierarchyLevel: 0,
+      canManage: [1, 2, 3, 4], // All subordinate levels
       permissions: [
-        'users.*',
-        'organizations.*',
-        'roles.*',
-        'services.*',
-        'stories.*',
+        'unions.read:own',
+        'unions.update:own',
+        'conferences.create:subordinate',
+        'conferences.read:subordinate',
+        'conferences.update:subordinate', 
+        'conferences.delete:subordinate',
+        'churches.read:subordinate',
+        'churches.manage:subordinate',
+        'teams.read:subordinate',
+        'teams.manage:subordinate',
+        'services.read:subordinate',
+        'services.manage:subordinate',
+        'users.manage:subordinate',
         'dashboard.view',
-        'analytics.read',
-        'analytics.export',
+        'analytics.read:subordinate',
+        'reports.generate:subordinate'
       ],
-      description:
-        'Administrative access for union level without system permissions',
-      roleCategory: 'conference_admin',
+      description: 'Administrative access for union level operations',
+      roleCategory: 'union_admin',
       quotaLimits: {
         maxUsers: 10,
-        scope: 'region',
+        scope: 'system',
         warningThreshold: 0.8,
       },
       isSystem: true,
     },
+    
+    // LEVEL 1: CONFERENCE/REGION  
     {
       name: 'conference_admin',
       displayName: 'Conference Administrator',
       level: 'conference',
+      hierarchyLevel: 1,
+      canManage: [2, 3, 4], // Churches, teams, services
       permissions: [
-        'organizations.read:subordinate',
-        'organizations.create:subordinate',
-        'organizations.update:subordinate',
-        'users.read:subordinate',
-        'users.create:subordinate',
-        'users.update:subordinate',
-        'users.assign_role:subordinate',
-        'roles.read',
-        'services.create:subordinate',
+        'churches.create:subordinate',
+        'churches.read:subordinate', 
+        'churches.update:subordinate',
+        'churches.delete:subordinate',
+        'conferences.read:own',
+        'conferences.update:own',
+        'teams.read:subordinate',
+        'teams.manage:subordinate',
         'services.read:subordinate',
-        'services.update:subordinate',
-        'services.delete:subordinate',
         'services.manage:subordinate',
-        'services.publish:subordinate',
-        'services.archive:subordinate',
-        'stories.create:subordinate',
-        'stories.read:subordinate',
-        'stories.update:subordinate',
-        'stories.delete:subordinate',
-        'stories.manage:subordinate',
+        'users.manage:subordinate',
         'dashboard.view',
-        'analytics.read:subordinate',
-        'teams.*:region',
+        'analytics.read:subordinate'
       ],
       description: 'Administrative access for conference level',
       roleCategory: 'conference_admin',
       quotaLimits: {
         maxUsers: 20,
-        scope: 'region',
+        scope: 'conference',
         warningThreshold: 0.8,
       },
       isSystem: true,
     },
+    
+    // LEVEL 2: CHURCH
     {
-      name: 'church_pastor',
-      displayName: 'Church Pastor',
+      name: 'church_admin',
+      displayName: 'Church Administrator',
       level: 'church',
+      hierarchyLevel: 2,
+      canManage: [3, 4], // Teams and services only
       permissions: [
-        'organizations.read:own',
-        'organizations.update:own',
-        'users.read:own',
-        'users.create:own',
-        'users.update:own',
-        'users.assign_role:own',
-        'roles.read',
-        'services.create:own',
+        'teams.create:own',
+        'teams.read:own',
+        'teams.update:own',
+        'teams.delete:own',
         'services.read:own',
-        'services.update:own',
-        'services.delete:own',
         'services.manage:own',
-        'services.publish:own',
-        'services.archive:own',
-        'stories.create:own',
-        'stories.read:own',
-        'stories.update:own',
-        'stories.delete:own',
-        'stories.manage:own',
-        'dashboard.view',
-        'analytics.read:own',
-        'teams.*:own',
+        'users.manage:own',
+        'dashboard.view'
       ],
       description: 'Full access within own church',
       roleCategory: 'team_leader',
       quotaLimits: {
         maxUsers: 500,
-        scope: 'organization',
+        scope: 'church',
         warningThreshold: 0.8,
       },
       isSystem: true,
     },
+    
+    // LEVEL 3: TEAM
     {
-      name: 'church_acs_leader',
-      displayName: 'Church ACS Leader',
-      level: 'church',
+      name: 'team_leader',
+      displayName: 'Team Leader',
+      level: 'team',
+      hierarchyLevel: 3,
+      canManage: [4], // Services only
       permissions: [
-        'users.read:acs_team',
-        'users.create:acs_team',
-        'users.update:acs_team',
-        'services.create:acs',
-        'services.read:acs',
-        'services.update:acs',
-        'services.manage:acs',
-        'services.publish:acs',
-        'stories.create:acs',
-        'stories.read:acs',
-        'stories.update:acs',
-        'stories.manage:acs',
-        'dashboard.view',
-        'teams.read:team',
-        'teams.update:team',
-        'teams.manage_members:team',
+        'services.create:team',
+        'services.read:team',
+        'services.update:team',
+        'services.delete:team',
+        'users.read:team',
+        'teams.read:own',
+        'teams.update:own'
       ],
-      description: 'ACS team leadership role',
-      roleCategory: 'team_member',
+      description: 'Team leadership with service management',
+      roleCategory: 'team_leader',
       quotaLimits: {
-        maxUsers: 900,
-        scope: 'organization',
+        maxUsers: 50,
+        scope: 'team',
         warningThreshold: 0.8,
       },
       isSystem: true,
     },
+    
     {
-      name: 'church_team_member',
-      displayName: 'Church Team Member',
-      level: 'church',
+      name: 'team_member',
+      displayName: 'Team Member',
+      level: 'team',
+      hierarchyLevel: 3,
+      canManage: [], // Cannot manage other entities
       permissions: [
-        'users.read:acs_team',
-        'services.read:acs',
-        'stories.read:acs',
-        'teams.read:team',
+        'services.read:team',
+        'teams.read:own',
+        'users.read:team'
       ],
       description: 'Basic team member access',
       roleCategory: 'team_member',
       quotaLimits: {
-        maxUsers: 900,
-        scope: 'organization',
+        maxUsers: 500,
+        scope: 'team',
         warningThreshold: 0.8,
       },
       isSystem: true,
     },
+    
+    // LEVEL 4: SERVICE (Lowest)
     {
-      name: 'church_communications',
-      displayName: 'Church Communications',
-      level: 'church',
+      name: 'service_coordinator',
+      displayName: 'Service Coordinator',
+      level: 'service',
+      hierarchyLevel: 4,
+      canManage: [], // Cannot manage other entities
       permissions: [
-        'users.read:team',
-        'services.read:team',
-        'stories.create:team',
-        'stories.read:team',
-        'stories.update:team',
-        'stories.manage:team',
-        'messages.create:team',
-        'messages.read:team',
-        'messages.update:team',
-        'messages.toggle:team',
-        'teams.read:team',
-        'dashboard.view',
+        'services.read:own',
+        'services.update:own'
       ],
-      description: 'Communications team member with message management',
-      roleCategory: 'communications',
+      description: 'Service-level coordinator with limited access',
+      roleCategory: 'team_member',
       quotaLimits: {
-        maxUsers: 900,
-        scope: 'organization',
+        maxUsers: 100,
+        scope: 'service',
         warningThreshold: 0.8,
       },
       isSystem: true,
     },
+    
+    // VIEWER ROLES
     {
       name: 'church_viewer',
       displayName: 'Church Viewer',
       level: 'church',
+      hierarchyLevel: 2,
+      canManage: [],
       permissions: ['services.read:public', 'stories.read:public'],
       description: 'Read-only access to public information',
+      roleCategory: 'viewer',
       isSystem: true,
     },
   ];
@@ -341,6 +362,17 @@ roleSchema.methods.hasPermission = function (requiredPermission) {
   return matchesScoped;
 };
 
+// NEW: Check if role can manage a specific hierarchy level
+roleSchema.methods.canManageLevel = function (targetLevel) {
+  return this.canManage.includes(targetLevel);
+};
+
+// NEW: Check if role can access entity at specific hierarchy path
+roleSchema.methods.canAccessEntity = function (userHierarchyPath, targetHierarchyPath) {
+  // Users can only access entities in their subtree
+  return targetHierarchyPath.startsWith(userHierarchyPath);
+};
+
 // Method to check if role has reached user quota
 roleSchema.methods.checkQuota = async function (organizationId = null) {
   if (!this.quotaLimits || !this.quotaLimits.maxUsers) {
@@ -364,12 +396,28 @@ roleSchema.methods.checkQuota = async function (organizationId = null) {
           'Organization ID required for region scope quota check'
         );
       }
-      const Organization = mongoose.model('Organization');
-      const org = await Organization.findById(organizationId);
-      const regionOrgs = await Organization.find({
-        parent: org.parent || org._id,
-      }).select('_id');
-      const orgIds = regionOrgs.map((o) => o._id);
+      // Using hierarchical system - get organizations in region
+      const Union = mongoose.model('Union');
+      const Conference = mongoose.model('Conference');  
+      const Church = mongoose.model('Church');
+      
+      let orgIds = [organizationId]; // Start with the given org
+      
+      // Try to find as union and get all conferences/churches
+      const union = await Union.findById(organizationId);
+      if (union) {
+        const conferences = await Conference.find({ unionId: union._id }).select('_id');
+        const churches = await Church.find({ unionId: union._id }).select('_id');
+        orgIds.push(...conferences.map(c => c._id), ...churches.map(c => c._id));
+      } else {
+        // Try as conference and get all churches
+        const conference = await Conference.findById(organizationId);
+        if (conference) {
+          const churches = await Church.find({ conferenceId: conference._id }).select('_id');
+          orgIds.push(...churches.map(c => c._id));
+        }
+      }
+      
       query = {
         'organizations.role': this._id,
         'organizations.organization': { $in: orgIds },

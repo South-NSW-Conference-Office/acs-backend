@@ -1,138 +1,93 @@
 const mongoose = require('mongoose');
 
-const serviceLocationSchema = new mongoose.Schema(
-  {
-    label: {
-      type: String,
-      required: true,
-    },
-    address: {
-      street: String,
-      suburb: String,
-      state: String,
-      postcode: String,
-      country: { type: String, default: 'Australia' },
-    },
-    coordinates: {
-      lat: Number,
-      lng: Number,
-    },
-    isMobile: {
-      type: Boolean,
-      default: false,
-    },
-    openingHours: [
-      {
-        day: {
-          type: String,
-          enum: [
-            'monday',
-            'tuesday',
-            'wednesday',
-            'thursday',
-            'friday',
-            'saturday',
-            'sunday',
-          ],
-        },
-        open: String,
-        close: String,
-        closed: Boolean,
-      },
-    ],
-  },
-  { _id: false }
-);
-
 const serviceSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 100,
     },
-    organization: {
+    teamId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
+      ref: 'Team',
       required: true,
-      index: true,
+    },
+    churchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Church',
+      required: true,
     },
     type: {
       type: String,
-      required: true,
-      index: true,
-      validate: {
-        validator: async function (value) {
-          const ServiceType = mongoose.model('ServiceType');
-          const type = await ServiceType.findByValue(value);
-          return !!type;
-        },
-        message: 'Invalid service type',
-      },
+      enum: [
+        'food_distribution',
+        'clothing_assistance',
+        'disaster_relief',
+        'health_services',
+        'education_support',
+        'elderly_care',
+        'youth_programs',
+        'community_service',
+        'financial_assistance',
+        'counseling_services',
+        'other'
+      ],
+      default: 'community_service',
     },
     descriptionShort: {
       type: String,
       maxlength: 200,
-      required: true,
     },
     descriptionLong: {
       type: String,
-      required: true,
+      maxlength: 2000,
     },
-    tags: [
-      {
-        type: String,
-        trim: true,
-        lowercase: true,
-      },
-    ],
     status: {
       type: String,
-      enum: ['active', 'paused', 'archived'],
+      enum: ['active', 'inactive', 'archived'],
       default: 'active',
-      index: true,
     },
-    primaryImage: {
-      url: String,
-      key: String, // S3/Wasabi object key for deletion
-      alt: String,
-    },
-    gallery: [
-      {
-        url: String,
-        key: String, // S3/Wasabi object key for deletion
-        thumbnailUrl: String,
-        thumbnailKey: String, // S3/Wasabi object key for thumbnail deletion
-        alt: String,
-        caption: String,
+    tags: [{
+      type: String,
+      maxlength: 50,
+    }],
+    locations: [{
+      type: {
+        type: String,
+        enum: ['Point'],
       },
-    ],
-    locations: [serviceLocationSchema],
+      coordinates: {
+        type: [Number],
+        index: '2dsphere',
+      },
+      address: String,
+      name: String,
+    }],
     contactInfo: {
-      email: String,
       phone: String,
+      email: String,
       website: String,
     },
-    socialMedia: {
-      facebook: String,
-      instagram: String,
-      twitter: String,
-    },
     eligibility: {
-      requirements: String,
-      ageGroups: [
-        {
-          type: String,
-          enum: ['children', 'teens', 'adults', 'seniors'],
-        },
-      ],
+      requirements: [String],
+      restrictions: [String],
+      ageRequirements: {
+        min: Number,
+        max: Number,
+      },
     },
     capacity: {
-      daily: Number,
-      weekly: Number,
-      notes: String,
+      maxParticipants: Number,
+      currentParticipants: {
+        type: Number,
+        default: 0,
+      },
     },
-    featuredUntil: Date,
+    hierarchyPath: {
+      type: String,
+      required: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -150,73 +105,115 @@ const serviceSchema = new mongoose.Schema(
   }
 );
 
-serviceSchema.index({
-  name: 'text',
-  descriptionShort: 'text',
-  descriptionLong: 'text',
-  tags: 'text',
-});
-serviceSchema.index({ organization: 1, status: 1 });
+// Indexes for performance
+serviceSchema.index({ teamId: 1, status: 1 });
+serviceSchema.index({ churchId: 1, status: 1 });
+serviceSchema.index({ hierarchyPath: 1 });
 serviceSchema.index({ type: 1, status: 1 });
 serviceSchema.index({ 'locations.coordinates': '2dsphere' });
 
-serviceSchema.virtual('isActive').get(function () {
-  return this.status === 'active';
-});
-
-serviceSchema.virtual('isFeatured').get(function () {
-  return this.featuredUntil && this.featuredUntil > new Date();
-});
-
-serviceSchema.pre('save', function (next) {
-  if (this.isModified()) {
-    this.updatedBy = this.createdBy;
+// Pre-save middleware to auto-populate churchId and hierarchyPath
+serviceSchema.pre('save', async function (next) {
+  if (this.isNew || this.isModified('teamId')) {
+    try {
+      const Team = mongoose.model('Team');
+      const team = await Team.findById(this.teamId).populate('churchId');
+      
+      if (!team) {
+        throw new Error('Team not found');
+      }
+      
+      if (!team.churchId) {
+        throw new Error('Team must be assigned to a church');
+      }
+      
+      this.churchId = team.churchId._id;
+      this.hierarchyPath = `${team.hierarchyPath}/service_${this._id}`;
+    } catch (error) {
+      return next(error);
+    }
   }
   next();
 });
 
-serviceSchema.methods.canBeViewedBy = function (user) {
-  return (
-    this.status === 'active' ||
-    (user &&
-      user.organizations.some((org) =>
-        org.organization.equals(this.organization)
-      ))
-  );
+// Static method to find services accessible to user based on hierarchy
+serviceSchema.statics.findAccessibleServices = async function (userHierarchyPath) {
+  if (!userHierarchyPath) {
+    return [];
+  }
+  
+  // Find services where the hierarchy path starts with user's path
+  const services = await this.find({
+    hierarchyPath: new RegExp(`^${userHierarchyPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+    status: 'active'
+  })
+  .populate('teamId', 'name type')
+  .populate('churchId', 'name')
+  .sort({ name: 1 });
+  
+  return services;
 };
 
-serviceSchema.statics.findActiveServices = function (filters = {}) {
-  return this.find({ ...filters, status: 'active' })
-    .populate('organization', 'name type')
-    .sort('-createdAt');
-};
-
-serviceSchema.statics.findByOrganization = function (
-  organizationId,
-  includeArchived = false
-) {
-  const query = { organization: organizationId };
+// Static method to find services by team
+serviceSchema.statics.findByTeam = async function (teamId, includeArchived = false) {
+  const query = { teamId };
   if (!includeArchived) {
     query.status = { $ne: 'archived' };
   }
-  return this.find(query).populate('organization', 'name type');
+  
+  const services = await this.find(query)
+    .populate('teamId', 'name type')
+    .populate('churchId', 'name')
+    .sort({ name: 1 });
+    
+  return services;
 };
 
-serviceSchema.statics.findNearby = function (coordinates, maxDistance = 50000) {
-  return this.find({
-    status: 'active',
+// Static method to find services by church
+serviceSchema.statics.findByChurch = async function (churchId, includeArchived = false) {
+  const query = { churchId };
+  if (!includeArchived) {
+    query.status = { $ne: 'archived' };
+  }
+  
+  const services = await this.find(query)
+    .populate('teamId', 'name type')
+    .populate('churchId', 'name')
+    .sort({ name: 1 });
+    
+  return services;
+};
+
+// Static method for geographic search
+serviceSchema.statics.findNearby = async function (coordinates, maxDistance = 50000) {
+  const services = await this.find({
     'locations.coordinates': {
       $near: {
         $geometry: {
           type: 'Point',
-          coordinates: [coordinates.lng, coordinates.lat],
+          coordinates: [coordinates.lng, coordinates.lat]
         },
-        $maxDistance: maxDistance,
-      },
+        $maxDistance: maxDistance
+      }
     },
-  });
+    status: 'active'
+  })
+  .populate('teamId', 'name type')
+  .populate('churchId', 'name')
+  .sort({ name: 1 });
+  
+  return services;
 };
 
-const Service = mongoose.model('Service', serviceSchema);
+// Instance method to check if service can be viewed by user
+serviceSchema.methods.canBeViewedBy = function (user) {
+  // Public services can be viewed by anyone
+  if (this.status === 'active') {
+    return true;
+  }
+  
+  // Inactive or archived services require authentication
+  return user && user.isActive;
+};
 
-module.exports = Service;
+module.exports = mongoose.model('Service', serviceSchema);
