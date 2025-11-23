@@ -62,7 +62,9 @@ router.get(
 
       const conferences = await Conference.find(query)
         .populate('unionId', 'name')
-        .select('name territory headquarters contact isActive unionId')
+        .select(
+          'name territory headquarters contact isActive unionId primaryImage'
+        )
         .sort('name');
 
       res.json({
@@ -147,7 +149,7 @@ router.post(
       .withMessage('Conference name must be at least 2 characters'),
     body('unionId').isMongoId().withMessage('Valid union ID required'),
     body('contact.email')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isEmail()
       .withMessage('Valid email required'),
   ],
@@ -207,7 +209,7 @@ router.put(
       .isLength({ min: 2 })
       .withMessage('Conference name must be at least 2 characters'),
     body('contact.email')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isEmail()
       .withMessage('Valid email required'),
   ],
@@ -413,6 +415,163 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to get conference hierarchy',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
+      });
+    }
+  }
+);
+
+// PUT /api/conferences/:id/banner - Upload/update conference banner image
+router.put(
+  '/:id/banner',
+  authorizeHierarchical('update', 'conference'),
+  auditLog('conference.banner.update'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Verify user has access to update this conference
+      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+        req.user,
+        id,
+        'update'
+      );
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'You do not have permission to update this conference banner',
+        });
+      }
+
+      const conference = await Conference.findById(id);
+      if (!conference) {
+        return res.status(404).json({
+          success: false,
+          message: 'Conference not found',
+        });
+      }
+
+      // Implementation would be similar to union banner upload
+      // For now, return a placeholder response
+      res.json({
+        success: true,
+        message: 'Banner upload endpoint ready for implementation',
+        data: {
+          image: {
+            url: 'placeholder-url',
+            key: 'placeholder-key',
+            alt: req.body.alt || '',
+          },
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload banner image',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
+      });
+    }
+  }
+);
+
+// PUT /api/conferences/:id/banner/media - Set conference banner from existing media file
+router.put(
+  '/:id/banner/media',
+  authorizeHierarchical('update', 'conference'),
+  auditLog('conference.banner.update_from_media'),
+  [
+    body('mediaFileId')
+      .isMongoId()
+      .withMessage('Valid media file ID is required'),
+    body('alt')
+      .optional()
+      .isString()
+      .trim()
+      .isLength({ max: 255 })
+      .withMessage('Alt text must be a string with max 255 characters'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
+      }
+
+      const { id } = req.params;
+      const { mediaFileId, alt } = req.body;
+
+      // Verify user has access to update this conference
+      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+        req.user,
+        id,
+        'update'
+      );
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'You do not have permission to update this conference banner',
+        });
+      }
+
+      const conference = await Conference.findById(id);
+      if (!conference) {
+        return res.status(404).json({
+          success: false,
+          message: 'Conference not found',
+        });
+      }
+
+      // Get the media file
+      const MediaFile = require('../models/MediaFile');
+      const mediaFile = await MediaFile.findById(mediaFileId);
+      if (!mediaFile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Media file not found',
+        });
+      }
+
+      // Update conference banner
+      conference.primaryImage = {
+        url: mediaFile.url,
+        key: mediaFile.key,
+        alt: alt || mediaFile.alt || '',
+        mediaFileId: mediaFile._id,
+      };
+      conference.metadata.lastUpdated = new Date();
+      await conference.save();
+
+      // Increment usage count for the media file
+      await MediaFile.findByIdAndUpdate(mediaFileId, {
+        $inc: { 'usage.total': 1 },
+        $set: { 'usage.lastUsed': new Date() },
+      });
+
+      res.json({
+        success: true,
+        message: 'Conference banner updated successfully',
+        data: {
+          image: conference.primaryImage,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to set banner image from media',
         error:
           process.env.NODE_ENV === 'development'
             ? error.message

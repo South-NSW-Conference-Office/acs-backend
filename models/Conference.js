@@ -19,7 +19,7 @@ const conferenceSchema = new mongoose.Schema(
     // Hierarchy properties
     hierarchyPath: {
       type: String,
-      required: true,
+      required: false, // Will be set automatically in pre-save middleware
       index: true,
     },
 
@@ -137,6 +137,17 @@ const conferenceSchema = new mongoose.Schema(
       lastUpdated: { type: Date, default: Date.now },
     },
 
+    // Banner image for the conference
+    primaryImage: {
+      url: String,
+      key: String,
+      alt: String,
+      mediaFileId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MediaFile',
+      },
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -186,6 +197,9 @@ conferenceSchema.pre('save', async function (next) {
       const union = await Union.findById(this.unionId);
       if (!union) {
         return next(new Error('Parent union not found'));
+      }
+      if (!union.hierarchyPath) {
+        return next(new Error('Parent union has no hierarchy path'));
       }
       // For new documents, set a temporary path that will be updated after save
       this.hierarchyPath = `${union.hierarchyPath}/temp-${Date.now()}`;
