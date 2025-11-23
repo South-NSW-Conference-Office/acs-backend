@@ -83,13 +83,6 @@ const churchSchema = new mongoose.Schema(
 
     // Church leadership
     leadership: {
-      pastor: {
-        name: String,
-        title: String,
-        email: String,
-        phone: String,
-        startDate: Date,
-      },
       associatePastors: [
         {
           name: String,
@@ -271,7 +264,6 @@ const churchSchema = new mongoose.Schema(
       default: true,
     },
 
-    establishedDate: Date,
     organizedDate: Date, // When officially organized as SDA church
 
     metadata: {
@@ -510,7 +502,7 @@ churchSchema.statics.getActiveChurches = function (conferenceId = null) {
   if (conferenceId) query.conferenceId = conferenceId;
 
   return this.find(query)
-    .select('name code hierarchyPath location contact leadership demographics')
+    .select('name code hierarchyPath location contact demographics')
     .populate('conferenceId', 'name code')
     .sort('name');
 };
