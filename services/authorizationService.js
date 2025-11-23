@@ -15,12 +15,23 @@ class AuthorizationService {
    * @returns {Boolean} - True if user is superadmin
    */
   isSuperAdmin(user) {
-    if (!user || !user.organizations || user.organizations.length === 0) {
+    if (!user) {
       return false;
     }
 
-    // Check if user has super_admin role
-    return user.organizations.some(assignment => 
+    // Check direct super admin flag
+    if (user.isSuperAdmin === true) {
+      return true;
+    }
+
+    // Check all hierarchical assignments for super_admin role
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+
+    return allAssignments.some(assignment => 
       assignment.role && 
       assignment.role.name === 'super_admin'
     );
@@ -33,7 +44,7 @@ class AuthorizationService {
    * @returns {Boolean} - True if user has permission
    */
   hasPermission(user, permission) {
-    if (!user || !user.organizations || user.organizations.length === 0) {
+    if (!user) {
       return false;
     }
 
@@ -42,8 +53,15 @@ class AuthorizationService {
       return true;
     }
 
+    // Check all hierarchical assignments for permission
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+
     // Check if user has the specific permission
-    return user.organizations.some(assignment => 
+    return allAssignments.some(assignment => 
       assignment.role && 
       assignment.role.permissions && 
       assignment.role.permissions.includes(permission)
@@ -56,7 +74,7 @@ class AuthorizationService {
    * @returns {Array} - Array of union IDs user can access
    */
   async getUserUnionAccess(user) {
-    if (!user || !user.organizations) return [];
+    if (!user) return [];
 
     // Super admin can access all unions
     if (this.isSuperAdmin(user)) {
@@ -67,29 +85,38 @@ class AuthorizationService {
     // Get union IDs from user assignments
     const unionIds = new Set();
     
-    for (const assignment of user.organizations) {
-      try {
-        // Try to find as union first
-        const union = await Union.findById(assignment.organization);
-        if (union) {
-          unionIds.add(union._id.toString());
-          continue;
-        }
+    // Direct union assignments
+    if (user.unionAssignments) {
+      for (const assignment of user.unionAssignments) {
+        unionIds.add(assignment.union.toString());
+      }
+    }
 
-        // Try to find as conference and get its union
-        const conference = await Conference.findById(assignment.organization);
-        if (conference) {
-          unionIds.add(conference.unionId.toString());
-          continue;
+    // Conference assignments - get their unions
+    if (user.conferenceAssignments) {
+      for (const assignment of user.conferenceAssignments) {
+        try {
+          const conference = await Conference.findById(assignment.conference);
+          if (conference) {
+            unionIds.add(conference.unionId.toString());
+          }
+        } catch (error) {
+          console.warn(`Error resolving conference ${assignment.conference}:`, error.message);
         }
+      }
+    }
 
-        // Try to find as church and get its union
-        const church = await Church.findById(assignment.organization);
-        if (church) {
-          unionIds.add(church.unionId.toString());
+    // Church assignments - get their unions  
+    if (user.churchAssignments) {
+      for (const assignment of user.churchAssignments) {
+        try {
+          const church = await Church.findById(assignment.church);
+          if (church) {
+            unionIds.add(church.unionId.toString());
+          }
+        } catch (error) {
+          console.warn(`Error resolving church ${assignment.church}:`, error.message);
         }
-      } catch (error) {
-        console.warn(`Error resolving organization ${assignment.organization}:`, error.message);
       }
     }
 
@@ -102,7 +129,7 @@ class AuthorizationService {
    * @returns {Array} - Array of conference IDs user can access
    */
   async getUserConferenceAccess(user) {
-    if (!user || !user.organizations) return [];
+    if (!user) return [];
 
     // Super admin can access all conferences
     if (this.isSuperAdmin(user)) {
@@ -112,30 +139,36 @@ class AuthorizationService {
 
     const conferenceIds = new Set();
 
-    for (const assignment of user.organizations) {
-      try {
-        // Try to find as union and get all its conferences
-        const union = await Union.findById(assignment.organization);
-        if (union) {
-          const conferences = await Conference.find({ unionId: union._id, isActive: true });
+    // Union assignments - get all conferences in union
+    if (user.unionAssignments) {
+      for (const assignment of user.unionAssignments) {
+        try {
+          const conferences = await Conference.find({ unionId: assignment.union });
           conferences.forEach(c => conferenceIds.add(c._id.toString()));
-          continue;
+        } catch (error) {
+          console.warn(`Error resolving union ${assignment.union}:`, error.message);
         }
+      }
+    }
 
-        // Try to find as conference directly
-        const conference = await Conference.findById(assignment.organization);
-        if (conference) {
-          conferenceIds.add(conference._id.toString());
-          continue;
-        }
+    // Direct conference assignments
+    if (user.conferenceAssignments) {
+      for (const assignment of user.conferenceAssignments) {
+        conferenceIds.add(assignment.conference.toString());
+      }
+    }
 
-        // Try to find as church and get its conference
-        const church = await Church.findById(assignment.organization);
-        if (church) {
-          conferenceIds.add(church.conferenceId.toString());
+    // Church assignments - get their conferences
+    if (user.churchAssignments) {
+      for (const assignment of user.churchAssignments) {
+        try {
+          const church = await Church.findById(assignment.church);
+          if (church) {
+            conferenceIds.add(church.conferenceId.toString());
+          }
+        } catch (error) {
+          console.warn(`Error resolving church ${assignment.church}:`, error.message);
         }
-      } catch (error) {
-        console.warn(`Error resolving organization ${assignment.organization}:`, error.message);
       }
     }
 
@@ -148,7 +181,7 @@ class AuthorizationService {
    * @returns {Array} - Array of church IDs user can access
    */
   async getUserChurchAccess(user) {
-    if (!user || !user.organizations) return [];
+    if (!user) return [];
 
     // Super admin can access all churches
     if (this.isSuperAdmin(user)) {
@@ -158,34 +191,37 @@ class AuthorizationService {
 
     const churchIds = new Set();
 
-    for (const assignment of user.organizations) {
-      try {
-        // Try to find as union and get all its churches
-        const union = await Union.findById(assignment.organization);
-        if (union) {
-          const conferences = await Conference.find({ unionId: union._id, isActive: true });
+    // Union assignments - get all churches in union
+    if (user.unionAssignments) {
+      for (const assignment of user.unionAssignments) {
+        try {
+          const conferences = await Conference.find({ unionId: assignment.union, isActive: true });
           for (const conference of conferences) {
             const churches = await Church.find({ conferenceId: conference._id, isActive: true });
             churches.forEach(c => churchIds.add(c._id.toString()));
           }
-          continue;
+        } catch (error) {
+          console.warn(`Error resolving union ${assignment.union}:`, error.message);
         }
+      }
+    }
 
-        // Try to find as conference and get all its churches
-        const conference = await Conference.findById(assignment.organization);
-        if (conference) {
-          const churches = await Church.find({ conferenceId: conference._id, isActive: true });
+    // Conference assignments - get all churches in conference  
+    if (user.conferenceAssignments) {
+      for (const assignment of user.conferenceAssignments) {
+        try {
+          const churches = await Church.find({ conferenceId: assignment.conference, isActive: true });
           churches.forEach(c => churchIds.add(c._id.toString()));
-          continue;
+        } catch (error) {
+          console.warn(`Error resolving conference ${assignment.conference}:`, error.message);
         }
+      }
+    }
 
-        // Try to find as church directly
-        const church = await Church.findById(assignment.organization);
-        if (church) {
-          churchIds.add(church._id.toString());
-        }
-      } catch (error) {
-        console.warn(`Error resolving organization ${assignment.organization}:`, error.message);
+    // Direct church assignments
+    if (user.churchAssignments) {
+      for (const assignment of user.churchAssignments) {
+        churchIds.add(assignment.church.toString());
       }
     }
 

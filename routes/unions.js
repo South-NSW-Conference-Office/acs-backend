@@ -43,7 +43,7 @@ router.get(
       }
 
       const unions = await Union.find(query)
-        .select('name code territory headquarters contact president isActive establishedDate')
+        .select('name territory headquarters contact isActive')
         .sort('name');
 
       res.json({
@@ -118,16 +118,6 @@ router.post(
       .trim()
       .isLength({ min: 2 })
       .withMessage('Union name must be at least 2 characters'),
-    body('code')
-      .trim()
-      .isLength({ min: 2, max: 10 })
-      .withMessage('Union code must be 2-10 characters')
-      .matches(/^[A-Z]+$/)
-      .withMessage('Union code must be uppercase letters only'),
-    body('territory.countries')
-      .optional()
-      .isArray()
-      .withMessage('Countries must be an array'),
     body('headquarters.country')
       .optional()
       .isString()
@@ -149,21 +139,28 @@ router.post(
       }
 
       // Check if code already exists
-      const existingUnion = await Union.findOne({ code: req.body.code.toUpperCase() });
-      if (existingUnion) {
-        return res.status(409).json({
-          success: false,
-          message: 'Union code already exists',
-        });
+      if (req.body.code) {
+        const existingUnion = await Union.findOne({ code: req.body.code.toUpperCase() });
+        if (existingUnion) {
+          return res.status(409).json({
+            success: false,
+            message: 'Union code already exists',
+          });
+        }
       }
 
-      const unionData = {
+      // Create the union document first to get an ID
+      const union = new Union({
         ...req.body,
-        code: req.body.code.toUpperCase(),
+        ...(req.body.code && { code: req.body.code.toUpperCase() }),
         createdBy: req.user.id,
-      };
+      });
 
-      const union = await Union.create(unionData);
+      // Set hierarchyPath before validation
+      union.hierarchyPath = union._id.toString();
+      
+      // Save the union
+      await union.save();
 
       res.status(201).json({
         success: true,
@@ -192,13 +189,6 @@ router.put(
       .trim()
       .isLength({ min: 2 })
       .withMessage('Union name must be at least 2 characters'),
-    body('code')
-      .optional()
-      .trim()
-      .isLength({ min: 2, max: 10 })
-      .withMessage('Union code must be 2-10 characters')
-      .matches(/^[A-Z]+$/)
-      .withMessage('Union code must be uppercase letters only'),
     body('contact.email')
       .optional()
       .isEmail()

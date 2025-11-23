@@ -24,12 +24,22 @@ const auditLogSchema = new mongoose.Schema({
       'user.role_assign',
       'user.role_remove',
       
-      // Organization actions
-      'organization.create',
-      'organization.update',
-      'organization.delete',
-      'organization.activate',
-      'organization.deactivate',
+      // Hierarchical entity actions
+      'union.create',
+      'union.update',
+      'union.delete',
+      'union.activate',
+      'union.deactivate',
+      'conference.create',
+      'conference.update', 
+      'conference.delete',
+      'conference.activate',
+      'conference.deactivate',
+      'church.create',
+      'church.update',
+      'church.delete', 
+      'church.activate',
+      'church.deactivate',
       
       // Hierarchy actions
       'hierarchy.move',
@@ -95,7 +105,7 @@ const auditLogSchema = new mongoose.Schema({
     type: {
       type: String,
       required: true,
-      enum: ['user', 'organization', 'team', 'service', 'role', 'permission', 'system']
+      enum: ['user', 'union', 'conference', 'church', 'team', 'service', 'role', 'permission', 'system']
     },
     id: {
       type: mongoose.Schema.Types.ObjectId,

@@ -29,7 +29,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.userId).populate(
-      'organizations.role teamAssignments.teamId'
+      'unionAssignments.role conferenceAssignments.role churchAssignments.role teamAssignments.teamId'
     );
 
     if (!user || !user.isActive) {
@@ -81,7 +81,7 @@ const authorize = (requiredPermission = {}) => {
 
       // Check if user is super admin first
       if (req.user.isSuperAdmin) {
-        // Super admins have all permissions regardless of organization
+        // Super admins have all permissions regardless of hierarchical entity
         req.userPermissions = {
           role: {
             id: 'super_admin',
@@ -91,53 +91,80 @@ const authorize = (requiredPermission = {}) => {
           },
           permissions: ['*'],
         };
-        req.organizationId = req.headers['x-organization-id'] || null;
+        req.unionId = req.headers['x-union-id'] || null;
+        req.conferenceId = req.headers['x-conference-id'] || null;
+        req.churchId = req.headers['x-church-id'] || null;
         return next();
       }
 
-      // For organization context, try to get from header or use first organization
-      const organizationId = req.headers['x-organization-id'];
+      // For hierarchical context, try to get from headers
+      const unionId = req.headers['x-union-id'];
+      const conferenceId = req.headers['x-conference-id'];
+      const churchId = req.headers['x-church-id'];
 
-      // Validate organization context if provided via header
-      if (req.headers['x-organization-id']) {
-        const validation =
-          await authorizationService.validateOrganizationContext(
-            req.user,
-            req.headers['x-organization-id']
-          );
+      // Determine the most specific context provided
+      let entityType = null;
+      let entityId = null;
+      
+      if (churchId) {
+        entityType = 'church';
+        entityId = churchId;
+      } else if (conferenceId) {
+        entityType = 'conference';
+        entityId = conferenceId;
+      } else if (unionId) {
+        entityType = 'union';
+        entityId = unionId;
+      }
 
-        if (!validation.valid) {
-          return res.status(403).json({
-            success: false,
-            message: validation.error,
-          });
+      let userPermissions = { role: null, permissions: [] };
+
+      // Get permissions based on the most specific context
+      if (entityType && entityId) {
+        switch (entityType) {
+          case 'church':
+            userPermissions = await req.user.getPermissionsForChurch(entityId);
+            break;
+          case 'conference':
+            userPermissions = await req.user.getPermissionsForConference(entityId);
+            break;
+          case 'union':
+            userPermissions = await req.user.getPermissionsForUnion(entityId);
+            break;
         }
       }
 
-      // If no organization context in header, we'll work without specific org context
-      let finalOrgId = organizationId;
-
-      const userPermissions =
-        await req.user.getPermissionsForOrganization(finalOrgId);
-
-      // If no role found for specific org, but user has any role assignments, use the first one
-      if (
-        !userPermissions.role &&
-        req.user.organizations &&
-        req.user.organizations.length > 0
-      ) {
-        await req.user.populate('organizations.role');
-        const primaryAssignment = req.user.organizations[0];
-
-        if (primaryAssignment && primaryAssignment.role) {
-          userPermissions.role = primaryAssignment.role;
-          userPermissions.permissions =
-            primaryAssignment.role.permissions || [];
-        } else {
-          return res.status(403).json({
-            success: false,
-            message: 'No role assigned',
-          });
+      // If no specific permissions found, try to find any role assignment
+      if (!userPermissions.role) {
+        // Check for any union assignment
+        if (req.user.unionAssignments && req.user.unionAssignments.length > 0) {
+          const assignment = req.user.unionAssignments[0];
+          if (assignment.role) {
+            userPermissions = {
+              role: assignment.role,
+              permissions: assignment.role.permissions || []
+            };
+          }
+        }
+        // Check for any conference assignment
+        else if (req.user.conferenceAssignments && req.user.conferenceAssignments.length > 0) {
+          const assignment = req.user.conferenceAssignments[0];
+          if (assignment.role) {
+            userPermissions = {
+              role: assignment.role,
+              permissions: assignment.role.permissions || []
+            };
+          }
+        }
+        // Check for any church assignment
+        else if (req.user.churchAssignments && req.user.churchAssignments.length > 0) {
+          const assignment = req.user.churchAssignments[0];
+          if (assignment.role) {
+            userPermissions = {
+              role: assignment.role,
+              permissions: assignment.role.permissions || []
+            };
+          }
         }
       }
 
@@ -164,7 +191,9 @@ const authorize = (requiredPermission = {}) => {
       }
 
       req.userPermissions = userPermissions;
-      req.organizationId = organizationId;
+      req.unionId = unionId;
+      req.conferenceId = conferenceId;
+      req.churchId = churchId;
       next();
     } catch (error) {
       return res.status(500).json({
@@ -221,10 +250,17 @@ const requireSuperAdmin = async (req, res, next) => {
       });
     }
 
-    // Check if user has super admin role in any organization
-    const hasSuperAdminRole = req.user.organizations.some(
-      (org) => org.role && org.role.name === 'super_admin'
-    );
+    // Check if user has super admin role in any hierarchical entity
+    const hasSuperAdminRole = req.user.isSuperAdmin || 
+      (req.user.unionAssignments && req.user.unionAssignments.some(
+        (assignment) => assignment.role && assignment.role.name === 'super_admin'
+      )) ||
+      (req.user.conferenceAssignments && req.user.conferenceAssignments.some(
+        (assignment) => assignment.role && assignment.role.name === 'super_admin'
+      )) ||
+      (req.user.churchAssignments && req.user.churchAssignments.some(
+        (assignment) => assignment.role && assignment.role.name === 'super_admin'
+      ));
 
     if (!hasSuperAdminRole) {
       return res.status(403).json({

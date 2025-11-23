@@ -73,14 +73,21 @@ class UserService {
       }
 
       if (roleId) {
-        query['organizations.role'] = roleId;
+        query.$or = [
+          { 'unionAssignments.role': roleId },
+          { 'conferenceAssignments.role': roleId },
+          { 'churchAssignments.role': roleId }
+        ];
       }
 
       // Execute query with pagination
       const users = await User.find(query)
-        .populate('organizations.organization', 'name type')
-        .populate('organizations.role', 'name displayName level')
-        .populate('primaryOrganization', 'name type')
+        .populate('unionAssignments.union', 'name code')
+        .populate('unionAssignments.role', 'name displayName level')
+        .populate('conferenceAssignments.conference', 'name code')
+        .populate('conferenceAssignments.role', 'name displayName level')
+        .populate('churchAssignments.church', 'name')
+        .populate('churchAssignments.role', 'name displayName level')
         .select('-password')
         .sort({ [sortBy]: sortOrder })
         .limit(limit)
@@ -115,9 +122,12 @@ class UserService {
   static async getUserById(id, userPermissions = {}, requestingUserId = null) {
     try {
       const user = await User.findById(id)
-        .populate('organizations.organization', 'name type')
-        .populate('organizations.role', 'name displayName level permissions')
-        .populate('primaryOrganization', 'name type')
+        .populate('unionAssignments.union', 'name code')
+        .populate('unionAssignments.role', 'name displayName level permissions')
+        .populate('conferenceAssignments.conference', 'name code')
+        .populate('conferenceAssignments.role', 'name displayName level permissions')
+        .populate('churchAssignments.church', 'name')
+        .populate('churchAssignments.role', 'name displayName level permissions')
         .select('-password')
         .lean();
 

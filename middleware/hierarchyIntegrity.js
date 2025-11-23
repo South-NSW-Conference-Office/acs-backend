@@ -6,11 +6,11 @@ const HierarchyValidator = require('../utils/hierarchyValidator');
  */
 class HierarchyIntegrityMiddleware {
   /**
-   * Pre-save middleware for organizations
+   * Pre-save middleware for conferences
    */
-  static async organizationPreSave(next) {
+  static async conferencePreSave(next) {
     try {
-      const Organization = mongoose.model('Organization');
+      const Union = mongoose.model('Union');
       
       // Validate hierarchy path format
       if (this.hierarchyPath && !HierarchyValidator.isValidPathFormat(this.hierarchyPath)) {
@@ -18,19 +18,61 @@ class HierarchyIntegrityMiddleware {
       }
       
       // Check for circular dependencies
-      if (this.isModified('parentOrganization') && this.parentOrganization) {
+      if (this.isModified('unionId') && this.unionId) {
         const hasCircular = HierarchyValidator.hasCircularDependency(
           this._id.toString(),
-          this.parentOrganization.toString()
+          this.unionId.toString()
         );
         
         if (hasCircular) {
-          throw new Error('Circular dependency detected in organization hierarchy');
+          throw new Error('Circular dependency detected in conference hierarchy');
         }
       }
       
       // If parent changed, update all descendants' paths
-      if (this.isModified('parentOrganization') && !this.isNew) {
+      if (this.isModified('unionId') && !this.isNew) {
+        const oldPath = this.hierarchyPath;
+        await this.buildHierarchyPath();
+        
+        if (oldPath !== this.hierarchyPath) {
+          // Queue cascade update for after save
+          this._hierarchyPathChanged = true;
+          this._oldHierarchyPath = oldPath;
+        }
+      }
+      
+      next();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Pre-save middleware for churches
+   */
+  static async churchPreSave(next) {
+    try {
+      const Conference = mongoose.model('Conference');
+      
+      // Validate hierarchy path format
+      if (this.hierarchyPath && !HierarchyValidator.isValidPathFormat(this.hierarchyPath)) {
+        throw new Error('Invalid hierarchy path format');
+      }
+      
+      // Check for circular dependencies
+      if (this.isModified('conferenceId') && this.conferenceId) {
+        const hasCircular = HierarchyValidator.hasCircularDependency(
+          this._id.toString(),
+          this.conferenceId.toString()
+        );
+        
+        if (hasCircular) {
+          throw new Error('Circular dependency detected in church hierarchy');
+        }
+      }
+      
+      // If parent changed, update all descendants' paths
+      if (this.isModified('conferenceId') && !this.isNew) {
         const oldPath = this.hierarchyPath;
         await this.buildHierarchyPath();
         
@@ -48,27 +90,27 @@ class HierarchyIntegrityMiddleware {
   }
   
   /**
-   * Post-save middleware to handle cascade updates
+   * Post-save middleware to handle cascade updates for conferences
    */
-  static async organizationPostSave() {
+  static async conferencePostSave() {
     if (this._hierarchyPathChanged && this._oldHierarchyPath) {
-      const Organization = mongoose.model('Organization');
+      const Church = mongoose.model('Church');
       const Team = mongoose.model('Team');
       const Service = mongoose.model('Service');
       
       try {
-        // Update all child organizations
-        const childOrgs = await Organization.find({
+        // Update all child churches
+        const childChurches = await Church.find({
           hierarchyPath: { $regex: `^${this._oldHierarchyPath}/` }
         });
         
-        for (const child of childOrgs) {
+        for (const child of childChurches) {
           const newPath = child.hierarchyPath.replace(this._oldHierarchyPath, this.hierarchyPath);
           child.hierarchyPath = newPath;
           await child.save({ validateBeforeSave: false }); // Skip validation to avoid loops
         }
         
-        // Update all teams in this organization's subtree
+        // Update all teams in this conference's subtree
         const teams = await Team.find({
           hierarchyPath: { $regex: `^${this._oldHierarchyPath}/` }
         });
@@ -79,7 +121,47 @@ class HierarchyIntegrityMiddleware {
           await team.save({ validateBeforeSave: false });
         }
         
-        // Update all services in this organization's subtree
+        // Update all services in this conference's subtree
+        const services = await Service.find({
+          hierarchyPath: { $regex: `^${this._oldHierarchyPath}/` }
+        });
+        
+        for (const service of services) {
+          const newPath = service.hierarchyPath.replace(this._oldHierarchyPath, this.hierarchyPath);
+          service.hierarchyPath = newPath;
+          await service.save({ validateBeforeSave: false });
+        }
+        
+      } catch (error) {
+        console.error('Error updating hierarchy paths:', error);
+      }
+      
+      delete this._hierarchyPathChanged;
+      delete this._oldHierarchyPath;
+    }
+  }
+
+  /**
+   * Post-save middleware to handle cascade updates for churches
+   */
+  static async churchPostSave() {
+    if (this._hierarchyPathChanged && this._oldHierarchyPath) {
+      const Team = mongoose.model('Team');
+      const Service = mongoose.model('Service');
+      
+      try {
+        // Update all teams in this church
+        const teams = await Team.find({
+          hierarchyPath: { $regex: `^${this._oldHierarchyPath}/` }
+        });
+        
+        for (const team of teams) {
+          const newPath = team.hierarchyPath.replace(this._oldHierarchyPath, this.hierarchyPath);
+          team.hierarchyPath = newPath;
+          await team.save({ validateBeforeSave: false });
+        }
+        
+        // Update all services in this church
         const services = await Service.find({
           hierarchyPath: { $regex: `^${this._oldHierarchyPath}/` }
         });
@@ -105,21 +187,17 @@ class HierarchyIntegrityMiddleware {
   static async teamPreSave(next) {
     try {
       const Team = mongoose.model('Team');
-      const Organization = mongoose.model('Organization');
+      const Church = mongoose.model('Church');
       
       // Validate church assignment
       if (!this.churchId) {
         throw new Error('Teams must be assigned to a church');
       }
       
-      // Ensure church exists and is actually a church
-      const church = await Organization.findById(this.churchId);
+      // Ensure church exists
+      const church = await Church.findById(this.churchId);
       if (!church) {
         throw new Error('Church not found');
-      }
-      
-      if (church.hierarchyLevel !== 'church') {
-        throw new Error('Teams can only be assigned to churches');
       }
       
       // Validate hierarchy path
@@ -129,7 +207,7 @@ class HierarchyIntegrityMiddleware {
       }
       
       // Validate hierarchy depth
-      this.hierarchyDepth = 3; // Teams are always at depth 3
+      this.hierarchyDepth = 3; // Teams are always at depth 3 (union/conference/church)
       
       // Check circular dependencies (shouldn't happen with teams, but safety check)
       if (!HierarchyValidator.isValidPathFormat(this.hierarchyPath)) {
@@ -182,7 +260,9 @@ class HierarchyIntegrityMiddleware {
    * Cascade deactivation when parent is deactivated
    */
   static async cascadeDeactivation(parentModel, parentId) {
-    const Organization = mongoose.model('Organization');
+    const Union = mongoose.model('Union');
+    const Conference = mongoose.model('Conference');
+    const Church = mongoose.model('Church');
     const Team = mongoose.model('Team');
     const Service = mongoose.model('Service');
     
@@ -192,8 +272,16 @@ class HierarchyIntegrityMiddleware {
       
       // Get parent entity
       switch (parentModel.toLowerCase()) {
-        case 'organization':
-          parent = await Organization.findById(parentId);
+        case 'union':
+          parent = await Union.findById(parentId);
+          parentPath = parent?.hierarchyPath;
+          break;
+        case 'conference':
+          parent = await Conference.findById(parentId);
+          parentPath = parent?.hierarchyPath;
+          break;
+        case 'church':
+          parent = await Church.findById(parentId);
           parentPath = parent?.hierarchyPath;
           break;
         case 'team':
@@ -208,19 +296,37 @@ class HierarchyIntegrityMiddleware {
         throw new Error('Parent entity not found');
       }
       
-      // Deactivate all subordinate organizations
-      await Organization.updateMany(
-        { 
-          hierarchyPath: { $regex: `^${parentPath}/` },
-          isActive: true
-        },
-        { 
-          isActive: false,
-          deactivatedAt: new Date(),
-          deactivatedBy: parent.updatedBy || parent.createdBy,
-          deactivationReason: 'Parent entity deactivated'
-        }
-      );
+      // Deactivate all subordinate conferences (if parent is union)
+      if (parentModel.toLowerCase() === 'union') {
+        await Conference.updateMany(
+          { 
+            hierarchyPath: { $regex: `^${parentPath}/` },
+            isActive: true
+          },
+          { 
+            isActive: false,
+            deactivatedAt: new Date(),
+            deactivatedBy: parent.updatedBy || parent.createdBy,
+            deactivationReason: 'Parent entity deactivated'
+          }
+        );
+      }
+      
+      // Deactivate all subordinate churches (if parent is union or conference)
+      if (['union', 'conference'].includes(parentModel.toLowerCase())) {
+        await Church.updateMany(
+          { 
+            hierarchyPath: { $regex: `^${parentPath}/` },
+            isActive: true
+          },
+          { 
+            isActive: false,
+            deactivatedAt: new Date(),
+            deactivatedBy: parent.updatedBy || parent.createdBy,
+            deactivationReason: 'Parent entity deactivated'
+          }
+        );
+      }
       
       // Deactivate all subordinate teams
       await Team.updateMany(
@@ -261,16 +367,22 @@ class HierarchyIntegrityMiddleware {
    * Validate entity move within hierarchy
    */
   static async validateEntityMove(entityType, entityId, newParentId) {
-    const Organization = mongoose.model('Organization');
+    const Union = mongoose.model('Union');
+    const Conference = mongoose.model('Conference');
+    const Church = mongoose.model('Church');
     const Team = mongoose.model('Team');
     
     try {
       let entity, newParent;
       
       switch (entityType.toLowerCase()) {
-        case 'organization':
-          entity = await Organization.findById(entityId);
-          newParent = await Organization.findById(newParentId);
+        case 'conference':
+          entity = await Conference.findById(entityId);
+          newParent = await Union.findById(newParentId);
+          break;
+        case 'church':
+          entity = await Church.findById(entityId);
+          newParent = await Conference.findById(newParentId);
           
           if (!entity || !newParent) {
             throw new Error('Entity or new parent not found');
@@ -321,13 +433,18 @@ class HierarchyIntegrityMiddleware {
    * Apply middleware to models
    */
   static applyToModels() {
-    const Organization = mongoose.model('Organization');
+    const Conference = mongoose.model('Conference');
+    const Church = mongoose.model('Church');
     const Team = mongoose.model('Team');
     const Service = mongoose.model('Service');
     
-    // Organization middleware
-    Organization.schema.pre('save', HierarchyIntegrityMiddleware.organizationPreSave);
-    Organization.schema.post('save', HierarchyIntegrityMiddleware.organizationPostSave);
+    // Conference middleware
+    Conference.schema.pre('save', HierarchyIntegrityMiddleware.conferencePreSave);
+    Conference.schema.post('save', HierarchyIntegrityMiddleware.conferencePostSave);
+    
+    // Church middleware
+    Church.schema.pre('save', HierarchyIntegrityMiddleware.churchPreSave);
+    Church.schema.post('save', HierarchyIntegrityMiddleware.churchPostSave);
     
     // Team middleware
     Team.schema.pre('save', HierarchyIntegrityMiddleware.teamPreSave);

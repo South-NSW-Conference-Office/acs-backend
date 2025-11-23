@@ -25,13 +25,29 @@ class HierarchicalAuthorizationService {
    * @returns {Promise<Number>} - Hierarchy level (0=super_admin, 1=conference, 2=church, 3=team, 4=service)
    */
   async getUserHighestLevel(user) {
-    if (!user || !user.organizations || user.organizations.length === 0) {
+    if (!user) {
+      return 999; // No access
+    }
+
+    // Check if user has isSuperAdmin flag set directly
+    if (user.isSuperAdmin === true) {
+      return 0; // Super admin is highest level
+    }
+
+    // Combine all hierarchical assignments 
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+
+    if (allAssignments.length === 0) {
       return 999; // No access
     }
 
     let highestLevel = 999;
     
-    for (const orgAssignment of user.organizations) {
+    for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
       
       // Handle both populated and string role references
@@ -63,16 +79,33 @@ class HierarchicalAuthorizationService {
    * @returns {Promise<String>} - Hierarchy path (e.g., "union123/conference456")
    */
   async getUserHierarchyPath(user) {
-    if (!user || !user.organizations || user.organizations.length === 0) {
+    if (!user) {
+      return null;
+    }
+
+    // Super admin users have access to all hierarchy levels
+    if (user.isSuperAdmin === true) {
+      return ''; // Empty path means system-level access
+    }
+
+    // Combine all hierarchical assignments
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+
+    if (allAssignments.length === 0) {
       return null;
     }
     
     let highestLevelPath = null;
     let highestLevel = 999;
     
-    for (const orgAssignment of user.organizations) {
+    for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
-      const org = orgAssignment.organization;
+      // Get org reference based on assignment type
+      const org = orgAssignment.union || orgAssignment.conference || orgAssignment.church;
       
       // Get role level
       let roleLevel = 4;
@@ -288,24 +321,19 @@ class HierarchicalAuthorizationService {
    */
   async getUserChurch(user) {
     try {
-      if (!user || !user.organizations) return null;
+      if (!user) return null;
       
-      for (const orgAssignment of user.organizations) {
-        const org = orgAssignment.organization;
-        let orgObj = org;
+      // Check church assignments first
+      if (user.churchAssignments && user.churchAssignments.length > 0) {
+        const churchAssignment = user.churchAssignments[0];
+        const churchId = churchAssignment.church;
         
-        if (typeof org === 'string') {
-          // Try Church model first, then legacy Organization
-          orgObj = await Church.findById(org);
-          if (!orgObj) {
-            // Legacy fallback removed - Organization model no longer exists
-            // All data should now be in Union/Conference/Church collections
-          }
+        let churchObj = churchId;
+        if (typeof churchId === 'string') {
+          churchObj = await Church.findById(churchId);
         }
         
-        if (orgObj && (orgObj.hierarchyLevel === 2 || orgObj.hierarchyLevel === 'church')) {
-          return orgObj;
-        }
+        return churchObj;
       }
       
       return null;
@@ -429,7 +457,13 @@ class HierarchicalAuthorizationService {
       }
       
       // Get permissions from all role assignments
-      for (const orgAssignment of user.organizations || []) {
+      const allAssignments = [
+        ...(user.unionAssignments || []),
+        ...(user.conferenceAssignments || []),
+        ...(user.churchAssignments || [])
+      ];
+      
+      for (const orgAssignment of allAssignments) {
         const rolePermissions = await this.getRolePermissions(
           orgAssignment.role,
           userLevel,
@@ -610,7 +644,7 @@ class HierarchicalAuthorizationService {
    * @returns {Promise<Array>} - Array of manageable hierarchy levels
    */
   async getUserManagedLevels(user) {
-    if (!user || !user.organizations) return [];
+    if (!user) return [];
     
     const managedLevels = new Set();
     const userLevel = await this.getUserHighestLevel(user);
@@ -620,8 +654,15 @@ class HierarchicalAuthorizationService {
       return [0, 1, 2, 3, 4];
     }
     
+    // Get all assignments
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+    
     // Get managed levels from roles
-    for (const orgAssignment of user.organizations) {
+    for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
       let roleObj = role;
       

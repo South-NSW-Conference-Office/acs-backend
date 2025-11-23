@@ -246,7 +246,7 @@ router.post(
       }
 
       const user = await User.findById(userId)
-        .populate('organizations.role');
+        .populate('unionAssignments.role conferenceAssignments.role churchAssignments.role');
 
       if (!user) {
         return res.status(404).json({
@@ -324,7 +324,7 @@ router.post(
 
       // Find user and populate role data
       const user = await User.findOne({ email, isActive: true })
-        .populate('organizations.role');
+        .populate('unionAssignments.role conferenceAssignments.role churchAssignments.role');
 
       if (!user) {
         return res.status(401).json({
@@ -387,13 +387,20 @@ router.post(
       }
 
       // Prepare user data for response
+      // Combine all hierarchical assignments
+      const allAssignments = [
+        ...(user.unionAssignments || []),
+        ...(user.conferenceAssignments || []),
+        ...(user.churchAssignments || [])
+      ];
+
       const userData = {
         id: user._id,
         name: user.name,
         email: user.email,
         verified: user.verified,
         avatar: user.avatar,
-        organizations: user.organizations
+        organizations: allAssignments
           .filter((org) => org.role)
           .map((org) => ({
             role: {
@@ -462,13 +469,20 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
     }
 
     // Prepare user data for response (without sensitive information)
+    // Combine all hierarchical assignments
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+
     const userData = {
       id: user._id,
       name: user.name,
       email: user.email,
       verified: user.verified,
       avatar: user.avatar,
-      organizations: user.organizations
+      organizations: allAssignments
         .filter((org) => org.role)
         .map((org) => ({
           role: {
@@ -809,13 +823,20 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
     }
 
     // Prepare user data for response
+    // Combine all hierarchical assignments
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || [])
+    ];
+
     const userData = {
       id: user._id,
       name: user.name,
       email: user.email,
       verified: user.verified,
       avatar: user.avatar,
-      organizations: user.organizations
+      organizations: allAssignments
         .filter((org) => org.role)
         .map((org) => ({
           role: {

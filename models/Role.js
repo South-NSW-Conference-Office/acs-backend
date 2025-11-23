@@ -348,7 +348,7 @@ roleSchema.methods.hasPermission = function (requiredPermission) {
     return true;
   }
 
-  // Check for scoped permissions (e.g., 'organizations.create:subordinate' matches 'organizations.create')
+  // Check for scoped permissions (e.g., 'churches.create:subordinate' matches 'churches.create')
   const matchesScoped = this.permissions.some((permission) => {
     const [permResource, permActionWithScope] = permission.split('.');
     if (!permActionWithScope || !permActionWithScope.includes(':')) {
@@ -374,7 +374,7 @@ roleSchema.methods.canAccessEntity = function (userHierarchyPath, targetHierarch
 };
 
 // Method to check if role has reached user quota
-roleSchema.methods.checkQuota = async function (organizationId = null) {
+roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'church') {
   if (!this.quotaLimits || !this.quotaLimits.maxUsers) {
     return { allowed: true, current: 0, max: null };
   }
@@ -385,67 +385,112 @@ roleSchema.methods.checkQuota = async function (organizationId = null) {
   // Build query based on quota scope
   switch (this.quotaLimits.scope) {
     case 'system':
-      // Count all users with this role system-wide
-      query = { 'organizations.role': this._id };
+      // Count all users with this role system-wide across all entity types
+      query = {
+        $or: [
+          { 'unionAssignments.role': this._id },
+          { 'conferenceAssignments.role': this._id },
+          { 'churchAssignments.role': this._id }
+        ]
+      };
       break;
 
-    case 'region': {
-      // Count users with this role in the same region/conference
-      if (!organizationId) {
-        throw new Error(
-          'Organization ID required for region scope quota check'
-        );
+    case 'union': {
+      // Count users with this role in the union and all subordinate entities
+      if (!entityId) {
+        throw new Error('Entity ID required for union scope quota check');
       }
-      // Using hierarchical system - get organizations in region
+      
       const Union = mongoose.model('Union');
       const Conference = mongoose.model('Conference');  
       const Church = mongoose.model('Church');
       
-      let orgIds = [organizationId]; // Start with the given org
+      let unionId = entityId;
       
-      // Try to find as union and get all conferences/churches
-      const union = await Union.findById(organizationId);
-      if (union) {
-        const conferences = await Conference.find({ unionId: union._id }).select('_id');
-        const churches = await Church.find({ unionId: union._id }).select('_id');
-        orgIds.push(...conferences.map(c => c._id), ...churches.map(c => c._id));
-      } else {
-        // Try as conference and get all churches
-        const conference = await Conference.findById(organizationId);
-        if (conference) {
-          const churches = await Church.find({ conferenceId: conference._id }).select('_id');
-          orgIds.push(...churches.map(c => c._id));
-        }
+      // If entity is not union, find the parent union
+      if (entityType === 'conference') {
+        const conference = await Conference.findById(entityId);
+        unionId = conference?.unionId;
+      } else if (entityType === 'church') {
+        const church = await Church.findById(entityId);
+        unionId = church?.unionId;
       }
       
+      if (!unionId) {
+        throw new Error('Could not determine union for quota check');
+      }
+      
+      const conferences = await Conference.find({ unionId }).select('_id');
+      const churches = await Church.find({ unionId }).select('_id');
+      
       query = {
-        'organizations.role': this._id,
-        'organizations.organization': { $in: orgIds },
+        $or: [
+          { 'unionAssignments.role': this._id, 'unionAssignments.union': unionId },
+          { 'conferenceAssignments.role': this._id, 'conferenceAssignments.conference': { $in: conferences.map(c => c._id) } },
+          { 'churchAssignments.role': this._id, 'churchAssignments.church': { $in: churches.map(c => c._id) } }
+        ]
       };
       break;
     }
 
-    case 'organization':
-      // Count users with this role in specific organization
-      if (!organizationId) {
-        throw new Error(
-          'Organization ID required for organization scope quota check'
-        );
+    case 'conference': {
+      // Count users with this role in specific conference and subordinate churches
+      if (!entityId) {
+        throw new Error('Entity ID required for conference scope quota check');
       }
+      
+      let conferenceId = entityId;
+      
+      // If entity is church, find parent conference
+      if (entityType === 'church') {
+        const Church = mongoose.model('Church');
+        const church = await Church.findById(entityId);
+        conferenceId = church?.conferenceId;
+      }
+      
+      if (!conferenceId) {
+        throw new Error('Could not determine conference for quota check');
+      }
+      
+      const Church = mongoose.model('Church');
+      const churches = await Church.find({ conferenceId }).select('_id');
+      
       query = {
-        'organizations.role': this._id,
-        'organizations.organization': organizationId,
+        $or: [
+          { 'conferenceAssignments.role': this._id, 'conferenceAssignments.conference': conferenceId },
+          { 'churchAssignments.role': this._id, 'churchAssignments.church': { $in: churches.map(c => c._id) } }
+        ]
       };
       break;
+    }
 
+    case 'church':
+      // Count users with this role in specific church
+      if (!entityId) {
+        throw new Error('Entity ID required for church scope quota check');
+      }
+      
+      let churchId = entityId;
+      
+      // Entity should be church for this scope
+      if (entityType !== 'church') {
+        throw new Error('Church scope quota check requires church entity');
+      }
+      
+      query = {
+        'churchAssignments.role': this._id,
+        'churchAssignments.church': churchId
+      };
+      break;
+      
     case 'team':
-      // This would need team context - for now treat as organization
-      if (!organizationId) {
-        throw new Error('Organization ID required for team scope quota check');
+      // This would need team context - for now treat as church
+      if (!entityId) {
+        throw new Error('Entity ID required for team scope quota check');
       }
       query = {
-        'organizations.role': this._id,
-        'organizations.organization': organizationId,
+        'churchAssignments.role': this._id,
+        'churchAssignments.church': entityId
       };
       break;
   }
@@ -467,7 +512,7 @@ roleSchema.methods.checkQuota = async function (organizationId = null) {
 };
 
 // Static method to get quota status for all roles
-roleSchema.statics.getQuotaStatus = async function (organizationId = null) {
+roleSchema.statics.getQuotaStatus = async function (entityId = null, entityType = 'church') {
   const roles = await this.find({
     isActive: true,
     'quotaLimits.maxUsers': { $ne: null },
@@ -476,7 +521,7 @@ roleSchema.statics.getQuotaStatus = async function (organizationId = null) {
 
   for (const role of roles) {
     try {
-      const status = await role.checkQuota(organizationId);
+      const status = await role.checkQuota(entityId, entityType);
       quotaStatuses.push({
         role: {
           id: role._id,

@@ -6,7 +6,10 @@ const HierarchyValidator = require('../utils/hierarchyValidator');
  */
 class HierarchyMigrationService {
   constructor() {
-    this.Organization = mongoose.model('Organization');
+    // this.Organization = mongoose.model('Organization'); // REMOVED - Using hierarchical models
+    this.Union = mongoose.model('Union');
+    this.Conference = mongoose.model('Conference');
+    this.Church = mongoose.model('Church');
     this.Team = mongoose.model('Team');
     this.Service = mongoose.model('Service');
     this.User = mongoose.model('User');
@@ -29,13 +32,11 @@ class HierarchyMigrationService {
     session.startTransaction();
 
     try {
-      // Step 1: Rebuild organization paths (top-down)
-      if (verbose) console.log('Rebuilding organization hierarchy paths...');
+      // Step 1: Rebuild hierarchical paths (top-down)
+      if (verbose) console.log('Rebuilding hierarchy paths...');
       
       // Start with unions
-      const unions = await this.Organization.find({ 
-        hierarchyLevel: 'union' 
-      }).session(session);
+      const unions = await this.Union.find({}).session(session);
       
       for (const union of unions) {
         const oldPath = union.hierarchyPath;
@@ -43,7 +44,7 @@ class HierarchyMigrationService {
         
         if (oldPath !== union.hierarchyPath) {
           results.changes.push({
-            type: 'organization',
+            type: 'union',
             id: union._id,
             oldPath,
             newPath: union.hierarchyPath
@@ -58,14 +59,12 @@ class HierarchyMigrationService {
       }
       
       // Then conferences
-      const conferences = await this.Organization.find({ 
-        hierarchyLevel: 'conference' 
-      }).populate('parentOrganization').session(session);
+      const conferences = await this.Conference.find({}).populate('unionId').session(session);
       
       for (const conf of conferences) {
-        if (!conf.parentOrganization) {
+        if (!conf.unionId) {
           results.errors.push({
-            type: 'organization',
+            type: 'conference',
             id: conf._id,
             error: 'Conference missing parent union'
           });
@@ -73,12 +72,12 @@ class HierarchyMigrationService {
         }
         
         const oldPath = conf.hierarchyPath;
-        const expectedPath = `${conf.parentOrganization.hierarchyPath}/${conf._id}`;
+        const expectedPath = `${conf.unionId.hierarchyPath || conf.unionId._id}/${conf._id}`;
         
         if (oldPath !== expectedPath) {
           conf.hierarchyPath = expectedPath;
           results.changes.push({
-            type: 'organization',
+            type: 'conference',
             id: conf._id,
             oldPath,
             newPath: conf.hierarchyPath
@@ -93,28 +92,26 @@ class HierarchyMigrationService {
       }
       
       // Finally churches
-      const churches = await this.Organization.find({ 
-        hierarchyLevel: 'church' 
-      }).populate('parentOrganization').session(session);
+      const churches = await this.Church.find({}).populate('conferenceId').session(session);
       
       for (const church of churches) {
-        if (!church.parentOrganization) {
+        if (!church.conferenceId) {
           results.errors.push({
-            type: 'organization',
+            type: 'church',
             id: church._id,
             error: 'Church missing parent conference'
           });
           continue;
         }
         
-        const parent = await this.Organization.findById(church.parentOrganization._id).session(session);
+        const parent = await this.Conference.findById(church.conferenceId._id).session(session);
         const oldPath = church.hierarchyPath;
         const expectedPath = `${parent.hierarchyPath}/${church._id}`;
         
         if (oldPath !== expectedPath) {
           church.hierarchyPath = expectedPath;
           results.changes.push({
-            type: 'organization',
+            type: 'church',
             id: church._id,
             oldPath,
             newPath: church.hierarchyPath

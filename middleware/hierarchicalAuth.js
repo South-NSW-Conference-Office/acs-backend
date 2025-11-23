@@ -32,7 +32,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.userId).populate(
-      'organizations.organization organizations.role teamAssignments.teamId'
+      'unionAssignments.role conferenceAssignments.role churchAssignments.role teamAssignments.teamId'
     );
 
     if (!user || !user.isActive) {

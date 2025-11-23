@@ -1,10 +1,60 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const organizationAssignmentSchema = new mongoose.Schema({
-  organization: {
+// organizationAssignmentSchema REMOVED - Using hierarchical assignments (unionAssignments, conferenceAssignments, churchAssignments)
+
+const unionAssignmentSchema = new mongoose.Schema({
+  union: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Organization',
+    ref: 'Union',
+    required: true,
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    required: true,
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  expiresAt: {
+    type: Date,
+  },
+});
+
+const conferenceAssignmentSchema = new mongoose.Schema({
+  conference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conference',
+    required: true,
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    required: true,
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  expiresAt: {
+    type: Date,
+  },
+});
+
+const churchAssignmentSchema = new mongoose.Schema({
+  church: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Church',
     required: true,
   },
   role: {
@@ -112,12 +162,24 @@ const userSchema = new mongoose.Schema(
         type: String,
       },
     },
-    organizations: [organizationAssignmentSchema],
-    primaryOrganization: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
+    // organizations: [organizationAssignmentSchema], // REMOVED - Using hierarchical assignments
+    // primaryOrganization REMOVED - Using hierarchical structure
+    unionAssignments: {
+      type: [unionAssignmentSchema],
+      default: [],
     },
-    teamAssignments: [teamAssignmentSchema],
+    conferenceAssignments: {
+      type: [conferenceAssignmentSchema],
+      default: [],
+    },
+    churchAssignments: {
+      type: [churchAssignmentSchema],
+      default: [],
+    },
+    teamAssignments: {
+      type: [teamAssignmentSchema],
+      default: [],
+    },
     primaryTeam: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Team',
@@ -195,19 +257,23 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Get user permissions for a specific organization
-userSchema.methods.getPermissionsForOrganization = async function (
-  organizationId
-) {
-  const assignment = this.organizations.find(
-    (org) => org.organization.toString() === organizationId.toString()
+// getPermissionsForOrganization REMOVED - Using hierarchical permission methods (getPermissionsForUnion, getPermissionsForConference, getPermissionsForChurch)
+
+// Get user permissions for a specific union
+userSchema.methods.getPermissionsForUnion = async function (unionId) {
+  if (!this.unionAssignments || !Array.isArray(this.unionAssignments)) {
+    return { role: null, permissions: [] };
+  }
+  
+  const assignment = this.unionAssignments.find(
+    (assignment) => assignment.union.toString() === unionId.toString()
   );
 
   if (!assignment) {
     return { role: null, permissions: [] };
   }
 
-  await this.populate('organizations.role');
+  await this.populate('unionAssignments.role');
   const role = assignment.role;
 
   return {
@@ -218,31 +284,88 @@ userSchema.methods.getPermissionsForOrganization = async function (
       level: role.level,
     },
     permissions: Array.isArray(role.permissions) ? role.permissions : [],
-    organization: organizationId,
+    union: unionId,
+  };
+};
+
+// Get user permissions for a specific conference
+userSchema.methods.getPermissionsForConference = async function (conferenceId) {
+  if (!this.conferenceAssignments || !Array.isArray(this.conferenceAssignments)) {
+    return { role: null, permissions: [] };
+  }
+  
+  const assignment = this.conferenceAssignments.find(
+    (assignment) => assignment.conference.toString() === conferenceId.toString()
+  );
+
+  if (!assignment) {
+    return { role: null, permissions: [] };
+  }
+
+  await this.populate('conferenceAssignments.role');
+  const role = assignment.role;
+
+  return {
+    role: {
+      id: role._id,
+      name: role.name,
+      displayName: role.displayName,
+      level: role.level,
+    },
+    permissions: Array.isArray(role.permissions) ? role.permissions : [],
+    conference: conferenceId,
+  };
+};
+
+// Get user permissions for a specific church
+userSchema.methods.getPermissionsForChurch = async function (churchId) {
+  if (!this.churchAssignments || !Array.isArray(this.churchAssignments)) {
+    return { role: null, permissions: [] };
+  }
+  
+  const assignment = this.churchAssignments.find(
+    (assignment) => assignment.church.toString() === churchId.toString()
+  );
+
+  if (!assignment) {
+    return { role: null, permissions: [] };
+  }
+
+  await this.populate('churchAssignments.role');
+  const role = assignment.role;
+
+  return {
+    role: {
+      id: role._id,
+      name: role.name,
+      displayName: role.displayName,
+      level: role.level,
+    },
+    permissions: Array.isArray(role.permissions) ? role.permissions : [],
+    church: churchId,
   };
 };
 
 // Get user permissions for a specific team
 userSchema.methods.getPermissionsForTeam = async function (teamId) {
-  // Check if user is super admin first - avoid importing models here
-  const hasSuperAdminRole = this.organizations && this.organizations.some((org) => {
-    const roleName = org.role?.name || org.role;
-    return roleName === 'super_admin';
-  });
+  // Check if user is super admin first
+  const hasSuperAdminRole = this.isSuperAdmin || 
+    (this.unionAssignments && this.unionAssignments.some((assignment) => assignment.role?.name === 'super_admin')) ||
+    (this.conferenceAssignments && this.conferenceAssignments.some((assignment) => assignment.role?.name === 'super_admin')) ||
+    (this.churchAssignments && this.churchAssignments.some((assignment) => assignment.role?.name === 'super_admin'));
 
-  // Check for wildcard permissions across organizations
+  // Check for wildcard permissions across hierarchical entities
   let hasWildcardPermissions = false;
-  if (this.organizations && this.organizations.length > 0) {
-    for (const org of this.organizations) {
-      try {
-        const orgPermissions = await this.getPermissionsForOrganization(org.organization || org._id);
-        if (orgPermissions.permissions.includes('*') || orgPermissions.permissions.includes('all')) {
-          hasWildcardPermissions = true;
-          break;
-        }
-      } catch (error) {
-        // Continue checking other organizations
-      }
+  const allAssignments = [
+    ...(this.unionAssignments || []),
+    ...(this.conferenceAssignments || []),
+    ...(this.churchAssignments || [])
+  ];
+
+  for (const assignment of allAssignments) {
+    if (assignment.role?.permissions?.includes('*') || assignment.role?.permissions?.includes('all')) {
+      hasWildcardPermissions = true;
+      break;
     }
   }
 
@@ -250,11 +373,14 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
   if (hasSuperAdminRole || hasWildcardPermissions) {
     return {
       teamRole: 'super_admin',
-      orgRole: 'super_admin', 
+      hierarchicalRole: 'super_admin', 
       permissions: ['*'],
       team: teamId,
-      organization: null, // Will be set by calling code if needed
     };
+  }
+
+  if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
+    return { role: null, permissions: [] };
   }
 
   const assignment = this.teamAssignments.find(
@@ -265,37 +391,39 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
     return { role: null, permissions: [] };
   }
 
-  // Get organization permissions first
+  // Get church permissions first
   await this.populate({
     path: 'teamAssignments.teamId',
-    populate: { path: 'organizationId' },
+    populate: { path: 'churchId' },
   });
 
   const team = assignment.teamId;
-  const orgPermissions = await this.getPermissionsForOrganization(
-    team.organizationId
-  );
+  const churchPermissions = await this.getPermissionsForChurch(team.churchId);
 
-  // Combine org permissions with team-specific overrides
+  // Combine church permissions with team-specific overrides
   const teamPermissions = [
-    ...orgPermissions.permissions,
+    ...churchPermissions.permissions,
     ...assignment.permissions,
   ];
 
   return {
     teamRole: assignment.role,
-    orgRole: orgPermissions.role,
+    churchRole: churchPermissions.role,
     permissions: [...new Set(teamPermissions)], // Remove duplicates
     team: teamId,
-    organization: team.organizationId,
+    church: team.churchId,
   };
 };
 
 // Get all teams for user
 userSchema.methods.getTeams = async function () {
+  if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
+    return [];
+  }
+  
   await this.populate({
     path: 'teamAssignments.teamId',
-    populate: { path: 'organizationId', select: 'name' },
+    populate: { path: 'churchId', select: 'name' },
   });
 
   return this.teamAssignments.map((assignment) => ({
@@ -308,6 +436,10 @@ userSchema.methods.getTeams = async function () {
 
 // Check if user has specific team role
 userSchema.methods.hasTeamRole = function (teamId, role) {
+  if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
+    return false;
+  }
+  
   const assignment = this.teamAssignments.find(
     (team) => team.teamId.toString() === teamId.toString()
   );
@@ -317,6 +449,10 @@ userSchema.methods.hasTeamRole = function (teamId, role) {
 
 // Check if user is team leader for any team
 userSchema.methods.isTeamLeader = function () {
+  if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
+    return false;
+  }
+  
   return this.teamAssignments.some(
     (assignment) => assignment.role === 'leader'
   );
@@ -324,6 +460,10 @@ userSchema.methods.isTeamLeader = function () {
 
 // Get teams where user is leader
 userSchema.methods.getLeadingTeams = async function () {
+  if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
+    return [];
+  }
+  
   const leadingAssignments = this.teamAssignments.filter(
     (assignment) => assignment.role === 'leader'
   );
@@ -334,7 +474,11 @@ userSchema.methods.getLeadingTeams = async function () {
   const teamIds = leadingAssignments.map((a) => a.teamId);
 
   return Team.find({ _id: { $in: teamIds } })
-    .populate('organizationId', 'name')
+    .populate([
+      { path: 'unionId', select: 'name' },
+      { path: 'conferenceId', select: 'name' },
+      { path: 'churchId', select: 'name' }
+    ])
     .lean();
 };
 

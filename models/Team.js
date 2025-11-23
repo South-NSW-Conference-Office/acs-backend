@@ -25,12 +25,6 @@ const teamSchema = new mongoose.Schema(
       }
     },
     
-    // Legacy field for backward compatibility
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      index: true,
-    },
 
     // TEAM HIERARCHY PATH  
     hierarchyPath: {
@@ -94,8 +88,8 @@ const teamSchema = new mongoose.Schema(
       },
       visibility: {
         type: String,
-        enum: ['public', 'private', 'organization'],
-        default: 'organization',
+        enum: ['public', 'private', 'church'],
+        default: 'church',
       },
     },
 
@@ -133,8 +127,6 @@ teamSchema.index({ hierarchyPath: 1 });
 teamSchema.index({ leaderId: 1 });
 teamSchema.index({ name: 'text' });
 teamSchema.index({ createdAt: -1 });
-// Legacy index for backward compatibility
-teamSchema.index({ organizationId: 1, type: 1 });
 
 // Virtual for member assignments (will be stored in User model)
 teamSchema.virtual('members', {
@@ -234,12 +226,9 @@ teamSchema.methods.getMembers = async function (options = {}) {
 
 // Statics - HIERARCHICAL TEAM MANAGEMENT
 teamSchema.statics.createTeam = async function (data) {
-  const { churchId, organizationId, leaderId } = data;
+  const { churchId, leaderId } = data;
   
-  // Support both new churchId and legacy organizationId
-  const actualChurchId = churchId || organizationId;
-  
-  if (!actualChurchId) {
+  if (!churchId) {
     throw new Error('Church ID is required');
   }
 
@@ -258,8 +247,7 @@ teamSchema.statics.createTeam = async function (data) {
   // Create team with church binding
   const teamData = {
     ...data,
-    churchId: actualChurchId,
-    organizationId: actualChurchId // For backward compatibility
+    churchId: churchId
   };
 
   const team = await this.create(teamData);
@@ -298,13 +286,6 @@ teamSchema.statics.getTeamsByChurch = async function (
   return teams;
 };
 
-// Legacy method for backward compatibility
-teamSchema.statics.getTeamsByOrganization = async function (
-  organizationId,
-  options = {}
-) {
-  return this.getTeamsByChurch(organizationId, options);
-};
 
 // NEW: Get teams accessible to a user based on hierarchy
 teamSchema.statics.getAccessibleTeams = async function (userHierarchyPath) {
@@ -326,7 +307,7 @@ teamSchema.statics.getTeamsByUser = async function (userId) {
   const teamIds = user.teamAssignments.map((a) => a.teamId);
 
   return this.find({ _id: { $in: teamIds } })
-    .populate('organizationId', 'name type')
+    .populate('churchId', 'name type hierarchyPath')
     .populate('leaderId', 'name email')
     .populate('createdBy', 'name email')
     .lean();
@@ -340,10 +321,6 @@ teamSchema.pre('save', async function (next) {
       await this.buildHierarchyPath();
     }
     
-    // Sync organizationId for backward compatibility
-    if (this.isModified('churchId')) {
-      this.organizationId = this.churchId;
-    }
     
     // Ensure member count doesn't exceed max
     if (this.isModified('memberCount')) {

@@ -171,20 +171,22 @@ router.post(
       }
 
       // Check if code already exists within the union
-      const existingConference = await Conference.findOne({ 
-        unionId: req.body.unionId,
-        code: req.body.code.toUpperCase() 
-      });
-      if (existingConference) {
-        return res.status(409).json({
-          success: false,
-          message: 'Conference code already exists in this union',
+      if (req.body.code) {
+        const existingConference = await Conference.findOne({ 
+          unionId: req.body.unionId,
+          code: req.body.code.toUpperCase() 
         });
+        if (existingConference) {
+          return res.status(409).json({
+            success: false,
+            message: 'Conference code already exists in this union',
+          });
+        }
       }
 
       const conferenceData = {
         ...req.body,
-        code: req.body.code.toUpperCase(),
+        ...(req.body.code && { code: req.body.code.toUpperCase() }),
         createdBy: req.user.id,
       };
 

@@ -9,20 +9,6 @@ const unionSchema = new mongoose.Schema(
       unique: true, // Union names should be unique globally
     },
     
-    code: {
-      type: String,
-      required: true,
-      unique: true,
-      uppercase: true,
-      trim: true,
-      validate: {
-        validator: function(v) {
-          return /^[A-Z]{2,10}$/.test(v); // 2-10 uppercase letters
-        },
-        message: 'Union code must be 2-10 uppercase letters'
-      }
-    },
-    
     // Hierarchy properties
     hierarchyPath: {
       type: String,
@@ -39,11 +25,6 @@ const unionSchema = new mongoose.Schema(
     
     // Union-specific properties
     territory: {
-      countries: [{
-        code: { type: String, required: true }, // ISO country code
-        name: { type: String, required: true },
-        regions: [String] // States/provinces within country
-      }],
       description: String,
     },
     
@@ -53,7 +34,6 @@ const unionSchema = new mongoose.Schema(
       state: String,
       country: String,
       postalCode: String,
-      timezone: String,
     },
     
     contact: {
@@ -70,14 +50,6 @@ const unionSchema = new mongoose.Schema(
       },
       phone: String,
       website: String,
-    },
-    
-    // Leadership
-    president: {
-      name: String,
-      title: String,
-      email: String,
-      phone: String,
     },
     
     // Administrative settings
@@ -111,8 +83,6 @@ const unionSchema = new mongoose.Schema(
       default: true,
     },
     
-    establishedDate: Date,
-    
     metadata: {
       membershipCount: Number,
       churchCount: Number,
@@ -131,8 +101,6 @@ const unionSchema = new mongoose.Schema(
 
 // Indexes for performance
 unionSchema.index({ name: 1 });
-unionSchema.index({ code: 1 });
-unionSchema.index({ 'territory.countries.code': 1 });
 unionSchema.index({ isActive: 1 });
 
 // Virtual to get conferences
@@ -251,20 +219,9 @@ unionSchema.methods.getStatistics = async function() {
 };
 
 // Static methods
-unionSchema.statics.findByCode = function(code) {
-  return this.findOne({ code: code.toUpperCase(), isActive: true });
-};
-
-unionSchema.statics.findByTerritory = function(countryCode) {
-  return this.find({ 
-    'territory.countries.code': countryCode.toUpperCase(),
-    isActive: true 
-  });
-};
-
 unionSchema.statics.getActiveUnions = function() {
   return this.find({ isActive: true })
-    .select('name code hierarchyPath territory.countries contact')
+    .select('name hierarchyPath territory.description contact')
     .sort('name');
 };
 
