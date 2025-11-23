@@ -1,9 +1,9 @@
 const User = require('../models/User');
-const Role = require('../models/Role');
-// const Organization = require('../models/Organization'); // REMOVED - Using hierarchical models
-const Union = require('../models/Union');
-const Conference = require('../models/Conference');
+const Team = require('../models/Team');
 const Church = require('../models/Church');
+const Conference = require('../models/Conference');
+const Union = require('../models/Union');
+const UniversalAssignmentService = require('./universalAssignmentService');
 const {
   AppError,
   NotFoundError,
@@ -12,7 +12,7 @@ const {
 const emailService = require('./emailService');
 
 class UserService {
-  // Get users with filtering and pagination
+  // Get users with filtering and pagination - TEAM-CENTRIC
   static async getUsers(
     filters = {},
     pagination = {},
@@ -22,8 +22,9 @@ class UserService {
     try {
       const {
         search,
-        organizationId,
-        roleId,
+        teamId,
+        churchId,
+        role,
         isActive = true,
         verified,
       } = filters;
@@ -49,45 +50,47 @@ class UserService {
         query.verified = verified;
       }
 
-      // Apply permission-based filtering
-      if (!userPermissions.permissions?.includes('*')) {
-        const accessibleOrgIds =
-          await this.getUserAccessibleOrganizations(requestingUserId);
+      // Apply team-based filtering
+      if (!userPermissions.permissions?.includes('*') && requestingUserId) {
+        const accessibleTeams = await this.getUserAccessibleTeams(requestingUserId);
 
-        if (organizationId) {
-          // Check if requesting user can access the specified organization
-          if (!accessibleOrgIds.includes(organizationId.toString())) {
+        if (teamId) {
+          // Check if requesting user can access the specified team
+          if (!accessibleTeams.includes(teamId.toString())) {
             return { users: [], total: 0, pagination: {} };
           }
-          query['organizations.organization'] = organizationId;
+          query['teamAssignments.teamId'] = teamId;
         } else {
-          // Filter to only accessible organizations
-          if (accessibleOrgIds.length > 0) {
-            query['organizations.organization'] = { $in: accessibleOrgIds };
+          // Filter to only users in accessible teams
+          if (accessibleTeams.length > 0) {
+            query['teamAssignments.teamId'] = { $in: accessibleTeams };
           } else {
             return { users: [], total: 0, pagination: {} };
           }
         }
-      } else if (organizationId) {
-        query['organizations.organization'] = organizationId;
+      } else if (teamId) {
+        query['teamAssignments.teamId'] = teamId;
       }
 
-      if (roleId) {
-        query.$or = [
-          { 'unionAssignments.role': roleId },
-          { 'conferenceAssignments.role': roleId },
-          { 'churchAssignments.role': roleId },
-        ];
+      // Filter by church (through team assignments)
+      if (churchId) {
+        const churchTeams = await Team.find({ churchId, isActive: true }).select('_id');
+        const churchTeamIds = churchTeams.map(team => team._id);
+        query['teamAssignments.teamId'] = { $in: churchTeamIds };
+      }
+
+      // Filter by team role
+      if (role) {
+        query['teamAssignments.role'] = role;
       }
 
       // Execute query with pagination
       const users = await User.find(query)
-        .populate('unionAssignments.union', 'name code')
-        .populate('unionAssignments.role', 'name displayName level')
-        .populate('conferenceAssignments.conference', 'name code')
-        .populate('conferenceAssignments.role', 'name displayName level')
-        .populate('churchAssignments.church', 'name')
-        .populate('churchAssignments.role', 'name displayName level')
+        .populate({
+          path: 'teamAssignments.teamId',
+          populate: { path: 'churchId', select: 'name' }
+        })
+        .populate('primaryTeam', 'name')
         .select('-password')
         .sort({ [sortBy]: sortOrder })
         .limit(limit)
@@ -96,7 +99,7 @@ class UserService {
 
       const total = await User.countDocuments(query);
 
-      // Add computed id field for frontend compatibility
+      // Add computed id field and organizational context for frontend compatibility
       const usersWithId = users.map((user) => ({
         ...user,
         id: user._id.toString(),
@@ -118,22 +121,21 @@ class UserService {
     }
   }
 
-  // Get single user by ID
+  // Get single user by ID - TEAM-CENTRIC
   static async getUserById(id, userPermissions = {}, requestingUserId = null) {
     try {
       const user = await User.findById(id)
-        .populate('unionAssignments.union', 'name code')
-        .populate('unionAssignments.role', 'name displayName level permissions')
-        .populate('conferenceAssignments.conference', 'name code')
-        .populate(
-          'conferenceAssignments.role',
-          'name displayName level permissions'
-        )
-        .populate('churchAssignments.church', 'name')
-        .populate(
-          'churchAssignments.role',
-          'name displayName level permissions'
-        )
+        .populate({
+          path: 'teamAssignments.teamId',
+          populate: {
+            path: 'churchId',
+            populate: {
+              path: 'conferenceId',
+              populate: { path: 'unionId' }
+            }
+          }
+        })
+        .populate('primaryTeam', 'name category tags')
         .select('-password')
         .lean();
 
@@ -161,7 +163,7 @@ class UserService {
     }
   }
 
-  // Create new user
+  // Create new user - TEAM-CENTRIC (preserves invitation system)
   static async createUser(userData, createdBy) {
     try {
       const {
@@ -173,7 +175,8 @@ class UserService {
         city,
         state,
         country,
-        organizations = [],
+        teamAssignments = [], // New: teams instead of organizations
+        sendInvitation = true,
       } = userData;
 
       // Check if user already exists
@@ -182,11 +185,28 @@ class UserService {
         throw new ConflictError('User with this email already exists');
       }
 
-      // Validate organization assignments
-      const validatedOrganizations =
-        await this.validateOrganizationAssignments(organizations);
+      // Validate team assignments
+      const validatedTeamAssignments = [];
+      for (const teamAssignment of teamAssignments) {
+        const team = await Team.findById(teamAssignment.teamId);
+        if (!team) {
+          throw new NotFoundError(`Team with ID ${teamAssignment.teamId}`);
+        }
+        if (!team.isActive) {
+          throw new AppError(`Cannot assign user to inactive team: ${team.name}`, 400);
+        }
+        
+        validatedTeamAssignments.push({
+          teamId: teamAssignment.teamId,
+          role: teamAssignment.role || 'member',
+          status: 'active',
+          joinedAt: new Date(),
+          invitedBy: createdBy,
+          permissions: teamAssignment.permissions || []
+        });
+      }
 
-      // Create user
+      // Create user with team assignments
       const userFields = {
         name,
         email,
@@ -196,16 +216,10 @@ class UserService {
         state,
         country: country || 'Australia',
         verified: process.env.NODE_ENV === 'development', // Auto-verify in development
-        organizations: validatedOrganizations.map((org) => ({
-          organization: org.organizationId,
-          role: org.roleId,
-          assignedAt: new Date(),
-          assignedBy: createdBy,
-        })),
-        primaryOrganization:
-          validatedOrganizations.length > 0
-            ? validatedOrganizations[0].organizationId
-            : null,
+        teamAssignments: validatedTeamAssignments,
+        primaryTeam: validatedTeamAssignments.length > 0 
+          ? validatedTeamAssignments[0].teamId 
+          : null,
       };
 
       // Only add password if provided (for users who need to set it later)
@@ -215,7 +229,7 @@ class UserService {
 
       const user = new User(userFields);
 
-      // Generate verification token
+      // Generate verification token for invitation system
       const verificationToken = emailService.generateVerificationToken();
       const expirationTime = emailService.getExpirationTime();
 
@@ -224,27 +238,38 @@ class UserService {
 
       await user.save();
 
-      // Populate for email details
-      await user.populate(
-        'organizations.organization organizations.role primaryOrganization'
-      );
+      // Update team member counts
+      for (const assignment of validatedTeamAssignments) {
+        await UniversalAssignmentService.updateTeamMemberCount(assignment.teamId);
+      }
 
-      // Prepare user details for email
+      // Populate team details for email
+      await user.populate({
+        path: 'teamAssignments.teamId',
+        populate: { path: 'churchId', select: 'name' }
+      });
+
+      // Prepare user details for email (preserving existing invitation system)
+      const primaryTeam = user.teamAssignments[0]?.teamId;
       const userWithDetails = {
         ...user.toObject(),
-        organizationName: user.organizations[0]?.organization?.name,
-        roleName: user.organizations[0]?.role?.displayName,
+        organizationName: primaryTeam?.churchId?.name || 'Adventist Community Services',
+        roleName: user.teamAssignments[0]?.role || 'Team Member',
+        teamName: primaryTeam?.name,
       };
 
-      // Send verification email
-      try {
-        await emailService.sendVerificationEmail(
-          userWithDetails,
-          verificationToken
-        );
-      } catch (emailError) {
-        // Failed to send verification email
-        // Don't fail user creation if email fails
+      // Send verification email (preserving existing invitation system)
+      if (sendInvitation) {
+        try {
+          await emailService.sendVerificationEmail(
+            userWithDetails,
+            verificationToken
+          );
+        } catch (emailError) {
+          // Failed to send verification email
+          // Don't fail user creation if email fails
+          console.error('Failed to send verification email:', emailError);
+        }
       }
 
       const userObj = user.toObject();
@@ -320,155 +345,73 @@ class UserService {
     }
   }
 
-  // Assign role to user
-  static async assignRole(userId, organizationId, roleName, assignedBy) {
+  // TEAM ASSIGNMENT METHODS - Replacing organizational assignment
+
+  // Assign user to team
+  static async assignUserToTeam(userId, teamId, role = 'member', assignedBy = null) {
+    try {
+      return await UniversalAssignmentService.assignUserToTeam(userId, teamId, role, assignedBy);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to assign user to team', 500);
+    }
+  }
+
+  // Remove user from team
+  static async removeUserFromTeam(userId, teamId) {
+    try {
+      return await UniversalAssignmentService.removeUserFromTeam(userId, teamId);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to remove user from team', 500);
+    }
+  }
+
+  // Get user team assignments with organizational context
+  static async getUserAssignments(userId) {
+    try {
+      return await UniversalAssignmentService.getUserAssignments(userId);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError('Failed to fetch user assignments', 500);
+    }
+  }
+
+  // Get teams accessible to a user
+  static async getUserAccessibleTeams(userId) {
     try {
       const user = await User.findById(userId);
       if (!user) {
         throw new NotFoundError('User');
       }
 
-      // Find organization (try all hierarchical types)
-      let organization = await Union.findById(organizationId);
-      if (!organization) {
-        organization = await Conference.findById(organizationId);
-      }
-      if (!organization) {
-        organization = await Church.findById(organizationId);
-      }
-      if (!organization) {
-        throw new NotFoundError('Organization');
+      // Super admins can access all teams
+      if (user.isSuperAdmin) {
+        const allTeams = await Team.find({ isActive: true }).select('_id');
+        return allTeams.map(team => team._id.toString());
       }
 
-      const role = await Role.findOne({ name: roleName, isActive: true });
-      if (!role) {
-        throw new NotFoundError('Role');
+      // Get user's organizational scope through team memberships
+      const scope = await user.getOrganizationalScope();
+      
+      // Find teams within user's accessible churches
+      if (scope.churches.length > 0) {
+        const accessibleTeams = await Team.find({ 
+          churchId: { $in: scope.churches },
+          isActive: true 
+        }).select('_id');
+        
+        return accessibleTeams.map(team => team._id.toString());
       }
 
-      // Check if user already has a role in this organization
-      const existingIndex = user.organizations.findIndex(
-        (org) => org.organization.toString() === organizationId
-      );
-
-      if (existingIndex !== -1) {
-        // Update existing assignment
-        user.organizations[existingIndex] = {
-          organization: organizationId,
-          role: role._id,
-          assignedAt: new Date(),
-          assignedBy,
-        };
-      } else {
-        // Add new assignment
-        user.organizations.push({
-          organization: organizationId,
-          role: role._id,
-          assignedAt: new Date(),
-          assignedBy,
-        });
-      }
-
-      // Set as primary organization if user doesn't have one
-      if (!user.primaryOrganization) {
-        user.primaryOrganization = organizationId;
-      }
-
-      await user.save();
-      await user.populate('organizations.organization organizations.role');
-
-      return user.organizations;
+      return [];
     } catch (error) {
       if (error instanceof AppError) throw error;
-      throw new AppError('Failed to assign role', 500);
+      throw new AppError('Failed to fetch accessible teams', 500);
     }
   }
 
-  // Revoke user role
-  static async revokeRole(userId, organizationId) {
-    try {
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new NotFoundError('User');
-      }
-
-      // Remove organization assignment
-      user.organizations = user.organizations.filter(
-        (org) => org.organization.toString() !== organizationId
-      );
-
-      // Update primary organization if it was removed
-      if (user.primaryOrganization?.toString() === organizationId) {
-        user.primaryOrganization =
-          user.organizations.length > 0
-            ? user.organizations[0].organization
-            : null;
-      }
-
-      await user.save();
-      return user.organizations;
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw new AppError('Failed to revoke role', 500);
-    }
-  }
-
-  // Get user permissions for organization
-  static async getUserPermissions(userId, organizationId) {
-    try {
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new NotFoundError('User');
-      }
-
-      return await user.getPermissionsForOrganization(organizationId);
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw new AppError('Failed to fetch user permissions', 500);
-    }
-  }
-
-  // Helper methods
-  static async validateOrganizationAssignments(assignments) {
-    const validated = [];
-
-    for (const assignment of assignments) {
-      // Find organization (try all hierarchical types)
-      let org = await Union.findById(assignment.organizationId);
-      if (!org) {
-        org = await Conference.findById(assignment.organizationId);
-      }
-      if (!org) {
-        org = await Church.findById(assignment.organizationId);
-      }
-      if (!org) {
-        throw new NotFoundError(
-          `Organization with ID ${assignment.organizationId}`
-        );
-      }
-
-      const role = await Role.findOne({
-        name: assignment.roleName,
-        isActive: true,
-      });
-      if (!role) {
-        throw new NotFoundError(`Role ${assignment.roleName}`);
-      }
-
-      validated.push({
-        organizationId: assignment.organizationId,
-        roleId: role._id,
-      });
-    }
-
-    return validated;
-  }
-
-  static async getUserAccessibleOrganizations() {
-    // Legacy method - now returns empty array since organizations are replaced by hierarchical system
-    // Use AuthorizationService.getUserUnionAccess, getUserConferenceAccess, or getUserChurchAccess instead
-    // Deprecated: use hierarchical access methods instead
-    return [];
-  }
+  // Helper methods - TEAM-CENTRIC
 
   static async canUserAccessUser(
     requestingUserId,
@@ -485,13 +428,57 @@ class UserService {
       return true;
     }
 
-    // Check if users share any organizations
-    const requestingUserOrgs =
-      await this.getUserAccessibleOrganizations(requestingUserId);
-    const targetUserOrgs =
-      await this.getUserAccessibleOrganizations(targetUserId);
+    if (!requestingUserId) {
+      return false;
+    }
 
-    return requestingUserOrgs.some((orgId) => targetUserOrgs.includes(orgId));
+    try {
+      // Get both users
+      const requestingUser = await User.findById(requestingUserId);
+      const targetUser = await User.findById(targetUserId);
+
+      if (!requestingUser || !targetUser) {
+        return false;
+      }
+
+      // Super admins can access all users
+      if (requestingUser.isSuperAdmin) {
+        return true;
+      }
+
+      // Check if users share organizational scope through team memberships
+      const requestingUserScope = await requestingUser.getOrganizationalScope();
+      const targetUserScope = await targetUser.getOrganizationalScope();
+
+      // Check for shared churches
+      const sharedChurches = requestingUserScope.churches.filter(
+        churchId => targetUserScope.churches.includes(churchId)
+      );
+
+      if (sharedChurches.length > 0) {
+        return true;
+      }
+
+      // Check for shared conferences
+      const sharedConferences = requestingUserScope.conferences.filter(
+        conferenceId => targetUserScope.conferences.includes(conferenceId)
+      );
+
+      if (sharedConferences.length > 0) {
+        return true;
+      }
+
+      // Check for shared unions
+      const sharedUnions = requestingUserScope.unions.filter(
+        unionId => targetUserScope.unions.includes(unionId)
+      );
+
+      return sharedUnions.length > 0;
+
+    } catch (error) {
+      console.error('Error checking user access:', error);
+      return false;
+    }
   }
 
   static async sendWelcomeEmail() {

@@ -31,9 +31,16 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.userId).populate(
-      'unionAssignments.role conferenceAssignments.role churchAssignments.role teamAssignments.teamId'
-    );
+    const user = await User.findById(decoded.userId).populate({
+      path: 'teamAssignments.teamId',
+      populate: {
+        path: 'churchId',
+        populate: {
+          path: 'conferenceId',
+          populate: { path: 'unionId' }
+        }
+      }
+    });
 
     if (!user || !user.isActive) {
       return res.status(401).json({

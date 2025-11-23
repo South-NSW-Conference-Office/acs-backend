@@ -21,6 +21,7 @@ const serviceTypeRoutes = require('./routes/serviceTypes');
 const permissionRoutes = require('./routes/permissions');
 const teamRoutes = require('./routes/teams');
 const teamTypeRoutes = require('./routes/teamTypes');
+const assignmentRoutes = require('./routes/assignments');
 const quotaRoutes = require('./routes/quota');
 const profileRoutes = require('./routes/profile');
 const roleLimitsRoutes = require('./routes/admin/role-limits');
@@ -32,7 +33,6 @@ const PORT = process.env.PORT || 5000;
 
 // Security middleware
 app.use(helmet());
-
 // CORS configuration
 app.use(
   cors({
@@ -93,6 +93,7 @@ app.use(
       'X-Conference-Id',
       'X-Church-Id',
       'X-Team-Id',
+      'X-Organization-Id',
     ],
   })
 );
@@ -237,6 +238,7 @@ const startServer = () => {
     },
     { path: '/api/teams', handler: teamRoutes, name: 'teams' },
     { path: '/api/team-types', handler: teamTypeRoutes, name: 'team-types' },
+    { path: '/api/assignments', handler: assignmentRoutes, name: 'assignments' },
     { path: '/api/quota', handler: quotaRoutes, name: 'quota' },
     { path: '/api/profile', handler: profileRoutes, name: 'profile' },
     { path: '/api/media', handler: mediaRoutes, name: 'media' },

@@ -49,7 +49,7 @@ router.get('/all', authenticateToken, async (req, res) => {
     const userHierarchyPath =
       await hierarchicalAuthService.getUserHierarchyPath(req.user);
 
-    if (!userHierarchyPath) {
+    if (userHierarchyPath === null) {
       return res.status(403).json({
         success: false,
         message: 'No hierarchy access found',
