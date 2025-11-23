@@ -83,7 +83,7 @@ class SecureQueryBuilder {
     return {
       ...baseQuery,
       hierarchyPath: { $regex: `^${userPath}` },
-      isActive: true
+      isActive: true,
     };
   }
 
@@ -182,15 +182,18 @@ class SecureQueryBuilder {
    */
   async buildTeamQuery(user, baseQuery = {}) {
     const userLevel = await hierarchicalAuthService.getUserHighestLevel(user);
-    
+
     // Super admin sees all teams
     if (userLevel === 0) {
       return { ...baseQuery, isActive: true };
     }
 
     // Get user's accessible teams based on hierarchy
-    const accessibleTeams = await hierarchicalAuthService.getAccessibleEntities(user, 'teams');
-    const teamIds = accessibleTeams.map(team => team._id);
+    const accessibleTeams = await hierarchicalAuthService.getAccessibleEntities(
+      user,
+      'teams'
+    );
+    const teamIds = accessibleTeams.map((team) => team._id);
 
     if (teamIds.length === 0) {
       return { _id: null }; // No access
@@ -198,7 +201,7 @@ class SecureQueryBuilder {
 
     return {
       ...baseQuery,
-      _id: { $in: teamIds }
+      _id: { $in: teamIds },
     };
   }
 
@@ -210,15 +213,16 @@ class SecureQueryBuilder {
    */
   async buildServiceQuery(user, baseQuery = {}) {
     const userLevel = await hierarchicalAuthService.getUserHighestLevel(user);
-    
+
     // Super admin sees all services
     if (userLevel === 0) {
       return { ...baseQuery, status: { $ne: 'archived' } };
     }
 
     // Get user's accessible services based on hierarchy
-    const accessibleServices = await hierarchicalAuthService.getAccessibleEntities(user, 'services');
-    const serviceIds = accessibleServices.map(service => service._id);
+    const accessibleServices =
+      await hierarchicalAuthService.getAccessibleEntities(user, 'services');
+    const serviceIds = accessibleServices.map((service) => service._id);
 
     if (serviceIds.length === 0) {
       return { _id: null }; // No access
@@ -226,7 +230,7 @@ class SecureQueryBuilder {
 
     return {
       ...baseQuery,
-      _id: { $in: serviceIds }
+      _id: { $in: serviceIds },
     };
   }
 

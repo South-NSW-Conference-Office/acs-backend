@@ -105,7 +105,7 @@ const authorize = (requiredPermission = {}) => {
       // Determine the most specific context provided
       let entityType = null;
       let entityId = null;
-      
+
       if (churchId) {
         entityType = 'church';
         entityId = churchId;
@@ -126,7 +126,8 @@ const authorize = (requiredPermission = {}) => {
             userPermissions = await req.user.getPermissionsForChurch(entityId);
             break;
           case 'conference':
-            userPermissions = await req.user.getPermissionsForConference(entityId);
+            userPermissions =
+              await req.user.getPermissionsForConference(entityId);
             break;
           case 'union':
             userPermissions = await req.user.getPermissionsForUnion(entityId);
@@ -142,27 +143,33 @@ const authorize = (requiredPermission = {}) => {
           if (assignment.role) {
             userPermissions = {
               role: assignment.role,
-              permissions: assignment.role.permissions || []
+              permissions: assignment.role.permissions || [],
             };
           }
         }
         // Check for any conference assignment
-        else if (req.user.conferenceAssignments && req.user.conferenceAssignments.length > 0) {
+        else if (
+          req.user.conferenceAssignments &&
+          req.user.conferenceAssignments.length > 0
+        ) {
           const assignment = req.user.conferenceAssignments[0];
           if (assignment.role) {
             userPermissions = {
               role: assignment.role,
-              permissions: assignment.role.permissions || []
+              permissions: assignment.role.permissions || [],
             };
           }
         }
         // Check for any church assignment
-        else if (req.user.churchAssignments && req.user.churchAssignments.length > 0) {
+        else if (
+          req.user.churchAssignments &&
+          req.user.churchAssignments.length > 0
+        ) {
           const assignment = req.user.churchAssignments[0];
           if (assignment.role) {
             userPermissions = {
               role: assignment.role,
-              permissions: assignment.role.permissions || []
+              permissions: assignment.role.permissions || [],
             };
           }
         }
@@ -251,16 +258,23 @@ const requireSuperAdmin = async (req, res, next) => {
     }
 
     // Check if user has super admin role in any hierarchical entity
-    const hasSuperAdminRole = req.user.isSuperAdmin || 
-      (req.user.unionAssignments && req.user.unionAssignments.some(
-        (assignment) => assignment.role && assignment.role.name === 'super_admin'
-      )) ||
-      (req.user.conferenceAssignments && req.user.conferenceAssignments.some(
-        (assignment) => assignment.role && assignment.role.name === 'super_admin'
-      )) ||
-      (req.user.churchAssignments && req.user.churchAssignments.some(
-        (assignment) => assignment.role && assignment.role.name === 'super_admin'
-      ));
+    const hasSuperAdminRole =
+      req.user.isSuperAdmin ||
+      (req.user.unionAssignments &&
+        req.user.unionAssignments.some(
+          (assignment) =>
+            assignment.role && assignment.role.name === 'super_admin'
+        )) ||
+      (req.user.conferenceAssignments &&
+        req.user.conferenceAssignments.some(
+          (assignment) =>
+            assignment.role && assignment.role.name === 'super_admin'
+        )) ||
+      (req.user.churchAssignments &&
+        req.user.churchAssignments.some(
+          (assignment) =>
+            assignment.role && assignment.role.name === 'super_admin'
+        ));
 
     if (!hasSuperAdminRole) {
       return res.status(403).json({

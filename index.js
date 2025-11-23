@@ -10,7 +10,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 // const organizationRoutes = require('./routes/organizations'); // REMOVED - Using hierarchical routes
 const unionRoutes = require('./routes/unions');
-const conferenceRoutes = require('./routes/conferences'); 
+const conferenceRoutes = require('./routes/conferences');
 const churchRoutes = require('./routes/churches');
 const roleRoutes = require('./routes/roles');
 const serviceRoutes = require('./routes/servicesHierarchical');
@@ -25,6 +25,7 @@ const quotaRoutes = require('./routes/quota');
 const profileRoutes = require('./routes/profile');
 const roleLimitsRoutes = require('./routes/admin/role-limits');
 const superAdminRoutes = require('./routes/superAdmin');
+const mediaRoutes = require('./routes/media');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,8 +37,10 @@ app.use(helmet());
 app.use(
   cors({
     origin: function (origin, callback) {
-      logger.info(`[CORS] Processing request from origin: ${origin || 'no-origin'}`);
-      
+      logger.info(
+        `[CORS] Processing request from origin: ${origin || 'no-origin'}`
+      );
+
       // Allow requests with no origin (mobile apps, curl, etc.)
       if (!origin) {
         logger.info('[CORS] Allowing request with no origin');
@@ -51,7 +54,9 @@ app.use(
         'https://admin.adventhub.org',
       ].filter(Boolean); // Remove undefined values
 
-      logger.info(`[CORS] Configured allowed origins: ${JSON.stringify(allowedOrigins)}`);
+      logger.info(
+        `[CORS] Configured allowed origins: ${JSON.stringify(allowedOrigins)}`
+      );
 
       // Allow any localhost port for development
       const localhostRegex = /^http:\/\/localhost:\d+$/;
@@ -68,7 +73,7 @@ app.use(
         isAllowedOrigin,
         isLocalhost,
         isLocalhostIP,
-        isLocalNetwork
+        isLocalNetwork,
       });
 
       if (isAllowedOrigin || isLocalhost || isLocalhostIP || isLocalNetwork) {
@@ -94,30 +99,43 @@ app.use(
 
 // Handle preflight OPTIONS requests with debugging
 app.options('*', (req, res, next) => {
-  logger.info(`[CORS] OPTIONS preflight request from ${req.get('Origin')} to ${req.path}`);
+  logger.info(
+    `[CORS] OPTIONS preflight request from ${req.get('Origin')} to ${req.path}`
+  );
   logger.info(`[CORS] Request headers:`, req.headers);
   cors()(req, res, next);
 });
 
 // Body parsing middleware with error handling
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    logger.debug(`[JSON] Parsing body for ${req.method} ${req.path}, size: ${buf.length} bytes`);
-  }
-}));
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+      logger.debug(
+        `[JSON] Parsing body for ${req.method} ${req.path}, size: ${buf.length} bytes`
+      );
+    },
+  })
+);
 
-app.use(express.urlencoded({ 
-  extended: true,
-  verify: (req, res, buf) => {
-    logger.debug(`[URL-ENCODED] Parsing body for ${req.method} ${req.path}, size: ${buf.length} bytes`);
-  }
-}));
+app.use(
+  express.urlencoded({
+    extended: true,
+    verify: (req, res, buf) => {
+      logger.debug(
+        `[URL-ENCODED] Parsing body for ${req.method} ${req.path}, size: ${buf.length} bytes`
+      );
+    },
+  })
+);
 
 // Global error handling for body parsing
 app.use((error, req, res, next) => {
   if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
-    logger.error(`[BODY-PARSE] JSON syntax error in ${req.method} ${req.path}:`, error.message);
+    logger.error(
+      `[BODY-PARSE] JSON syntax error in ${req.method} ${req.path}:`,
+      error.message
+    );
     return res.status(400).json({
       success: false,
       message: 'Invalid JSON in request body',
@@ -143,25 +161,28 @@ try {
 // Function to start the server after database connection
 const startServer = () => {
   logger.info('[SERVER] Starting route registration...');
-  
+
   // Request logging middleware
   app.use((req, res, next) => {
     const start = Date.now();
-    
+
     res.on('finish', () => {
       const duration = Date.now() - start;
       const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
-      logger[logLevel](`[REQUEST] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, {
-        method: req.method,
-        path: req.path,
-        statusCode: res.statusCode,
-        duration,
-        userAgent: req.get('User-Agent'),
-        origin: req.get('Origin'),
-        ip: req.ip
-      });
+      logger[logLevel](
+        `[REQUEST] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`,
+        {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          duration,
+          userAgent: req.get('User-Agent'),
+          origin: req.get('Origin'),
+          ip: req.ip,
+        }
+      );
     });
-    
+
     next();
   });
 
@@ -171,21 +192,54 @@ const startServer = () => {
     { path: '/api/users', handler: userRoutes, name: 'users' },
     // { path: '/api/organizations', handler: organizationRoutes, name: 'organizations' }, // REMOVED - Using hierarchical routes
     { path: '/api/unions', handler: unionRoutes, name: 'unions' },
-    { path: '/api/conferences', handler: conferenceRoutes, name: 'conferences' },
+    {
+      path: '/api/conferences',
+      handler: conferenceRoutes,
+      name: 'conferences',
+    },
     { path: '/api/churches', handler: churchRoutes, name: 'churches' },
     { path: '/api/roles', handler: roleRoutes, name: 'roles' },
     { path: '/api/services', handler: serviceRoutes, name: 'services' },
-    { path: '/api/admin/services', handler: adminServiceRoutes, name: 'admin-services' },
-    { path: '/api/admin/events', handler: adminEventRoutes, name: 'admin-events' },
-    { path: '/api/admin/volunteer-opportunities', handler: adminVolunteerOpportunityRoutes, name: 'admin-volunteer-opportunities' },
-    { path: '/api/admin/service-types', handler: serviceTypeRoutes, name: 'admin-service-types' },
-    { path: '/api/admin/role-limits', handler: roleLimitsRoutes, name: 'admin-role-limits' },
-    { path: '/api/super-admin', handler: superAdminRoutes, name: 'super-admin' },
-    { path: '/api/permissions', handler: permissionRoutes, name: 'permissions' },
+    {
+      path: '/api/admin/services',
+      handler: adminServiceRoutes,
+      name: 'admin-services',
+    },
+    {
+      path: '/api/admin/events',
+      handler: adminEventRoutes,
+      name: 'admin-events',
+    },
+    {
+      path: '/api/admin/volunteer-opportunities',
+      handler: adminVolunteerOpportunityRoutes,
+      name: 'admin-volunteer-opportunities',
+    },
+    {
+      path: '/api/admin/service-types',
+      handler: serviceTypeRoutes,
+      name: 'admin-service-types',
+    },
+    {
+      path: '/api/admin/role-limits',
+      handler: roleLimitsRoutes,
+      name: 'admin-role-limits',
+    },
+    {
+      path: '/api/super-admin',
+      handler: superAdminRoutes,
+      name: 'super-admin',
+    },
+    {
+      path: '/api/permissions',
+      handler: permissionRoutes,
+      name: 'permissions',
+    },
     { path: '/api/teams', handler: teamRoutes, name: 'teams' },
     { path: '/api/team-types', handler: teamTypeRoutes, name: 'team-types' },
     { path: '/api/quota', handler: quotaRoutes, name: 'quota' },
-    { path: '/api/profile', handler: profileRoutes, name: 'profile' }
+    { path: '/api/profile', handler: profileRoutes, name: 'profile' },
+    { path: '/api/media', handler: mediaRoutes, name: 'media' },
   ];
 
   routes.forEach(({ path, handler, name }) => {
@@ -193,7 +247,10 @@ const startServer = () => {
       app.use(path, handler);
       logger.info(`[ROUTES] ✓ Registered ${name} routes at ${path}`);
     } catch (error) {
-      logger.error(`[ROUTES] ✗ Failed to register ${name} routes at ${path}:`, error);
+      logger.error(
+        `[ROUTES] ✗ Failed to register ${name} routes at ${path}:`,
+        error
+      );
       throw new Error(`Failed to register ${name} routes: ${error.message}`);
     }
   });
@@ -207,7 +264,8 @@ const startServer = () => {
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       environment: process.env.NODE_ENV || 'development',
-      mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+      mongodb:
+        mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     };
     logger.debug('[HEALTH] Health check response:', healthData);
     res.status(200).json(healthData);
@@ -227,22 +285,25 @@ const startServer = () => {
       headers: req.headers,
       userAgent: req.get('User-Agent'),
       origin: req.get('Origin'),
-      ip: req.ip
+      ip: req.ip,
     });
 
     const statusCode = error.statusCode || error.status || 500;
-    
+
     res.status(statusCode).json({
       success: false,
       message: statusCode === 500 ? 'Internal server error' : error.message,
-      error: process.env.NODE_ENV === 'development' ? {
-        message: error.message,
-        stack: error.stack,
-        details: error
-      } : undefined,
+      error:
+        process.env.NODE_ENV === 'development'
+          ? {
+              message: error.message,
+              stack: error.stack,
+              details: error,
+            }
+          : undefined,
       timestamp: new Date().toISOString(),
       path: req.path,
-      method: req.method
+      method: req.method,
     });
   });
 
@@ -255,22 +316,24 @@ const startServer = () => {
       headers: req.headers,
       userAgent: req.get('User-Agent'),
       origin: req.get('Origin'),
-      ip: req.ip
+      ip: req.ip,
     });
-    
+
     res.status(404).json({
       success: false,
       message: 'Route not found',
       path: req.path,
       method: req.method,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   });
 
   // Start server with enhanced logging
   const server = app.listen(PORT, () => {
     logger.info(`[SERVER] ✓ Server successfully started on port ${PORT}`);
-    logger.info(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(
+      `[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`
+    );
     logger.info(`[SERVER] Health check: http://localhost:${PORT}/health`);
     logger.info(`[SERVER] Process ID: ${process.pid}`);
     logger.info(`[SERVER] Node version: ${process.version}`);
@@ -302,7 +365,12 @@ const startServer = () => {
 
 // Database connection with enhanced logging
 logger.info('[DATABASE] Starting database connection...');
-logger.info('[DATABASE] MongoDB URI:', process.env.MONGO_URI ? `Set (${process.env.MONGO_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')})` : 'Not set');
+logger.info(
+  '[DATABASE] MongoDB URI:',
+  process.env.MONGO_URI
+    ? `Set (${process.env.MONGO_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')})`
+    : 'Not set'
+);
 
 const connectionOptions = {
   serverSelectionTimeoutMS: 15000,
@@ -352,7 +420,7 @@ mongoose
   .connect(process.env.MONGO_URI, connectionOptions)
   .then(async () => {
     logger.info('[DATABASE] ✓ Database connected successfully');
-    
+
     try {
       // Initialize database with system roles and permissions
       logger.info('[DATABASE] Starting database initialization...');
@@ -373,20 +441,28 @@ mongoose
       message: error.message,
       code: error.code,
       codeName: error.codeName,
-      stack: error.stack
+      stack: error.stack,
     });
-    
+
     // Provide helpful error messages
     if (error.message.includes('ENOTFOUND')) {
-      logger.error('[DATABASE] ✗ DNS resolution failed - check your MongoDB URI hostname');
+      logger.error(
+        '[DATABASE] ✗ DNS resolution failed - check your MongoDB URI hostname'
+      );
     } else if (error.message.includes('ECONNREFUSED')) {
-      logger.error('[DATABASE] ✗ Connection refused - MongoDB server may not be running');
+      logger.error(
+        '[DATABASE] ✗ Connection refused - MongoDB server may not be running'
+      );
     } else if (error.message.includes('Authentication failed')) {
-      logger.error('[DATABASE] ✗ Authentication failed - check your username/password');
+      logger.error(
+        '[DATABASE] ✗ Authentication failed - check your username/password'
+      );
     } else if (error.message.includes('bad auth')) {
-      logger.error('[DATABASE] ✗ Authentication error - check your credentials');
+      logger.error(
+        '[DATABASE] ✗ Authentication error - check your credentials'
+      );
     }
-    
+
     process.exit(1);
   });
 
@@ -400,9 +476,9 @@ process.on('uncaughtException', (error) => {
     timestamp: new Date().toISOString(),
     pid: process.pid,
     memory: process.memoryUsage(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
-  
+
   // Give logging a chance to finish before exiting
   setTimeout(() => {
     process.exit(1);
@@ -417,9 +493,9 @@ process.on('unhandledRejection', (reason, promise) => {
     timestamp: new Date().toISOString(),
     pid: process.pid,
     memory: process.memoryUsage(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
-  
+
   // Give logging a chance to finish before exiting
   setTimeout(() => {
     process.exit(1);
@@ -451,7 +527,7 @@ logger.info('[PROCESS] ✓ Process started', {
   arch: process.arch,
   cwd: process.cwd(),
   environment: process.env.NODE_ENV || 'development',
-  timestamp: new Date().toISOString()
+  timestamp: new Date().toISOString(),
 });
 
 module.exports = app;

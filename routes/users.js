@@ -5,7 +5,7 @@ const Role = require('../models/Role');
 // const Organization = require('../models/Organization') // REMOVED - Using hierarchical models
 const Union = require('../models/Union');
 const Conference = require('../models/Conference');
-const Church = require('../models/Church');;
+const Church = require('../models/Church');
 const UserService = require('../services/userService');
 const {
   authenticateToken,
@@ -201,7 +201,7 @@ router.post(
 
       // Find organization (try all hierarchical types)
       let organization = null;
-      
+
       // Try as Union first
       organization = await Union.findById(organizationId);
       if (!organization) {
@@ -212,7 +212,7 @@ router.post(
         // Try as Church
         organization = await Church.findById(organizationId);
       }
-      
+
       if (!organization) {
         return res.status(404).json({
           success: false,

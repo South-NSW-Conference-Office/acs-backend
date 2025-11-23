@@ -7,7 +7,7 @@ const churchSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    
+
     // Parent relationship
     conferenceId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -15,33 +15,33 @@ const churchSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    
+
     // Hierarchy properties
     hierarchyPath: {
       type: String,
       required: true,
       index: true,
     },
-    
+
     hierarchyLevel: {
       type: Number,
       default: 2, // Church is always level 2
       immutable: true,
     },
-    
+
     // Church identification
     code: {
       type: String,
       uppercase: true,
       trim: true,
       validate: {
-        validator: function(v) {
+        validator: function (v) {
           return !v || /^[A-Z0-9]{2,20}$/.test(v);
         },
-        message: 'Church code must be 2-20 uppercase letters/numbers'
-      }
+        message: 'Church code must be 2-20 uppercase letters/numbers',
+      },
     },
-    
+
     // Location and contact
     location: {
       address: {
@@ -57,18 +57,18 @@ const churchSchema = new mongoose.Schema(
       },
       timezone: String,
     },
-    
+
     contact: {
       email: {
         type: String,
         lowercase: true,
         trim: true,
         validate: {
-          validator: function(v) {
+          validator: function (v) {
             return !v || /^\S+@\S+\.\S+$/.test(v);
           },
-          message: 'Invalid email format'
-        }
+          message: 'Invalid email format',
+        },
       },
       phone: String,
       website: String,
@@ -78,9 +78,9 @@ const churchSchema = new mongoose.Schema(
         state: String,
         postalCode: String,
         country: String,
-      }
+      },
     },
-    
+
     // Church leadership
     leadership: {
       pastor: {
@@ -90,13 +90,15 @@ const churchSchema = new mongoose.Schema(
         phone: String,
         startDate: Date,
       },
-      associatePastors: [{
-        name: String,
-        title: String,
-        email: String,
-        phone: String,
-        responsibilities: [String],
-      }],
+      associatePastors: [
+        {
+          name: String,
+          title: String,
+          email: String,
+          phone: String,
+          responsibilities: [String],
+        },
+      ],
       firstElder: {
         name: String,
         email: String,
@@ -118,7 +120,7 @@ const churchSchema = new mongoose.Schema(
         phone: String,
       },
     },
-    
+
     // Church demographics and statistics
     demographics: {
       membershipCount: {
@@ -135,14 +137,14 @@ const churchSchema = new mongoose.Schema(
         lastUpdated: Date,
       },
       ageGroups: {
-        children: Number,    // 0-12
-        youth: Number,       // 13-17
+        children: Number, // 0-12
+        youth: Number, // 13-17
         youngAdults: Number, // 18-35
-        adults: Number,      // 36-64
-        seniors: Number,     // 65+
-      }
+        adults: Number, // 36-64
+        seniors: Number, // 65+
+      },
     },
-    
+
     // Facilities and services
     facilities: {
       sanctuary: {
@@ -150,11 +152,13 @@ const churchSchema = new mongoose.Schema(
         hasAV: { type: Boolean, default: false },
         hasAccessibility: { type: Boolean, default: false },
       },
-      classrooms: [{
-        name: String,
-        capacity: Number,
-        purpose: String, // 'sabbath_school', 'children', 'youth', 'multipurpose'
-      }],
+      classrooms: [
+        {
+          name: String,
+          capacity: Number,
+          purpose: String, // 'sabbath_school', 'children', 'youth', 'multipurpose'
+        },
+      ],
       kitchen: {
         available: { type: Boolean, default: false },
         capacity: Number,
@@ -166,7 +170,7 @@ const churchSchema = new mongoose.Schema(
       },
       other: [String], // Fellowship hall, gymnasium, etc.
     },
-    
+
     // Service schedule
     services: {
       sabbathSchool: {
@@ -186,73 +190,90 @@ const churchSchema = new mongoose.Schema(
         time: String,
         description: String,
       },
-      special: [{
-        name: String,
-        schedule: String,
-        description: String,
-      }]
+      special: [
+        {
+          name: String,
+          schedule: String,
+          description: String,
+        },
+      ],
     },
-    
+
     // Community outreach settings
     outreach: {
-      primaryFocus: [{
-        type: String,
-        enum: ['food_assistance', 'clothing', 'health_services', 'education', 
-               'disaster_relief', 'community_development', 'family_services']
-      }],
+      primaryFocus: [
+        {
+          type: String,
+          enum: [
+            'food_assistance',
+            'clothing',
+            'health_services',
+            'education',
+            'disaster_relief',
+            'community_development',
+            'family_services',
+          ],
+        },
+      ],
       serviceArea: {
         radius: Number, // Miles/kilometers served
         communities: [String],
         specialPopulations: [String],
       },
-      partnerships: [{
-        organization: String,
-        type: String,
-        contactPerson: String,
-        relationship: String,
-      }],
+      partnerships: [
+        {
+          organization: String,
+          type: String,
+          contactPerson: String,
+          relationship: String,
+        },
+      ],
     },
-    
+
     // Church settings and preferences
     settings: {
-      serviceLanguages: [{
-        language: String,
-        isPrimary: { type: Boolean, default: false },
-        serviceTypes: [String], // Which services are in this language
-      }],
+      serviceLanguages: [
+        {
+          language: String,
+          isPrimary: { type: Boolean, default: false },
+          serviceTypes: [String], // Which services are in this language
+        },
+      ],
       reportingPreferences: {
         frequency: {
           type: String,
           enum: ['weekly', 'monthly', 'quarterly'],
-          default: 'monthly'
+          default: 'monthly',
         },
         preferredDay: String,
         contactMethod: {
           type: String,
           enum: ['email', 'phone', 'postal'],
-          default: 'email'
-        }
+          default: 'email',
+        },
       },
       acsSettings: {
-        operatingHours: [{
-          day: String,
-          open: String,
-          close: String,
-        }],
+        operatingHours: [
+          {
+            day: String,
+            open: String,
+            close: String,
+          },
+        ],
         specialRequirements: [String],
         volunteerCoordinator: String,
-      }
+      },
     },
-    
+
     // Status and metadata
     isActive: {
       type: Boolean,
       default: true,
     },
-    
+
     establishedDate: Date,
     organizedDate: Date, // When officially organized as SDA church
-    
+
     metadata: {
       teamCount: { type: Number, default: 0 },
       serviceCount: { type: Number, default: 0 },
@@ -260,7 +281,7 @@ const churchSchema = new mongoose.Schema(
       lastVisit: Date,
       lastUpdated: { type: Date, default: Date.now },
     },
-    
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -284,7 +305,7 @@ churchSchema.virtual('conference', {
   ref: 'Conference',
   localField: 'conferenceId',
   foreignField: '_id',
-  justOne: true
+  justOne: true,
 });
 
 // Virtual to get teams
@@ -292,16 +313,16 @@ churchSchema.virtual('teams', {
   ref: 'Team',
   localField: '_id',
   foreignField: 'churchId',
-  match: { isActive: true }
+  match: { isActive: true },
 });
 
 // Ensure virtual fields are serialized
 churchSchema.set('toJSON', {
   virtuals: true,
-  transform: function(doc, ret) {
+  transform: function (doc, ret) {
     delete ret.__v;
     return ret;
-  }
+  },
 });
 
 // Pre-save middleware
@@ -316,25 +337,32 @@ churchSchema.pre('save', async function (next) {
       }
       this.hierarchyPath = `${conference.hierarchyPath}/${this._id}`;
     }
-    
+
     // Ensure hierarchy level is 2
     this.hierarchyLevel = 2;
-    
+
     // Update metadata timestamp
     this.metadata.lastUpdated = new Date();
-    
+
     // Calculate totals from components
     if (this.demographics) {
       const age = this.demographics.ageGroups;
       if (age) {
-        const totalFromAgeGroups = (age.children || 0) + (age.youth || 0) + 
-                                 (age.youngAdults || 0) + (age.adults || 0) + (age.seniors || 0);
-        if (totalFromAgeGroups > 0 && !this.demographics.membershipCount.total) {
+        const totalFromAgeGroups =
+          (age.children || 0) +
+          (age.youth || 0) +
+          (age.youngAdults || 0) +
+          (age.adults || 0) +
+          (age.seniors || 0);
+        if (
+          totalFromAgeGroups > 0 &&
+          !this.demographics.membershipCount.total
+        ) {
           this.demographics.membershipCount.total = totalFromAgeGroups;
         }
       }
     }
-    
+
     next();
   } catch (error) {
     next(error);
@@ -342,124 +370,145 @@ churchSchema.pre('save', async function (next) {
 });
 
 // Instance methods
-churchSchema.methods.getFullHierarchy = async function() {
+churchSchema.methods.getFullHierarchy = async function () {
   const Conference = mongoose.model('Conference');
-  const Union = mongoose.model('Union');
   const Team = mongoose.model('Team');
-  
-  const conference = await Conference.findById(this.conferenceId).populate('unionId');
+
+  const conference = await Conference.findById(this.conferenceId).populate(
+    'unionId'
+  );
   const teams = await Team.find({ churchId: this._id, isActive: true })
     .select('name type hierarchyPath')
     .sort('name');
-  
+
   return {
     union: conference.unionId,
     conference,
     church: this,
-    teams
+    teams,
   };
 };
 
-churchSchema.methods.getStatistics = async function() {
+churchSchema.methods.getStatistics = async function () {
   const Team = mongoose.model('Team');
   const Service = mongoose.model('Service');
-  
+
   const stats = {
     teams: await Team.countDocuments({ churchId: this._id, isActive: true }),
     services: 0,
     volunteers: 0,
     beneficiaries: 0,
   };
-  
+
   // Get teams for this church
-  const teams = await Team.find({ churchId: this._id, isActive: true }).select('_id');
-  const teamIds = teams.map(t => t._id);
-  
+  const teams = await Team.find({ churchId: this._id, isActive: true }).select(
+    '_id'
+  );
+  const teamIds = teams.map((t) => t._id);
+
   if (teamIds.length > 0) {
     // Count services and get aggregated stats
     const serviceStats = await Service.aggregate([
       { $match: { teamId: { $in: teamIds }, status: { $ne: 'archived' } } },
-      { $group: {
-        _id: null,
-        serviceCount: { $sum: 1 },
-        totalVolunteers: { $sum: '$statistics.volunteers' },
-        totalBeneficiaries: { $sum: '$statistics.beneficiaries' }
-      }}
+      {
+        $group: {
+          _id: null,
+          serviceCount: { $sum: 1 },
+          totalVolunteers: { $sum: '$statistics.volunteers' },
+          totalBeneficiaries: { $sum: '$statistics.beneficiaries' },
+        },
+      },
     ]);
-    
+
     if (serviceStats.length > 0) {
       stats.services = serviceStats[0].serviceCount;
       stats.volunteers = serviceStats[0].totalVolunteers || 0;
       stats.beneficiaries = serviceStats[0].totalBeneficiaries || 0;
     }
   }
-  
+
   return stats;
 };
 
-churchSchema.methods.canManageTeam = function(teamHierarchyPath) {
+churchSchema.methods.canManageTeam = function (teamHierarchyPath) {
   return teamHierarchyPath.startsWith(this.hierarchyPath + '/');
 };
 
-churchSchema.methods.isNearLocation = function(latitude, longitude, radiusMiles = 50) {
-  if (!this.location.coordinates.latitude || !this.location.coordinates.longitude) {
+churchSchema.methods.isNearLocation = function (
+  latitude,
+  longitude,
+  radiusMiles = 50
+) {
+  if (
+    !this.location.coordinates.latitude ||
+    !this.location.coordinates.longitude
+  ) {
     return false;
   }
-  
+
   const earthRadius = 3959; // miles
-  const lat1 = this.location.coordinates.latitude * Math.PI / 180;
-  const lat2 = latitude * Math.PI / 180;
-  const deltaLat = (latitude - this.location.coordinates.latitude) * Math.PI / 180;
-  const deltaLng = (longitude - this.location.coordinates.longitude) * Math.PI / 180;
-  
-  const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
-          Math.cos(lat1) * Math.cos(lat2) *
-          Math.sin(deltaLng/2) * Math.sin(deltaLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const lat1 = (this.location.coordinates.latitude * Math.PI) / 180;
+  const lat2 = (latitude * Math.PI) / 180;
+  const deltaLat =
+    ((latitude - this.location.coordinates.latitude) * Math.PI) / 180;
+  const deltaLng =
+    ((longitude - this.location.coordinates.longitude) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(deltaLng / 2) *
+      Math.sin(deltaLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = earthRadius * c;
-  
+
   return distance <= radiusMiles;
 };
 
 // Static methods
-churchSchema.statics.findByConference = function(conferenceId) {
+churchSchema.statics.findByConference = function (conferenceId) {
   return this.find({ conferenceId, isActive: true }).sort('name');
 };
 
-churchSchema.statics.findByCode = function(code, conferenceId = null) {
+churchSchema.statics.findByCode = function (code, conferenceId = null) {
   const query = { code: code.toUpperCase(), isActive: true };
   if (conferenceId) query.conferenceId = conferenceId;
   return this.findOne(query);
 };
 
-churchSchema.statics.findByLocation = function(city, state = null) {
-  const query = { 
+churchSchema.statics.findByLocation = function (city, state = null) {
+  const query = {
     'location.address.city': new RegExp(city, 'i'),
-    isActive: true 
+    isActive: true,
   };
   if (state) query['location.address.state'] = new RegExp(state, 'i');
-  
+
   return this.find(query).populate('conferenceId', 'name code');
 };
 
-churchSchema.statics.findNearLocation = function(latitude, longitude, radiusMiles = 50) {
+churchSchema.statics.findNearLocation = function (
+  latitude,
+  longitude,
+  radiusMiles = 50
+) {
   const radiusMeters = radiusMiles * 1609.34; // Convert miles to meters
-  
+
   return this.find({
     'location.coordinates': {
       $near: {
         $geometry: { type: 'Point', coordinates: [longitude, latitude] },
-        $maxDistance: radiusMeters
-      }
+        $maxDistance: radiusMeters,
+      },
     },
-    isActive: true
+    isActive: true,
   }).populate('conferenceId', 'name code');
 };
 
-churchSchema.statics.getActiveChurches = function(conferenceId = null) {
+churchSchema.statics.getActiveChurches = function (conferenceId = null) {
   const query = { isActive: true };
   if (conferenceId) query.conferenceId = conferenceId;
-  
+
   return this.find(query)
     .select('name code hierarchyPath location contact leadership demographics')
     .populate('conferenceId', 'name code')
@@ -467,40 +516,51 @@ churchSchema.statics.getActiveChurches = function(conferenceId = null) {
 };
 
 // Cascade deletion prevention
-churchSchema.pre('remove', async function(next) {
+churchSchema.pre('remove', async function (next) {
   const Team = mongoose.model('Team');
   const teamCount = await Team.countDocuments({ churchId: this._id });
-  
+
   if (teamCount > 0) {
-    return next(new Error(`Cannot delete church: ${teamCount} teams still exist`));
+    return next(
+      new Error(`Cannot delete church: ${teamCount} teams still exist`)
+    );
   }
-  
+
   next();
 });
 
 // Validation
-churchSchema.pre('save', async function(next) {
+churchSchema.pre('save', async function (next) {
   if (this.code && this.isNew) {
     // Ensure code is unique within conference
     const existing = await this.constructor.findOne({
       conferenceId: this.conferenceId,
       code: this.code,
-      _id: { $ne: this._id }
+      _id: { $ne: this._id },
     });
-    
+
     if (existing) {
-      return next(new Error(`Church code '${this.code}' already exists in this conference`));
+      return next(
+        new Error(
+          `Church code '${this.code}' already exists in this conference`
+        )
+      );
     }
   }
-  
+
   // Ensure at least one primary language
-  if (this.settings.serviceLanguages && this.settings.serviceLanguages.length > 0) {
-    const primaryLanguages = this.settings.serviceLanguages.filter(lang => lang.isPrimary);
+  if (
+    this.settings.serviceLanguages &&
+    this.settings.serviceLanguages.length > 0
+  ) {
+    const primaryLanguages = this.settings.serviceLanguages.filter(
+      (lang) => lang.isPrimary
+    );
     if (primaryLanguages.length === 0) {
       this.settings.serviceLanguages[0].isPrimary = true;
     }
   }
-  
+
   next();
 });
 

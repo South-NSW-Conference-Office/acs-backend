@@ -80,7 +80,7 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
   return async (req, res, next) => {
     try {
       const user = req.user;
-      
+
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -89,16 +89,23 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
       }
 
       // 1. Determine target entity
-      const entityId = req.params.id || req.params.teamId || req.params.serviceId || req.params.organizationId;
+      const entityId =
+        req.params.id ||
+        req.params.teamId ||
+        req.params.serviceId ||
+        req.params.organizationId;
       let targetEntity = null;
-      
+
       if (entityId && targetEntityType) {
-        targetEntity = await hierarchicalAuthService.getEntity(targetEntityType, entityId);
-        
+        targetEntity = await hierarchicalAuthService.getEntity(
+          targetEntityType,
+          entityId
+        );
+
         if (!targetEntity) {
-          return res.status(404).json({ 
-            success: false, 
-            message: `${targetEntityType} not found` 
+          return res.status(404).json({
+            success: false,
+            message: `${targetEntityType} not found`,
           });
         }
       }
@@ -106,52 +113,58 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
       // 2. Check hierarchical access
       if (targetEntity && targetEntity.hierarchyPath) {
         const canAccess = await hierarchicalAuthService.canUserManageEntity(
-          user, 
-          targetEntity.hierarchyPath, 
+          user,
+          targetEntity.hierarchyPath,
           requiredAction
         );
-        
+
         if (!canAccess) {
           return res.status(403).json({
             success: false,
             message: `Insufficient hierarchical permissions for ${requiredAction} on ${targetEntityType}`,
             userLevel: await hierarchicalAuthService.getUserHighestLevel(user),
-            targetLevel: hierarchicalAuthService.parseHierarchyLevel(targetEntity.hierarchyPath),
+            targetLevel: hierarchicalAuthService.parseHierarchyLevel(
+              targetEntity.hierarchyPath
+            ),
             debug: {
-              userPath: await hierarchicalAuthService.getUserHierarchyPath(user),
-              targetPath: targetEntity.hierarchyPath
-            }
+              userPath:
+                await hierarchicalAuthService.getUserHierarchyPath(user),
+              targetPath: targetEntity.hierarchyPath,
+            },
           });
         }
       } else if (requiredAction === 'create') {
         // For creation, check if user can create this type of entity
-        const userLevel = await hierarchicalAuthService.getUserHighestLevel(user);
-        const requiredLevel = hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
-        
+        const userLevel =
+          await hierarchicalAuthService.getUserHighestLevel(user);
+        const requiredLevel =
+          hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
+
         if (userLevel >= requiredLevel) {
           return res.status(403).json({
             success: false,
             message: `Insufficient permissions to create ${targetEntityType}`,
             userLevel,
-            requiredLevel
+            requiredLevel,
           });
         }
       }
-      
+
       // 3. Store hierarchy context for route handlers
       req.targetEntity = targetEntity;
       req.hierarchicalAccess = true;
-      req.userHierarchyLevel = await hierarchicalAuthService.getUserHighestLevel(user);
-      req.userHierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(user);
-      
+      req.userHierarchyLevel =
+        await hierarchicalAuthService.getUserHighestLevel(user);
+      req.userHierarchyPath =
+        await hierarchicalAuthService.getUserHierarchyPath(user);
+
       next();
-      
     } catch (error) {
-      console.error('Hierarchical authorization error:', error);
+      // Log hierarchical authorization error silently
       return res.status(500).json({
         success: false,
         message: 'Hierarchical authorization error',
-        error: error.message
+        error: error.message,
       });
     }
   };
@@ -169,13 +182,15 @@ const requireSuperAdmin = async (req, res, next) => {
       });
     }
 
-    const userLevel = await hierarchicalAuthService.getUserHighestLevel(req.user);
-    
+    const userLevel = await hierarchicalAuthService.getUserHighestLevel(
+      req.user
+    );
+
     if (userLevel !== 0) {
       return res.status(403).json({
         success: false,
         message: 'Super admin access required',
-        userLevel
+        userLevel,
       });
     }
 
@@ -194,7 +209,8 @@ const requireSuperAdmin = async (req, res, next) => {
  */
 const validateOrganizationContext = async (req, res, next) => {
   try {
-    const organizationId = req.headers['x-organization-id'] || req.params.organizationId;
+    const organizationId =
+      req.headers['x-organization-id'] || req.params.organizationId;
 
     if (!organizationId) {
       return next(); // No organization context is valid for some operations
@@ -207,8 +223,11 @@ const validateOrganizationContext = async (req, res, next) => {
       });
     }
 
-    const organization = await hierarchicalAuthService.getEntity('organization', organizationId);
-    
+    const organization = await hierarchicalAuthService.getEntity(
+      'organization',
+      organizationId
+    );
+
     if (!organization) {
       return res.status(404).json({
         success: false,
@@ -253,7 +272,8 @@ const authorizeTeamAccess = (requiredAction = 'read') => {
         });
       }
 
-      const teamId = req.headers['x-team-id'] || req.params.teamId || req.body.teamId;
+      const teamId =
+        req.headers['x-team-id'] || req.params.teamId || req.body.teamId;
 
       if (!teamId) {
         return res.status(400).json({
@@ -263,7 +283,7 @@ const authorizeTeamAccess = (requiredAction = 'read') => {
       }
 
       const team = await hierarchicalAuthService.getEntity('team', teamId);
-      
+
       if (!team) {
         return res.status(404).json({
           success: false,
@@ -297,7 +317,7 @@ const authorizeTeamAccess = (requiredAction = 'read') => {
 };
 
 /**
- * Middleware for service-specific authorization  
+ * Middleware for service-specific authorization
  */
 const authorizeServiceAccess = (requiredAction = 'read') => {
   return async (req, res, next) => {
@@ -309,7 +329,8 @@ const authorizeServiceAccess = (requiredAction = 'read') => {
         });
       }
 
-      const serviceId = req.params.serviceId || req.params.id || req.body.serviceId;
+      const serviceId =
+        req.params.serviceId || req.params.id || req.body.serviceId;
 
       if (!serviceId) {
         return res.status(400).json({
@@ -318,8 +339,11 @@ const authorizeServiceAccess = (requiredAction = 'read') => {
         });
       }
 
-      const service = await hierarchicalAuthService.getEntity('service', serviceId);
-      
+      const service = await hierarchicalAuthService.getEntity(
+        'service',
+        serviceId
+      );
+
       if (!service) {
         return res.status(404).json({
           success: false,
@@ -358,5 +382,5 @@ module.exports = {
   requireSuperAdmin,
   validateOrganizationContext,
   authorizeTeamAccess,
-  authorizeServiceAccess
+  authorizeServiceAccess,
 };

@@ -245,8 +245,9 @@ router.post(
         });
       }
 
-      const user = await User.findById(userId)
-        .populate('unionAssignments.role conferenceAssignments.role churchAssignments.role');
+      const user = await User.findById(userId).populate(
+        'unionAssignments.role conferenceAssignments.role churchAssignments.role'
+      );
 
       if (!user) {
         return res.status(404).json({
@@ -323,8 +324,9 @@ router.post(
       const { email, password } = req.body;
 
       // Find user and populate role data
-      const user = await User.findOne({ email, isActive: true })
-        .populate('unionAssignments.role conferenceAssignments.role churchAssignments.role');
+      const user = await User.findOne({ email, isActive: true }).populate(
+        'unionAssignments.role conferenceAssignments.role churchAssignments.role'
+      );
 
       if (!user) {
         return res.status(401).json({
@@ -391,7 +393,7 @@ router.post(
       const allAssignments = [
         ...(user.unionAssignments || []),
         ...(user.conferenceAssignments || []),
-        ...(user.churchAssignments || [])
+        ...(user.churchAssignments || []),
       ];
 
       const userData = {
@@ -473,7 +475,7 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
     const allAssignments = [
       ...(user.unionAssignments || []),
       ...(user.conferenceAssignments || []),
-      ...(user.churchAssignments || [])
+      ...(user.churchAssignments || []),
     ];
 
     const userData = {
@@ -785,26 +787,30 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
     const user = req.user;
 
     // Get user's highest level in hierarchy
-    const hierarchyLevel = await hierarchicalAuthService.getUserHighestLevel(user);
-    
+    const hierarchyLevel =
+      await hierarchicalAuthService.getUserHighestLevel(user);
+
     // Get user's hierarchy path
-    const hierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(user);
-    
+    const hierarchyPath =
+      await hierarchicalAuthService.getUserHierarchyPath(user);
+
     // Get levels this user can manage
-    const managedLevels = await hierarchicalAuthService.getUserManagedLevels(user);
+    const managedLevels =
+      await hierarchicalAuthService.getUserManagedLevels(user);
 
     // Get permissions based on hierarchy level
     let permissions = [];
     let role = null;
 
-    if (hierarchyLevel === 0) { // Super Admin
+    if (hierarchyLevel === 0) {
+      // Super Admin
       permissions = ['*'];
       role = {
         id: 'super_admin',
         name: 'super_admin',
         displayName: 'Super Administrator',
         level: 'system',
-        hierarchyLevel: 0
+        hierarchyLevel: 0,
       };
     } else if (user.organizations.length > 0) {
       // Get the first organization assignment since we no longer have primaryOrganization
@@ -817,7 +823,7 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
           name: primaryOrgAssignment.role.name,
           displayName: primaryOrgAssignment.role.displayName,
           level: primaryOrgAssignment.role.level,
-          hierarchyLevel: primaryOrgAssignment.role.hierarchyLevel || 4
+          hierarchyLevel: primaryOrgAssignment.role.hierarchyLevel || 4,
         };
       }
     }
@@ -827,7 +833,7 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
     const allAssignments = [
       ...(user.unionAssignments || []),
       ...(user.conferenceAssignments || []),
-      ...(user.churchAssignments || [])
+      ...(user.churchAssignments || []),
     ];
 
     const userData = {
@@ -845,12 +851,12 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
             displayName: org.role.displayName,
             level: org.role.level,
             hierarchyLevel: org.role.hierarchyLevel,
-            canManage: org.role.canManage
+            canManage: org.role.canManage,
           },
           assignedAt: org.assignedAt,
         })),
       teamAssignments: user.teamAssignments || [],
-      primaryTeam: user.primaryTeam
+      primaryTeam: user.primaryTeam,
     };
 
     res.json({
@@ -861,7 +867,7 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
         role,
         hierarchyLevel,
         hierarchyPath,
-        managedLevels
+        managedLevels,
       },
     });
   } catch (error) {

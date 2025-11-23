@@ -74,19 +74,22 @@ async function canManageService(
     if (permissionDetails && permissionDetails.endsWith(':subordinate')) {
       // Use hierarchical system to get subordinates
       let subordinateOrgIds = [];
-      
+
       // Try as union - get all conferences and churches
       const union = await Union.findById(userOrgId);
       if (union) {
         const conferences = await Conference.find({ unionId: union._id });
         const churches = await Church.find({ unionId: union._id });
-        subordinateOrgIds = [...conferences.map(c => c._id.toString()), ...churches.map(c => c._id.toString())];
+        subordinateOrgIds = [
+          ...conferences.map((c) => c._id.toString()),
+          ...churches.map((c) => c._id.toString()),
+        ];
       } else {
         // Try as conference - get all churches
         const conference = await Conference.findById(userOrgId);
         if (conference) {
           const churches = await Church.find({ conferenceId: conference._id });
-          subordinateOrgIds = churches.map(c => c._id.toString());
+          subordinateOrgIds = churches.map((c) => c._id.toString());
         }
       }
 
@@ -176,9 +179,9 @@ async function getManageableOrganizations(
     const conferences = await Conference.find({}).select('_id');
     const churches = await Church.find({}).select('_id');
     return [
-      ...unions.map(u => u._id.toString()),
-      ...conferences.map(c => c._id.toString()),
-      ...churches.map(c => c._id.toString())
+      ...unions.map((u) => u._id.toString()),
+      ...conferences.map((c) => c._id.toString()),
+      ...churches.map((c) => c._id.toString()),
     ];
   }
 
@@ -220,13 +223,13 @@ async function getManageableOrganizations(
       if (union) {
         const conferences = await Conference.find({ unionId: union._id });
         const churches = await Church.find({ unionId: union._id });
-        conferences.forEach(c => manageableOrgs.add(c._id.toString()));
-        churches.forEach(c => manageableOrgs.add(c._id.toString()));
+        conferences.forEach((c) => manageableOrgs.add(c._id.toString()));
+        churches.forEach((c) => manageableOrgs.add(c._id.toString()));
       } else {
         const conference = await Conference.findById(userOrgId);
         if (conference) {
           const churches = await Church.find({ conferenceId: conference._id });
-          churches.forEach(c => manageableOrgs.add(c._id.toString()));
+          churches.forEach((c) => manageableOrgs.add(c._id.toString()));
         }
       }
     }

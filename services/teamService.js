@@ -196,7 +196,7 @@ class TeamService {
     if (!hasPermission) {
       // Check if user is member of any team in this org
       const userTeams = await Team.getTeamsByUser(user._id);
-      
+
       const orgTeams = userTeams.filter(
         (team) => team.organizationId.toString() === organizationId.toString()
       );
@@ -211,7 +211,7 @@ class TeamService {
 
     // Return all teams for organization
     const allTeams = await Team.getTeamsByOrganization(organizationId, options);
-    
+
     return allTeams;
   }
 

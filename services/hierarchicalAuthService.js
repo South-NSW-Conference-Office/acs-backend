@@ -4,7 +4,7 @@ const Church = require('../models/Church');
 const Team = require('../models/Team');
 const Service = require('../models/Service');
 const Role = require('../models/Role');
-const User = require('../models/User');
+// const User = require('../models/User');
 const HierarchyValidator = require('../utils/hierarchyValidator');
 
 /**
@@ -18,7 +18,7 @@ class HierarchicalAuthorizationService {
     this.permissionCache = new Map();
     this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
   }
-  
+
   /**
    * Get user's highest hierarchy level (lowest number = highest level)
    * @param {Object} user - User object with populated organizations
@@ -34,11 +34,11 @@ class HierarchicalAuthorizationService {
       return 0; // Super admin is highest level
     }
 
-    // Combine all hierarchical assignments 
+    // Combine all hierarchical assignments
     const allAssignments = [
       ...(user.unionAssignments || []),
       ...(user.conferenceAssignments || []),
-      ...(user.churchAssignments || [])
+      ...(user.churchAssignments || []),
     ];
 
     if (allAssignments.length === 0) {
@@ -46,17 +46,17 @@ class HierarchicalAuthorizationService {
     }
 
     let highestLevel = 999;
-    
+
     for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
-      
+
       // Handle both populated and string role references
       const roleName = role?.name || role;
-      
+
       if (roleName === 'super_admin') {
         return 0; // Super admin is highest level
       }
-      
+
       // Get role object if we have string reference
       let roleObj = role;
       if (typeof role === 'string') {
@@ -64,15 +64,15 @@ class HierarchicalAuthorizationService {
       } else if (!role.hierarchyLevel && role._id) {
         roleObj = await Role.findById(role._id);
       }
-      
+
       if (roleObj && roleObj.hierarchyLevel !== undefined) {
         highestLevel = Math.min(highestLevel, roleObj.hierarchyLevel);
       }
     }
-    
+
     return highestLevel === 999 ? 4 : highestLevel; // Default to lowest level if unclear
   }
-  
+
   /**
    * Get user's hierarchy path for their highest-level assignment
    * @param {Object} user - User object
@@ -92,21 +92,22 @@ class HierarchicalAuthorizationService {
     const allAssignments = [
       ...(user.unionAssignments || []),
       ...(user.conferenceAssignments || []),
-      ...(user.churchAssignments || [])
+      ...(user.churchAssignments || []),
     ];
 
     if (allAssignments.length === 0) {
       return null;
     }
-    
+
     let highestLevelPath = null;
     let highestLevel = 999;
-    
+
     for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
       // Get org reference based on assignment type
-      const org = orgAssignment.union || orgAssignment.conference || orgAssignment.church;
-      
+      const org =
+        orgAssignment.union || orgAssignment.conference || orgAssignment.church;
+
       // Get role level
       let roleLevel = 4;
       if (typeof role === 'object' && role.hierarchyLevel !== undefined) {
@@ -115,11 +116,11 @@ class HierarchicalAuthorizationService {
         const roleObj = await Role.findById(role);
         if (roleObj) roleLevel = roleObj.hierarchyLevel;
       }
-      
+
       // If this is a higher level (lower number), update path
       if (roleLevel < highestLevel) {
         highestLevel = roleLevel;
-        
+
         // Get organization hierarchy path
         let orgObj = org;
         if (typeof org === 'string') {
@@ -132,16 +133,16 @@ class HierarchicalAuthorizationService {
             orgObj = await Church.findById(org);
           }
         }
-        
+
         if (orgObj && orgObj.hierarchyPath) {
           highestLevelPath = orgObj.hierarchyPath;
         }
       }
     }
-    
+
     return highestLevelPath;
   }
-  
+
   /**
    * Check if user can manage a specific entity
    * @param {Object} user - User object
@@ -149,40 +150,40 @@ class HierarchicalAuthorizationService {
    * @param {String} action - Action being performed
    * @returns {Promise<Boolean>} - True if user can manage entity
    */
-  async canUserManageEntity(user, targetEntityPath, action) {
+  async canUserManageEntity(user, targetEntityPath) {
     try {
-      // 1. Get user's highest role level  
+      // 1. Get user's highest role level
       const userLevel = await this.getUserHighestLevel(user);
       const userPath = await this.getUserHierarchyPath(user);
-      
+
       if (userLevel === 0) {
         return true; // Super admin can manage everything
       }
-      
+
       if (!userPath || !targetEntityPath) {
         return false;
       }
-      
+
       // 2. Parse target entity level from path
       const targetLevel = this.parseHierarchyLevel(targetEntityPath);
-      
+
       // 3. Check if user level can manage target level
       if (!this.canLevelManageLevel(userLevel, targetLevel)) {
         return false;
       }
-      
+
       // 4. Check if target is in user's subtree
       if (!targetEntityPath.startsWith(userPath)) {
         return false;
       }
-      
+
       return true;
     } catch (error) {
-      console.error('Error in canUserManageEntity:', error);
+      // console.error('Error in canUserManageEntity:', error);
       return false;
     }
   }
-  
+
   /**
    * Get entities user can access based on hierarchy
    * @param {Object} user - User object
@@ -193,24 +194,24 @@ class HierarchicalAuthorizationService {
     try {
       const userLevel = await this.getUserHighestLevel(user);
       const userPath = await this.getUserHierarchyPath(user);
-      
+
       // Super admin sees everything
       if (userLevel === 0) {
         return await this.getAllEntities(entityType);
       }
-      
+
       if (!userPath) {
         return [];
       }
-      
+
       // Others see only their subtree
       return await this.getEntitiesInSubtree(entityType, userPath);
     } catch (error) {
-      console.error('Error in getAccessibleEntities:', error);
+      // console.error('Error in getAccessibleEntities:', error);
       return [];
     }
   }
-  
+
   /**
    * Get all entities of a specific type
    * @param {String} entityType - Type of entity
@@ -232,7 +233,9 @@ class HierarchicalAuthorizationService {
         return Team.find({ isActive: true }).populate('churchId', 'name');
       case 'service':
       case 'services':
-        return Service.find({ status: { $ne: 'archived' } }).populate('teamId churchId');
+        return Service.find({ status: { $ne: 'archived' } }).populate(
+          'teamId churchId'
+        );
       // Legacy support
       case 'organization':
       case 'organizations':
@@ -242,7 +245,7 @@ class HierarchicalAuthorizationService {
         return [];
     }
   }
-  
+
   /**
    * Get entities in a specific subtree
    * @param {String} entityType - Type of entity
@@ -251,34 +254,48 @@ class HierarchicalAuthorizationService {
    */
   async getEntitiesInSubtree(entityType, hierarchyPath) {
     const query = {
-      hierarchyPath: { $regex: `^${hierarchyPath}` }
+      hierarchyPath: { $regex: `^${hierarchyPath}` },
     };
-    
+
     switch (entityType.toLowerCase()) {
       case 'union':
       case 'unions':
         return Union.find({ ...query, isActive: true });
       case 'conference':
       case 'conferences':
-        return Conference.find({ ...query, isActive: true }).populate('unionId', 'name');
+        return Conference.find({ ...query, isActive: true }).populate(
+          'unionId',
+          'name'
+        );
       case 'church':
       case 'churches':
-        return Church.find({ ...query, isActive: true }).populate('conferenceId', 'name');
+        return Church.find({ ...query, isActive: true }).populate(
+          'conferenceId',
+          'name'
+        );
       case 'team':
       case 'teams':
-        return Team.find({ ...query, isActive: true }).populate('churchId', 'name');
+        return Team.find({ ...query, isActive: true }).populate(
+          'churchId',
+          'name'
+        );
       case 'service':
       case 'services':
-        return Service.find({ ...query, status: { $ne: 'archived' } }).populate('teamId churchId');
+        return Service.find({ ...query, status: { $ne: 'archived' } }).populate(
+          'teamId churchId'
+        );
       // Legacy support
       case 'organization':
       case 'organizations':
-        return Church.find({ ...query, isActive: true }).populate('conferenceId', 'name');
+        return Church.find({ ...query, isActive: true }).populate(
+          'conferenceId',
+          'name'
+        );
       default:
         return [];
     }
   }
-  
+
   /**
    * Parse hierarchy level from path
    * @param {String} path - Hierarchy path
@@ -286,10 +303,10 @@ class HierarchicalAuthorizationService {
    */
   parseHierarchyLevel(path) {
     const segments = path.split('/');
-    
+
     // Count actual levels: union=0, conference=1, church=2, team=3, service=4
     let level = 0;
-    
+
     for (const segment of segments) {
       if (segment.includes('_')) {
         // team_xxx or service_xxx
@@ -300,10 +317,10 @@ class HierarchicalAuthorizationService {
         level++;
       }
     }
-    
+
     return Math.min(level - 1, 2); // Organizations max at level 2 (church)
   }
-  
+
   /**
    * Check if manager level can manage target level
    * @param {Number} managerLevel - Manager's hierarchy level
@@ -313,7 +330,7 @@ class HierarchicalAuthorizationService {
   canLevelManageLevel(managerLevel, targetLevel) {
     return managerLevel < targetLevel; // Higher levels (lower numbers) manage lower levels
   }
-  
+
   /**
    * Get user's church assignment (for team/service creation)
    * @param {Object} user - User object
@@ -322,27 +339,27 @@ class HierarchicalAuthorizationService {
   async getUserChurch(user) {
     try {
       if (!user) return null;
-      
+
       // Check church assignments first
       if (user.churchAssignments && user.churchAssignments.length > 0) {
         const churchAssignment = user.churchAssignments[0];
         const churchId = churchAssignment.church;
-        
+
         let churchObj = churchId;
         if (typeof churchId === 'string') {
           churchObj = await Church.findById(churchId);
         }
-        
+
         return churchObj;
       }
-      
+
       return null;
     } catch (error) {
-      console.error('Error in getUserChurch:', error);
+      // console.error('Error in getUserChurch:', error);
       return null;
     }
   }
-  
+
   /**
    * Get specific entity by type and ID
    * @param {String} entityType - Type of entity
@@ -351,7 +368,7 @@ class HierarchicalAuthorizationService {
    */
   async getEntity(entityType, entityId) {
     if (!entityId) return null;
-    
+
     try {
       switch (entityType.toLowerCase()) {
         case 'union':
@@ -371,14 +388,14 @@ class HierarchicalAuthorizationService {
           return null;
       }
     } catch (error) {
-      console.error(`Error getting ${entityType}:`, error);
+      // console.error(`Error getting ${entityType}:`, error);
       return null;
     }
   }
-  
+
   /**
    * Validate if user can create entity at specific level
-   * @param {Object} user - User object  
+   * @param {Object} user - User object
    * @param {String} entityType - Type of entity to create
    * @param {String} parentPath - Parent entity hierarchy path
    * @returns {Promise<Boolean>} - True if can create
@@ -387,31 +404,30 @@ class HierarchicalAuthorizationService {
     try {
       const userLevel = await this.getUserHighestLevel(user);
       const userPath = await this.getUserHierarchyPath(user);
-      
+
       // Super admin can create anything
       if (userLevel === 0) {
         return true;
       }
-      
+
       if (!userPath || !parentPath) {
         return false;
       }
-      
+
       // Must be in user's subtree
       if (!parentPath.startsWith(userPath)) {
         return false;
       }
-      
+
       // Check specific creation rules
       const targetLevel = this.getEntityCreationLevel(entityType);
       return this.canLevelManageLevel(userLevel, targetLevel);
-      
     } catch (error) {
-      console.error('Error in canUserCreateEntity:', error);
+      // console.error('Error in canUserCreateEntity:', error);
       return false;
     }
   }
-  
+
   /**
    * Get the level required to create a specific entity type
    * @param {String} entityType - Type of entity
@@ -419,15 +435,15 @@ class HierarchicalAuthorizationService {
    */
   getEntityCreationLevel(entityType) {
     const creationLevels = {
-      'union': -1,       // Only super admin can create unions
-      'conference': 0,   // Union can create conferences
-      'church': 1,       // Conference can create churches
-      'team': 2,         // Church can create teams
-      'service': 3,      // Team can create services
+      union: -1, // Only super admin can create unions
+      conference: 0, // Union can create conferences
+      church: 1, // Conference can create churches
+      team: 2, // Church can create teams
+      service: 3, // Team can create services
       // Legacy support
-      'organization': 1  // Treated as church creation
+      organization: 1, // Treated as church creation
     };
-    
+
     return creationLevels[entityType.toLowerCase()] || 4;
   }
 
@@ -438,51 +454,51 @@ class HierarchicalAuthorizationService {
    */
   async getInheritedPermissions(user) {
     if (!user || !user._id) return [];
-    
+
     const cacheKey = `permissions_${user._id}`;
     const cached = this.getCachedData(cacheKey);
     if (cached) return cached;
-    
+
     try {
       const permissions = new Set();
-      
+
       // Get user's highest level and path
       const userLevel = await this.getUserHighestLevel(user);
       const userPath = await this.getUserHierarchyPath(user);
-      
+
       // Super admin gets all permissions
       if (userLevel === 0) {
         permissions.add('*');
         return this.setCachedData(cacheKey, Array.from(permissions));
       }
-      
+
       // Get permissions from all role assignments
       const allAssignments = [
         ...(user.unionAssignments || []),
         ...(user.conferenceAssignments || []),
-        ...(user.churchAssignments || [])
+        ...(user.churchAssignments || []),
       ];
-      
+
       for (const orgAssignment of allAssignments) {
         const rolePermissions = await this.getRolePermissions(
           orgAssignment.role,
           userLevel,
           userPath
         );
-        rolePermissions.forEach(perm => permissions.add(perm));
+        rolePermissions.forEach((perm) => permissions.add(perm));
       }
-      
+
       // Add level-based implicit permissions
       const implicitPermissions = this.getImplicitPermissions(userLevel);
-      implicitPermissions.forEach(perm => permissions.add(perm));
-      
+      implicitPermissions.forEach((perm) => permissions.add(perm));
+
       return this.setCachedData(cacheKey, Array.from(permissions));
     } catch (error) {
-      console.error('Error getting inherited permissions:', error);
+      // console.error('Error getting inherited permissions:', error);
       return [];
     }
   }
-  
+
   /**
    * Get permissions for a specific role with inheritance
    * @param {Object|String} role - Role object or ID
@@ -490,28 +506,28 @@ class HierarchicalAuthorizationService {
    * @param {String} userPath - User's hierarchy path
    * @returns {Promise<Array>} - Array of permissions
    */
-  async getRolePermissions(role, userLevel, userPath) {
+  async getRolePermissions(role, userLevel) {
     let roleObj = role;
     if (typeof role === 'string') {
       roleObj = await Role.findById(role).populate('permissions');
     } else if (!role.permissions || !role.permissions[0]?.name) {
       roleObj = await Role.findById(role._id).populate('permissions');
     }
-    
+
     if (!roleObj) return [];
-    
+
     const permissions = new Set();
-    
+
     // Add base role permissions
-    roleObj.permissions?.forEach(perm => {
+    roleObj.permissions?.forEach((perm) => {
       if (typeof perm === 'object' && perm.name) {
         permissions.add(perm.name);
       }
     });
-    
+
     // Add hierarchy-scoped permissions based on role level
     if (roleObj.canManage && Array.isArray(roleObj.canManage)) {
-      roleObj.canManage.forEach(managedLevel => {
+      roleObj.canManage.forEach((managedLevel) => {
         if (managedLevel > userLevel) {
           // Add scoped permissions for lower levels
           permissions.add(`organizations.manage:subordinate`);
@@ -520,10 +536,10 @@ class HierarchicalAuthorizationService {
         }
       });
     }
-    
+
     return Array.from(permissions);
   }
-  
+
   /**
    * Get implicit permissions based on hierarchy level
    * @param {Number} level - Hierarchy level
@@ -531,7 +547,7 @@ class HierarchicalAuthorizationService {
    */
   getImplicitPermissions(level) {
     const implicitPerms = [];
-    
+
     switch (level) {
       case 0: // Super Admin
         implicitPerms.push('*');
@@ -560,15 +576,13 @@ class HierarchicalAuthorizationService {
         );
         break;
       case 4: // Service
-        implicitPerms.push(
-          'services.view:own'
-        );
+        implicitPerms.push('services.view:own');
         break;
     }
-    
+
     return implicitPerms;
   }
-  
+
   /**
    * Check if user has a specific permission with scope
    * @param {Object} user - User object
@@ -580,34 +594,34 @@ class HierarchicalAuthorizationService {
   async hasPermissionWithScope(user, permission, scope, targetPath) {
     try {
       const userPermissions = await this.getInheritedPermissions(user);
-      
+
       // Check for wildcard permissions
       if (userPermissions.includes('*')) return true;
-      
+
       // Check exact permission
       if (userPermissions.includes(permission)) return true;
-      
+
       // Check scoped permission
       const scopedPermission = `${permission}:${scope}`;
       if (userPermissions.includes(scopedPermission)) {
         // Validate scope constraints
         return await this.validatePermissionScope(user, scope, targetPath);
       }
-      
+
       // Check resource wildcard (e.g., 'organizations.*')
       const [resource] = permission.split('.');
       if (userPermissions.includes(`${resource}.*`)) return true;
       if (userPermissions.includes(`${resource}.*:${scope}`)) {
         return await this.validatePermissionScope(user, scope, targetPath);
       }
-      
+
       return false;
     } catch (error) {
-      console.error('Error checking permission with scope:', error);
+      // console.error('Error checking permission with scope:', error);
       return false;
     }
   }
-  
+
   /**
    * Validate permission scope constraints
    * @param {Object} user - User object
@@ -617,27 +631,28 @@ class HierarchicalAuthorizationService {
    */
   async validatePermissionScope(user, scope, targetPath) {
     const userPath = await this.getUserHierarchyPath(user);
-    
+
     switch (scope) {
       case 'all':
         return true;
-        
+
       case 'subordinate':
         if (!userPath || !targetPath) return false;
         // Target must be in user's subtree
         return HierarchyValidator.isInSubtree(targetPath, userPath);
-        
-      case 'own':
+
+      case 'own': {
         if (!userPath || !targetPath) return false;
         // Target must be directly under user's path
         const targetParent = HierarchyValidator.getParentPath(targetPath);
         return targetParent === userPath;
-        
+      }
+
       default:
         return false;
     }
   }
-  
+
   /**
    * Get managed levels for a user
    * @param {Object} user - User object
@@ -645,71 +660,71 @@ class HierarchicalAuthorizationService {
    */
   async getUserManagedLevels(user) {
     if (!user) return [];
-    
+
     const managedLevels = new Set();
     const userLevel = await this.getUserHighestLevel(user);
-    
+
     // Super admin manages all levels
     if (userLevel === 0) {
       return [0, 1, 2, 3, 4];
     }
-    
+
     // Get all assignments
     const allAssignments = [
       ...(user.unionAssignments || []),
       ...(user.conferenceAssignments || []),
-      ...(user.churchAssignments || [])
+      ...(user.churchAssignments || []),
     ];
-    
+
     // Get managed levels from roles
     for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
       let roleObj = role;
-      
+
       if (typeof role === 'string' || !role.canManage) {
         roleObj = await Role.findById(role._id || role);
       }
-      
+
       if (roleObj && roleObj.canManage) {
-        roleObj.canManage.forEach(level => {
+        roleObj.canManage.forEach((level) => {
           if (level > userLevel) {
             managedLevels.add(level);
           }
         });
       }
     }
-    
+
     // Add implicit managed levels
     for (let level = userLevel + 1; level <= 4; level++) {
       managedLevels.add(level);
     }
-    
+
     return Array.from(managedLevels).sort();
   }
-  
+
   /**
    * Cache management methods
    */
   getCachedData(key) {
     const cached = this.permissionCache.get(key);
     if (!cached) return null;
-    
+
     if (Date.now() - cached.timestamp > this.cacheTimeout) {
       this.permissionCache.delete(key);
       return null;
     }
-    
+
     return cached.data;
   }
-  
+
   setCachedData(key, data) {
     this.permissionCache.set(key, {
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
     return data;
   }
-  
+
   /**
    * Clear cache for a specific user
    * @param {String} userId - User ID
@@ -718,7 +733,7 @@ class HierarchicalAuthorizationService {
     const cacheKey = `permissions_${userId}`;
     this.permissionCache.delete(cacheKey);
   }
-  
+
   /**
    * Clear entire permission cache
    */

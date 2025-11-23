@@ -322,14 +322,33 @@ router.get('/organizations', async (req, res) => {
 
     // Get organizations from hierarchical models
     const unions = await Union.find({ _id: { $in: orgIds } }).select('name');
-    const conferences = await Conference.find({ _id: { $in: orgIds } }).select('name unionId');
-    const churches = await Church.find({ _id: { $in: orgIds } }).select('name conferenceId unionId');
-    
+    const conferences = await Conference.find({ _id: { $in: orgIds } }).select(
+      'name unionId'
+    );
+    const churches = await Church.find({ _id: { $in: orgIds } }).select(
+      'name conferenceId unionId'
+    );
+
     // Combine into legacy format for compatibility
     const organizations = [
-      ...unions.map(u => ({ _id: u._id, name: u.name, type: 'union', parent: null })),
-      ...conferences.map(c => ({ _id: c._id, name: c.name, type: 'conference', parent: c.unionId })),
-      ...churches.map(c => ({ _id: c._id, name: c.name, type: 'church', parent: c.conferenceId }))
+      ...unions.map((u) => ({
+        _id: u._id,
+        name: u.name,
+        type: 'union',
+        parent: null,
+      })),
+      ...conferences.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        type: 'conference',
+        parent: c.unionId,
+      })),
+      ...churches.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        type: 'church',
+        parent: c.conferenceId,
+      })),
     ];
 
     res.json({

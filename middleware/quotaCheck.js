@@ -202,7 +202,9 @@ const checkRoleChangeQuota = async (req, res, next) => {
     }
 
     // Get current user's role
-    const user = await User.findById(userId).populate('unionAssignments.role conferenceAssignments.role churchAssignments.role');
+    const user = await User.findById(userId).populate(
+      'unionAssignments.role conferenceAssignments.role churchAssignments.role'
+    );
     if (!user) {
       return res.status(404).json({
         success: false,

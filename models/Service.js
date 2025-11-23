@@ -31,7 +31,7 @@ const serviceSchema = new mongoose.Schema(
         'community_service',
         'financial_assistance',
         'counseling_services',
-        'other'
+        'other',
       ],
       default: 'community_service',
     },
@@ -48,22 +48,26 @@ const serviceSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'archived'],
       default: 'active',
     },
-    tags: [{
-      type: String,
-      maxlength: 50,
-    }],
-    locations: [{
-      type: {
+    tags: [
+      {
         type: String,
-        enum: ['Point'],
+        maxlength: 50,
       },
-      coordinates: {
-        type: [Number],
-        index: '2dsphere',
+    ],
+    locations: [
+      {
+        type: {
+          type: String,
+          enum: ['Point'],
+        },
+        coordinates: {
+          type: [Number],
+          index: '2dsphere',
+        },
+        address: String,
+        name: String,
       },
-      address: String,
-      name: String,
-    }],
+    ],
     contactInfo: {
       phone: String,
       email: String,
@@ -118,15 +122,15 @@ serviceSchema.pre('save', async function (next) {
     try {
       const Team = mongoose.model('Team');
       const team = await Team.findById(this.teamId).populate('churchId');
-      
+
       if (!team) {
         throw new Error('Team not found');
       }
-      
+
       if (!team.churchId) {
         throw new Error('Team must be assigned to a church');
       }
-      
+
       this.churchId = team.churchId._id;
       this.hierarchyPath = `${team.hierarchyPath}/service_${this._id}`;
     } catch (error) {
@@ -137,71 +141,84 @@ serviceSchema.pre('save', async function (next) {
 });
 
 // Static method to find services accessible to user based on hierarchy
-serviceSchema.statics.findAccessibleServices = async function (userHierarchyPath) {
+serviceSchema.statics.findAccessibleServices = async function (
+  userHierarchyPath
+) {
   if (!userHierarchyPath) {
     return [];
   }
-  
+
   // Find services where the hierarchy path starts with user's path
   const services = await this.find({
-    hierarchyPath: new RegExp(`^${userHierarchyPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
-    status: 'active'
+    hierarchyPath: new RegExp(
+      `^${userHierarchyPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+    ),
+    status: 'active',
   })
-  .populate('teamId', 'name type')
-  .populate('churchId', 'name')
-  .sort({ name: 1 });
-  
+    .populate('teamId', 'name type')
+    .populate('churchId', 'name')
+    .sort({ name: 1 });
+
   return services;
 };
 
 // Static method to find services by team
-serviceSchema.statics.findByTeam = async function (teamId, includeArchived = false) {
+serviceSchema.statics.findByTeam = async function (
+  teamId,
+  includeArchived = false
+) {
   const query = { teamId };
   if (!includeArchived) {
     query.status = { $ne: 'archived' };
   }
-  
+
   const services = await this.find(query)
     .populate('teamId', 'name type')
     .populate('churchId', 'name')
     .sort({ name: 1 });
-    
+
   return services;
 };
 
 // Static method to find services by church
-serviceSchema.statics.findByChurch = async function (churchId, includeArchived = false) {
+serviceSchema.statics.findByChurch = async function (
+  churchId,
+  includeArchived = false
+) {
   const query = { churchId };
   if (!includeArchived) {
     query.status = { $ne: 'archived' };
   }
-  
+
   const services = await this.find(query)
     .populate('teamId', 'name type')
     .populate('churchId', 'name')
     .sort({ name: 1 });
-    
+
   return services;
 };
 
 // Static method for geographic search
-serviceSchema.statics.findNearby = async function (coordinates, maxDistance = 50000) {
+serviceSchema.statics.findNearby = async function (
+  coordinates,
+  maxDistance = 50000
+) {
   const services = await this.find({
     'locations.coordinates': {
       $near: {
         $geometry: {
           type: 'Point',
-          coordinates: [coordinates.lng, coordinates.lat]
+          coordinates: [coordinates.lng, coordinates.lat],
         },
-        $maxDistance: maxDistance
-      }
+        $maxDistance: maxDistance,
+      },
     },
-    status: 'active'
+    status: 'active',
   })
-  .populate('teamId', 'name type')
-  .populate('churchId', 'name')
-  .sort({ name: 1 });
-  
+    .populate('teamId', 'name type')
+    .populate('churchId', 'name')
+    .sort({ name: 1 });
+
   return services;
 };
 
@@ -211,7 +228,7 @@ serviceSchema.methods.canBeViewedBy = function (user) {
   if (this.status === 'active') {
     return true;
   }
-  
+
   // Inactive or archived services require authentication
   return user && user.isActive;
 };

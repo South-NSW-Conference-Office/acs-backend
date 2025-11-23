@@ -49,10 +49,17 @@ const systemCategories = [
     isSystem: true,
   },
   {
+    name: 'media',
+    displayName: 'Media & File Management',
+    description: 'Media library and file upload management',
+    displayOrder: 7,
+    isSystem: true,
+  },
+  {
     name: 'system',
     displayName: 'System Administration',
     description: 'System-level administrative functions',
-    displayOrder: 7,
+    displayOrder: 8,
     isSystem: true,
   },
 ];
@@ -245,6 +252,46 @@ const systemPermissions = {
       allowedScopes: [],
     },
   ],
+  media: [
+    {
+      key: 'media.upload',
+      label: 'Upload Media',
+      description: 'Upload images and files to the media library',
+      allowedScopes: ['own', 'subordinate', 'all', 'acs', 'team'],
+    },
+    {
+      key: 'media.read',
+      label: 'View Media',
+      description: 'View and browse media library files',
+      allowedScopes: [
+        'self',
+        'own',
+        'subordinate',
+        'all',
+        'acs',
+        'public',
+        'team',
+      ],
+    },
+    {
+      key: 'media.update',
+      label: 'Edit Media',
+      description: 'Edit media file metadata, titles, and descriptions',
+      allowedScopes: ['self', 'own', 'subordinate', 'all', 'acs', 'team'],
+    },
+    {
+      key: 'media.delete',
+      label: 'Delete Media',
+      description: 'Remove media files from the library',
+      allowedScopes: ['self', 'own', 'subordinate', 'all', 'acs'],
+    },
+    {
+      key: 'media.manage',
+      label: 'Manage Media Library',
+      description: 'Full media library management including bulk operations',
+      allowedScopes: ['subordinate', 'all', 'acs'],
+    },
+  ],
   system: [
     {
       key: 'system.backup',
@@ -351,7 +398,8 @@ async function migratePermissions() {
     'organizations.*',
     'roles.*',
     'services.*',
-    'stories.*'
+    'stories.*',
+    'media.*'
   );
 
   await Role.findOneAndUpdate(

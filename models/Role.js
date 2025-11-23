@@ -20,30 +20,36 @@ const roleSchema = new mongoose.Schema(
       enum: ['union', 'conference', 'church', 'team', 'service'],
       lowercase: true,
     },
-    
+
     // HIERARCHICAL LEVEL NUMBER (0=highest, 4=lowest)
     hierarchyLevel: {
       type: Number,
       required: true,
       min: 0,
       max: 4,
-      default: function() {
-        const levelMap = { 'union': 0, 'conference': 1, 'church': 2, 'team': 3, 'service': 4 };
+      default: function () {
+        const levelMap = {
+          union: 0,
+          conference: 1,
+          church: 2,
+          team: 3,
+          service: 4,
+        };
         return levelMap[this.level] || 2;
-      }
+      },
     },
-    
+
     // LEVELS THIS ROLE CAN MANAGE
     canManage: {
       type: [Number],
-      default: function() {
+      default: function () {
         // Each level can manage levels below it
         const manageLevels = [];
         for (let i = this.hierarchyLevel + 1; i <= 4; i++) {
           manageLevels.push(i);
         }
         return manageLevels;
-      }
+      },
     },
     permissions: [
       {
@@ -137,11 +143,11 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
+
     // LEVEL 0: UNION ADMIN (between super_admin and conference)
     {
       name: 'union_admin',
-      displayName: 'Union Administrator', 
+      displayName: 'Union Administrator',
       level: 'union',
       hierarchyLevel: 0,
       canManage: [1, 2, 3, 4], // All subordinate levels
@@ -150,7 +156,7 @@ roleSchema.statics.createSystemRoles = async function () {
         'unions.update:own',
         'conferences.create:subordinate',
         'conferences.read:subordinate',
-        'conferences.update:subordinate', 
+        'conferences.update:subordinate',
         'conferences.delete:subordinate',
         'churches.read:subordinate',
         'churches.manage:subordinate',
@@ -161,7 +167,7 @@ roleSchema.statics.createSystemRoles = async function () {
         'users.manage:subordinate',
         'dashboard.view',
         'analytics.read:subordinate',
-        'reports.generate:subordinate'
+        'reports.generate:subordinate',
       ],
       description: 'Administrative access for union level operations',
       roleCategory: 'union_admin',
@@ -172,8 +178,8 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
-    // LEVEL 1: CONFERENCE/REGION  
+
+    // LEVEL 1: CONFERENCE/REGION
     {
       name: 'conference_admin',
       displayName: 'Conference Administrator',
@@ -182,7 +188,7 @@ roleSchema.statics.createSystemRoles = async function () {
       canManage: [2, 3, 4], // Churches, teams, services
       permissions: [
         'churches.create:subordinate',
-        'churches.read:subordinate', 
+        'churches.read:subordinate',
         'churches.update:subordinate',
         'churches.delete:subordinate',
         'conferences.read:own',
@@ -193,7 +199,7 @@ roleSchema.statics.createSystemRoles = async function () {
         'services.manage:subordinate',
         'users.manage:subordinate',
         'dashboard.view',
-        'analytics.read:subordinate'
+        'analytics.read:subordinate',
       ],
       description: 'Administrative access for conference level',
       roleCategory: 'conference_admin',
@@ -204,7 +210,7 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
+
     // LEVEL 2: CHURCH
     {
       name: 'church_admin',
@@ -220,7 +226,7 @@ roleSchema.statics.createSystemRoles = async function () {
         'services.read:own',
         'services.manage:own',
         'users.manage:own',
-        'dashboard.view'
+        'dashboard.view',
       ],
       description: 'Full access within own church',
       roleCategory: 'team_leader',
@@ -231,7 +237,7 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
+
     // LEVEL 3: TEAM
     {
       name: 'team_leader',
@@ -246,7 +252,7 @@ roleSchema.statics.createSystemRoles = async function () {
         'services.delete:team',
         'users.read:team',
         'teams.read:own',
-        'teams.update:own'
+        'teams.update:own',
       ],
       description: 'Team leadership with service management',
       roleCategory: 'team_leader',
@@ -257,18 +263,14 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
+
     {
       name: 'team_member',
       displayName: 'Team Member',
       level: 'team',
       hierarchyLevel: 3,
       canManage: [], // Cannot manage other entities
-      permissions: [
-        'services.read:team',
-        'teams.read:own',
-        'users.read:team'
-      ],
+      permissions: ['services.read:team', 'teams.read:own', 'users.read:team'],
       description: 'Basic team member access',
       roleCategory: 'team_member',
       quotaLimits: {
@@ -278,7 +280,7 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
+
     // LEVEL 4: SERVICE (Lowest)
     {
       name: 'service_coordinator',
@@ -286,10 +288,7 @@ roleSchema.statics.createSystemRoles = async function () {
       level: 'service',
       hierarchyLevel: 4,
       canManage: [], // Cannot manage other entities
-      permissions: [
-        'services.read:own',
-        'services.update:own'
-      ],
+      permissions: ['services.read:own', 'services.update:own'],
       description: 'Service-level coordinator with limited access',
       roleCategory: 'team_member',
       quotaLimits: {
@@ -299,7 +298,7 @@ roleSchema.statics.createSystemRoles = async function () {
       },
       isSystem: true,
     },
-    
+
     // VIEWER ROLES
     {
       name: 'church_viewer',
@@ -368,13 +367,19 @@ roleSchema.methods.canManageLevel = function (targetLevel) {
 };
 
 // NEW: Check if role can access entity at specific hierarchy path
-roleSchema.methods.canAccessEntity = function (userHierarchyPath, targetHierarchyPath) {
+roleSchema.methods.canAccessEntity = function (
+  userHierarchyPath,
+  targetHierarchyPath
+) {
   // Users can only access entities in their subtree
   return targetHierarchyPath.startsWith(userHierarchyPath);
 };
 
 // Method to check if role has reached user quota
-roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'church') {
+roleSchema.methods.checkQuota = async function (
+  entityId = null,
+  entityType = 'church'
+) {
   if (!this.quotaLimits || !this.quotaLimits.maxUsers) {
     return { allowed: true, current: 0, max: null };
   }
@@ -390,8 +395,8 @@ roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'c
         $or: [
           { 'unionAssignments.role': this._id },
           { 'conferenceAssignments.role': this._id },
-          { 'churchAssignments.role': this._id }
-        ]
+          { 'churchAssignments.role': this._id },
+        ],
       };
       break;
 
@@ -400,13 +405,12 @@ roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'c
       if (!entityId) {
         throw new Error('Entity ID required for union scope quota check');
       }
-      
-      const Union = mongoose.model('Union');
-      const Conference = mongoose.model('Conference');  
+
+      const Conference = mongoose.model('Conference');
       const Church = mongoose.model('Church');
-      
+
       let unionId = entityId;
-      
+
       // If entity is not union, find the parent union
       if (entityType === 'conference') {
         const conference = await Conference.findById(entityId);
@@ -415,20 +419,31 @@ roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'c
         const church = await Church.findById(entityId);
         unionId = church?.unionId;
       }
-      
+
       if (!unionId) {
         throw new Error('Could not determine union for quota check');
       }
-      
+
       const conferences = await Conference.find({ unionId }).select('_id');
       const churches = await Church.find({ unionId }).select('_id');
-      
+
       query = {
         $or: [
-          { 'unionAssignments.role': this._id, 'unionAssignments.union': unionId },
-          { 'conferenceAssignments.role': this._id, 'conferenceAssignments.conference': { $in: conferences.map(c => c._id) } },
-          { 'churchAssignments.role': this._id, 'churchAssignments.church': { $in: churches.map(c => c._id) } }
-        ]
+          {
+            'unionAssignments.role': this._id,
+            'unionAssignments.union': unionId,
+          },
+          {
+            'conferenceAssignments.role': this._id,
+            'conferenceAssignments.conference': {
+              $in: conferences.map((c) => c._id),
+            },
+          },
+          {
+            'churchAssignments.role': this._id,
+            'churchAssignments.church': { $in: churches.map((c) => c._id) },
+          },
+        ],
       };
       break;
     }
@@ -438,51 +453,58 @@ roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'c
       if (!entityId) {
         throw new Error('Entity ID required for conference scope quota check');
       }
-      
+
       let conferenceId = entityId;
-      
+
       // If entity is church, find parent conference
       if (entityType === 'church') {
         const Church = mongoose.model('Church');
         const church = await Church.findById(entityId);
         conferenceId = church?.conferenceId;
       }
-      
+
       if (!conferenceId) {
         throw new Error('Could not determine conference for quota check');
       }
-      
+
       const Church = mongoose.model('Church');
       const churches = await Church.find({ conferenceId }).select('_id');
-      
+
       query = {
         $or: [
-          { 'conferenceAssignments.role': this._id, 'conferenceAssignments.conference': conferenceId },
-          { 'churchAssignments.role': this._id, 'churchAssignments.church': { $in: churches.map(c => c._id) } }
-        ]
+          {
+            'conferenceAssignments.role': this._id,
+            'conferenceAssignments.conference': conferenceId,
+          },
+          {
+            'churchAssignments.role': this._id,
+            'churchAssignments.church': { $in: churches.map((c) => c._id) },
+          },
+        ],
       };
       break;
     }
 
-    case 'church':
+    case 'church': {
       // Count users with this role in specific church
       if (!entityId) {
         throw new Error('Entity ID required for church scope quota check');
       }
-      
-      let churchId = entityId;
-      
+
+      const churchId = entityId;
+
       // Entity should be church for this scope
       if (entityType !== 'church') {
         throw new Error('Church scope quota check requires church entity');
       }
-      
+
       query = {
         'churchAssignments.role': this._id,
-        'churchAssignments.church': churchId
+        'churchAssignments.church': churchId,
       };
       break;
-      
+    }
+
     case 'team':
       // This would need team context - for now treat as church
       if (!entityId) {
@@ -490,7 +512,7 @@ roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'c
       }
       query = {
         'churchAssignments.role': this._id,
-        'churchAssignments.church': entityId
+        'churchAssignments.church': entityId,
       };
       break;
   }
@@ -512,7 +534,10 @@ roleSchema.methods.checkQuota = async function (entityId = null, entityType = 'c
 };
 
 // Static method to get quota status for all roles
-roleSchema.statics.getQuotaStatus = async function (entityId = null, entityType = 'church') {
+roleSchema.statics.getQuotaStatus = async function (
+  entityId = null,
+  entityType = 'church'
+) {
   const roles = await this.find({
     isActive: true,
     'quotaLimits.maxUsers': { $ne: null },

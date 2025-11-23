@@ -16,23 +16,22 @@ const teamSchema = new mongoose.Schema(
       required: [true, 'Church is required'],
       index: true,
       validate: {
-        validator: async function(churchId) {
+        validator: async function (churchId) {
           const Church = mongoose.model('Church');
           const church = await Church.findById(churchId);
           return church && church.isActive;
         },
-        message: 'Team must belong to an active church'
-      }
+        message: 'Team must belong to an active church',
+      },
     },
-    
 
-    // TEAM HIERARCHY PATH  
+    // TEAM HIERARCHY PATH
     hierarchyPath: {
       type: String, // church's path + team ID
       required: true,
       index: true,
     },
-    
+
     // TEAM LEVEL = 3 (church is 2)
     hierarchyDepth: {
       type: Number,
@@ -227,19 +226,19 @@ teamSchema.methods.getMembers = async function (options = {}) {
 // Statics - HIERARCHICAL TEAM MANAGEMENT
 teamSchema.statics.createTeam = async function (data) {
   const { churchId, leaderId } = data;
-  
+
   if (!churchId) {
     throw new Error('Church ID is required');
   }
 
   // Validate church exists
   const Church = mongoose.model('Church');
-  const church = await Church.findById(actualChurchId);
-  
+  const church = await Church.findById(churchId);
+
   if (!church) {
     throw new Error('Church not found');
   }
-  
+
   if (!church.isActive) {
     throw new Error('Cannot create team under inactive church');
   }
@@ -247,7 +246,7 @@ teamSchema.statics.createTeam = async function (data) {
   // Create team with church binding
   const teamData = {
     ...data,
-    churchId: churchId
+    churchId: churchId,
   };
 
   const team = await this.create(teamData);
@@ -261,18 +260,15 @@ teamSchema.statics.createTeam = async function (data) {
 };
 
 // Get teams by church (updated method name for clarity)
-teamSchema.statics.getTeamsByChurch = async function (
-  churchId,
-  options = {}
-) {
+teamSchema.statics.getTeamsByChurch = async function (churchId, options = {}) {
   const { includeInactive = false, type } = options;
 
   const query = { churchId };
-  
+
   if (!includeInactive) {
     query.isActive = true;
   }
-  
+
   if (type) {
     query.type = type;
   }
@@ -286,16 +282,15 @@ teamSchema.statics.getTeamsByChurch = async function (
   return teams;
 };
 
-
 // NEW: Get teams accessible to a user based on hierarchy
 teamSchema.statics.getAccessibleTeams = async function (userHierarchyPath) {
   return this.find({
     hierarchyPath: { $regex: `^${userHierarchyPath}` },
-    isActive: true
+    isActive: true,
   })
-  .populate('churchId', 'name hierarchyLevel')
-  .populate('leaderId', 'name email')
-  .sort('name');
+    .populate('churchId', 'name hierarchyLevel')
+    .populate('leaderId', 'name email')
+    .sort('name');
 };
 
 teamSchema.statics.getTeamsByUser = async function (userId) {
@@ -320,15 +315,14 @@ teamSchema.pre('save', async function (next) {
     if (this.isModified('churchId') || !this.hierarchyPath) {
       await this.buildHierarchyPath();
     }
-    
-    
+
     // Ensure member count doesn't exceed max
     if (this.isModified('memberCount')) {
       if (this.memberCount > this.maxMembers) {
         this.memberCount = this.maxMembers;
       }
     }
-    
+
     next();
   } catch (error) {
     next(error);
@@ -336,22 +330,22 @@ teamSchema.pre('save', async function (next) {
 });
 
 // Build hierarchy path automatically
-teamSchema.methods.buildHierarchyPath = async function() {
+teamSchema.methods.buildHierarchyPath = async function () {
   if (!this.churchId) {
     throw new Error('Team must have a church assignment');
   }
-  
+
   const Church = mongoose.model('Church');
   const church = await Church.findById(this.churchId);
-  
+
   if (!church) {
     throw new Error('Church not found');
   }
-  
+
   if (!church.isActive) {
     throw new Error('Cannot assign team to inactive church');
   }
-  
+
   this.hierarchyPath = `${church.hierarchyPath}/team_${this._id}`;
 };
 

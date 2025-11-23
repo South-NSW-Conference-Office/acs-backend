@@ -12,7 +12,9 @@ const gzip = promisify(zlib.gzip);
  */
 class AuditRetentionService {
   constructor() {
-    this.archivePath = process.env.AUDIT_ARCHIVE_PATH || path.join(__dirname, '../../audit-archives');
+    this.archivePath =
+      process.env.AUDIT_ARCHIVE_PATH ||
+      path.join(__dirname, '../../audit-archives');
     this.isRunning = false;
     this.jobs = new Map();
   }
@@ -26,17 +28,23 @@ class AuditRetentionService {
       await this.ensureArchiveDirectory();
 
       // Schedule daily retention check at 2 AM
-      this.scheduleJob('daily-retention', '0 2 * * *', () => this.runRetentionPolicy());
+      this.scheduleJob('daily-retention', '0 2 * * *', () =>
+        this.runRetentionPolicy()
+      );
 
       // Schedule weekly archive job on Sunday at 3 AM
-      this.scheduleJob('weekly-archive', '0 3 * * 0', () => this.archiveOldLogs());
+      this.scheduleJob('weekly-archive', '0 3 * * 0', () =>
+        this.archiveOldLogs()
+      );
 
       // Schedule monthly cleanup on 1st at 4 AM
-      this.scheduleJob('monthly-cleanup', '0 4 1 * *', () => this.cleanupArchives());
+      this.scheduleJob('monthly-cleanup', '0 4 1 * *', () =>
+        this.cleanupArchives()
+      );
 
-      console.log('Audit retention service initialized');
+      // Audit retention service initialized
     } catch (error) {
-      console.error('Failed to initialize audit retention service:', error);
+      // Failed to initialize audit retention service
     }
   }
 
@@ -48,27 +56,31 @@ class AuditRetentionService {
       this.jobs.get(name).stop();
     }
 
-    const job = cron.schedule(schedule, async () => {
-      if (this.isRunning) {
-        console.log(`Skipping ${name} - another retention job is running`);
-        return;
-      }
+    const job = cron.schedule(
+      schedule,
+      async () => {
+        if (this.isRunning) {
+          // Skipping job - another retention job is running
+          return;
+        }
 
-      this.isRunning = true;
-      console.log(`Starting ${name} job`);
+        this.isRunning = true;
+        // Starting retention job
 
-      try {
-        await handler();
-        console.log(`Completed ${name} job`);
-      } catch (error) {
-        console.error(`Error in ${name} job:`, error);
-      } finally {
-        this.isRunning = false;
+        try {
+          await handler();
+          // Completed retention job
+        } catch (error) {
+          // Error in retention job
+        } finally {
+          this.isRunning = false;
+        }
+      },
+      {
+        scheduled: true,
+        timezone: process.env.TZ || 'America/New_York',
       }
-    }, {
-      scheduled: true,
-      timezone: process.env.TZ || 'America/New_York'
-    });
+    );
 
     this.jobs.set(name, job);
   }
@@ -81,21 +93,21 @@ class AuditRetentionService {
     const results = {
       deleted: 0,
       errors: 0,
-      categories: {}
+      categories: {},
     };
 
     try {
       // Process each retention category
       const categories = ['debug', 'operational', 'compliance', 'security'];
-      
+
       for (const category of categories) {
         const cutoffDate = this.getCutoffDate(category);
-        
+
         // Delete expired logs
         const deleteResult = await AuditLog.deleteMany({
           'retention.category': category,
           'retention.expiresAt': { $lte: cutoffDate },
-          'retention.archived': true
+          'retention.archived': true,
         });
 
         results.categories[category] = deleteResult.deletedCount;
@@ -110,25 +122,24 @@ class AuditRetentionService {
         result: {
           success: true,
           duration: Date.now() - startTime,
-          affectedCount: results.deleted
+          affectedCount: results.deleted,
         },
         changes: results,
-        retention: { category: 'operational' }
+        retention: { category: 'operational' },
       });
-
     } catch (error) {
-      console.error('Retention policy error:', error);
+      // Retention policy error
       results.errors++;
-      
+
       await AuditLog.logAction({
         action: 'system.maintenance',
         actor: { type: 'system' },
         target: { type: 'system', name: 'audit_retention' },
         result: {
           success: false,
-          error: { message: error.message }
+          error: { message: error.message },
         },
-        retention: { category: 'operational' }
+        retention: { category: 'operational' },
       });
     }
 
@@ -143,7 +154,7 @@ class AuditRetentionService {
     const results = {
       archived: 0,
       compressed: 0,
-      errors: 0
+      errors: 0,
     };
 
     try {
@@ -157,10 +168,10 @@ class AuditRetentionService {
       while (hasMore) {
         const logs = await AuditLog.find({
           timestamp: { $lt: archiveCutoff },
-          'retention.archived': false
+          'retention.archived': false,
         })
-        .limit(batchSize)
-        .lean();
+          .limit(batchSize)
+          .lean();
 
         if (logs.length === 0) {
           hasMore = false;
@@ -173,11 +184,11 @@ class AuditRetentionService {
         for (const [dateStr, dateLogs] of Object.entries(logsByDate)) {
           try {
             // Create archive file
-            const archiveFile = await this.createArchiveFile(dateStr, dateLogs);
+            await this.createArchiveFile(dateStr, dateLogs);
             results.compressed += dateLogs.length;
 
             // Mark logs as archived
-            const logIds = dateLogs.map(log => log._id);
+            const logIds = dateLogs.map((log) => log._id);
             await AuditLog.updateMany(
               { _id: { $in: logIds } },
               { $set: { 'retention.archived': true } }
@@ -185,7 +196,7 @@ class AuditRetentionService {
 
             results.archived += dateLogs.length;
           } catch (error) {
-            console.error(`Error archiving logs for ${dateStr}:`, error);
+            // Error archiving logs
             results.errors++;
           }
         }
@@ -199,14 +210,13 @@ class AuditRetentionService {
         result: {
           success: results.errors === 0,
           duration: Date.now() - startTime,
-          affectedCount: results.archived
+          affectedCount: results.archived,
         },
         changes: results,
-        retention: { category: 'operational' }
+        retention: { category: 'operational' },
       });
-
     } catch (error) {
-      console.error('Archive error:', error);
+      // Archive error
       results.errors++;
     }
 
@@ -219,7 +229,7 @@ class AuditRetentionService {
   async cleanupArchives() {
     const results = {
       deleted: 0,
-      errors: 0
+      errors: 0,
     };
 
     try {
@@ -227,7 +237,7 @@ class AuditRetentionService {
         debug: 30,
         operational: 180,
         compliance: 7 * 365,
-        security: 3 * 365
+        security: 3 * 365,
       };
 
       const files = await fs.readdir(this.archivePath);
@@ -250,13 +260,12 @@ class AuditRetentionService {
             results.deleted++;
           }
         } catch (error) {
-          console.error(`Error processing archive ${file}:`, error);
+          // Error processing archive
           results.errors++;
         }
       }
-
     } catch (error) {
-      console.error('Cleanup error:', error);
+      // Cleanup error
       results.errors++;
     }
 
@@ -272,7 +281,7 @@ class AuditRetentionService {
       debug: 7,
       operational: 90,
       compliance: 7 * 365,
-      security: 2 * 365
+      security: 2 * 365,
     };
 
     const days = retentionDays[category] || 90;
@@ -289,7 +298,7 @@ class AuditRetentionService {
     for (const log of logs) {
       const date = new Date(log.timestamp);
       const dateStr = date.toISOString().split('T')[0];
-      
+
       if (!groups[dateStr]) {
         groups[dateStr] = [];
       }
@@ -312,10 +321,10 @@ class AuditRetentionService {
     const archiveData = {
       date: dateStr,
       count: logs.length,
-      logs: logs.map(log => ({
+      logs: logs.map((log) => ({
         ...log,
-        _id: log._id.toString() // Convert ObjectId to string
-      }))
+        _id: log._id.toString(), // Convert ObjectId to string
+      })),
     };
 
     // Compress data
@@ -334,8 +343,13 @@ class AuditRetentionService {
    * Restore logs from archive
    */
   async restoreFromArchive(dateStr) {
-    const [year, month, day] = dateStr.split('-');
-    const filePath = path.join(this.archivePath, year, month, `audit-${dateStr}.json.gz`);
+    const [year, month] = dateStr.split('-');
+    const filePath = path.join(
+      this.archivePath,
+      year,
+      month,
+      `audit-${dateStr}.json.gz`
+    );
 
     try {
       const compressed = await fs.readFile(filePath);
@@ -365,33 +379,33 @@ class AuditRetentionService {
       totalFiles: 0,
       totalSize: 0,
       byMonth: {},
-      byCategory: {}
+      byCategory: {},
     };
 
     try {
       const years = await fs.readdir(this.archivePath);
-      
+
       for (const year of years) {
         const yearPath = path.join(this.archivePath, year);
         const yearStat = await fs.stat(yearPath);
-        
+
         if (yearStat.isDirectory()) {
           const months = await fs.readdir(yearPath);
-          
+
           for (const month of months) {
             const monthPath = path.join(yearPath, month);
             const files = await fs.readdir(monthPath);
-            
+
             stats.byMonth[`${year}-${month}`] = {
               files: 0,
-              size: 0
+              size: 0,
             };
-            
+
             for (const file of files) {
               if (file.endsWith('.gz')) {
                 const filePath = path.join(monthPath, file);
                 const fileStat = await fs.stat(filePath);
-                
+
                 stats.totalFiles++;
                 stats.totalSize += fileStat.size;
                 stats.byMonth[`${year}-${month}`].files++;
@@ -402,7 +416,7 @@ class AuditRetentionService {
         }
       }
     } catch (error) {
-      console.error('Error getting archive stats:', error);
+      // Error getting archive stats
     }
 
     return stats;
@@ -418,7 +432,7 @@ class AuditRetentionService {
   /**
    * Get category from filename
    */
-  getCategoryFromFilename(filename) {
+  getCategoryFromFilename() {
     // Could be enhanced to store category in filename
     return 'operational';
   }
@@ -443,9 +457,9 @@ class AuditRetentionService {
    * Stop all scheduled jobs
    */
   shutdown() {
-    for (const [name, job] of this.jobs.entries()) {
+    for (const job of this.jobs.values()) {
       job.stop();
-      console.log(`Stopped ${name} job`);
+      // Stopped retention job
     }
     this.jobs.clear();
   }

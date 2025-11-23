@@ -7,7 +7,7 @@ class HierarchyValidator {
     CONFERENCE: 1,
     CHURCH: 2,
     TEAM: 3,
-    SERVICE: 4
+    SERVICE: 4,
   };
 
   static LEVEL_NAMES = {
@@ -15,13 +15,13 @@ class HierarchyValidator {
     1: 'conference', // Union and Conference share same level
     2: 'church',
     3: 'team',
-    4: 'service'
+    4: 'service',
   };
 
   static ENTITY_TYPES = {
     ORGANIZATION: 'organization',
     TEAM: 'team',
-    SERVICE: 'service'
+    SERVICE: 'service',
   };
 
   /**
@@ -30,7 +30,7 @@ class HierarchyValidator {
    * @returns {boolean}
    */
   static isValidPathFormat(path) {
-    if (!path || typeof path !== 'string') return false;
+    if (typeof path !== 'string') return false;
 
     // Empty path is valid for root entities
     if (path === '') return true;
@@ -51,7 +51,7 @@ class HierarchyValidator {
     const segments = path.split('/');
     return segments.map((segment, index) => ({
       id: segment,
-      level: index + 1 // Level starts at 1 for first segment
+      level: index + 1, // Level starts at 1 for first segment
     }));
   }
 
@@ -104,11 +104,12 @@ class HierarchyValidator {
   static validateEntityTransition(entity, newParentPath, newLevel) {
     const result = {
       isValid: true,
-      errors: []
+      errors: [],
     };
 
     // Check if level change is valid
-    const currentLevel = entity.hierarchyLevel || this.getHierarchyDepth(entity.hierarchyPath);
+    const currentLevel =
+      entity.hierarchyLevel || this.getHierarchyDepth(entity.hierarchyPath);
     if (Math.abs(currentLevel - newLevel) > 1) {
       result.isValid = false;
       result.errors.push('Cannot skip hierarchy levels during transition');
@@ -164,22 +165,29 @@ class HierarchyValidator {
    * @param {Object} parentOrganization - Parent organization object (optional)
    * @returns {Object} Validation result
    */
-  static validateOrganizationHierarchy(organization, parentOrganization = null) {
+  static validateOrganizationHierarchy(
+    organization,
+    parentOrganization = null
+  ) {
     const result = {
       isValid: true,
-      errors: []
+      errors: [],
     };
 
     // Validate hierarchy level
     const validLevels = ['union', 'conference', 'church'];
     if (!validLevels.includes(organization.hierarchyLevel)) {
       result.isValid = false;
-      result.errors.push(`Invalid hierarchy level: ${organization.hierarchyLevel}`);
+      result.errors.push(
+        `Invalid hierarchy level: ${organization.hierarchyLevel}`
+      );
     }
 
     // Validate parent-child relationship
     if (parentOrganization) {
-      const parentLevel = validLevels.indexOf(parentOrganization.hierarchyLevel);
+      const parentLevel = validLevels.indexOf(
+        parentOrganization.hierarchyLevel
+      );
       const childLevel = validLevels.indexOf(organization.hierarchyLevel);
 
       if (childLevel !== parentLevel + 1) {
@@ -206,7 +214,7 @@ class HierarchyValidator {
   static validateTeamHierarchy(team, churchId) {
     const result = {
       isValid: true,
-      errors: []
+      errors: [],
     };
 
     if (!churchId) {
@@ -231,7 +239,7 @@ class HierarchyValidator {
   static validateServiceHierarchy(service, teamId) {
     const result = {
       isValid: true,
-      errors: []
+      errors: [],
     };
 
     if (!teamId) {
@@ -264,13 +272,16 @@ class HierarchyValidator {
 
     // Deep check if entities provided
     if (allEntities.length > 0) {
-      const entity = allEntities.find(e => e._id.toString() === entityId);
+      const entity = allEntities.find((e) => e._id.toString() === entityId);
       if (entity && entity.hierarchyPath) {
         // Check if new parent is currently a child of this entity
-        const newParent = allEntities.find(e => 
-          e.hierarchyPath === newParentPath
+        const newParent = allEntities.find(
+          (e) => e.hierarchyPath === newParentPath
         );
-        if (newParent && this.isInSubtree(newParent.hierarchyPath, entity.hierarchyPath)) {
+        if (
+          newParent &&
+          this.isInSubtree(newParent.hierarchyPath, entity.hierarchyPath)
+        ) {
           return true;
         }
       }

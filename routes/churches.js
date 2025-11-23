@@ -23,14 +23,8 @@ router.get(
       .optional()
       .isMongoId()
       .withMessage('Valid conference ID required'),
-    query('city')
-      .optional()
-      .isString()
-      .withMessage('City must be a string'),
-    query('state')
-      .optional()
-      .isString()
-      .withMessage('State must be a string'),
+    query('city').optional().isString().withMessage('City must be a string'),
+    query('state').optional().isString().withMessage('State must be a string'),
     query('includeInactive')
       .optional()
       .isBoolean()
@@ -48,8 +42,8 @@ router.get(
       }
 
       const { conferenceId, city, state, includeInactive } = req.query;
-      let query = {};
-      
+      const query = {};
+
       if (conferenceId) query.conferenceId = conferenceId;
       if (city) query['location.address.city'] = new RegExp(city, 'i');
       if (state) query['location.address.state'] = new RegExp(state, 'i');
@@ -58,8 +52,12 @@ router.get(
       }
 
       // Filter based on user's hierarchy access
-      const userLevel = await hierarchicalAuthService.getUserHighestLevel(req.user);
-      const userPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
+      const userLevel = await hierarchicalAuthService.getUserHighestLevel(
+        req.user
+      );
+      const userPath = await hierarchicalAuthService.getUserHierarchyPath(
+        req.user
+      );
 
       if (userLevel > 1 && userPath) {
         // Users below conference level can only see churches in their subtree
@@ -68,7 +66,9 @@ router.get(
 
       const churches = await Church.find(query)
         .populate('conferenceId', 'name code')
-        .select('name code location contact leadership demographics isActive establishedDate conferenceId')
+        .select(
+          'name code location contact leadership demographics isActive establishedDate conferenceId'
+        )
         .sort('name');
 
       res.json({
@@ -81,7 +81,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch churches',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -92,22 +95,13 @@ router.get(
   '/search',
   authorizeHierarchical('read', 'church'),
   [
-    query('lat')
-      .optional()
-      .isFloat()
-      .withMessage('Latitude must be a number'),
-    query('lng')
-      .optional()
-      .isFloat()
-      .withMessage('Longitude must be a number'),
+    query('lat').optional().isFloat().withMessage('Latitude must be a number'),
+    query('lng').optional().isFloat().withMessage('Longitude must be a number'),
     query('radius')
       .optional()
       .isInt({ min: 1 })
       .withMessage('Radius must be a positive integer'),
-    query('city')
-      .optional()
-      .isString()
-      .withMessage('City must be a string'),
+    query('city').optional().isString().withMessage('City must be a string'),
   ],
   async (req, res) => {
     try {
@@ -126,8 +120,8 @@ router.get(
       if (lat && lng) {
         // Geographic search
         churches = await Church.findNearLocation(
-          parseFloat(lat), 
-          parseFloat(lng), 
+          parseFloat(lat),
+          parseFloat(lng),
           parseInt(radius)
         );
       } else if (city) {
@@ -141,12 +135,17 @@ router.get(
       }
 
       // Filter based on user's hierarchy access
-      const userLevel = await hierarchicalAuthService.getUserHighestLevel(req.user);
-      const userPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
+      const userLevel = await hierarchicalAuthService.getUserHighestLevel(
+        req.user
+      );
+      const userPath = await hierarchicalAuthService.getUserHierarchyPath(
+        req.user
+      );
 
       if (userLevel > 1 && userPath) {
-        churches = churches.filter(church => 
-          church.hierarchyPath && church.hierarchyPath.startsWith(userPath)
+        churches = churches.filter(
+          (church) =>
+            church.hierarchyPath && church.hierarchyPath.startsWith(userPath)
         );
       }
 
@@ -160,7 +159,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to search churches',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -208,7 +210,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch church',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -273,9 +278,9 @@ router.post(
 
       // Check if code already exists within the conference (if provided)
       if (req.body.code) {
-        const existingChurch = await Church.findOne({ 
+        const existingChurch = await Church.findOne({
           conferenceId: req.body.conferenceId,
-          code: req.body.code.toUpperCase() 
+          code: req.body.code.toUpperCase(),
         });
         if (existingChurch) {
           return res.status(409).json({
@@ -379,10 +384,10 @@ router.put(
 
       // Check if code already exists in conference (if being updated)
       if (req.body.code) {
-        const existingChurch = await Church.findOne({ 
+        const existingChurch = await Church.findOne({
           conferenceId: currentChurch.conferenceId,
           code: req.body.code.toUpperCase(),
-          _id: { $ne: id }
+          _id: { $ne: id },
         });
         if (existingChurch) {
           return res.status(409).json({
@@ -395,9 +400,9 @@ router.put(
 
       const church = await Church.findByIdAndUpdate(
         id,
-        { 
+        {
           ...req.body,
-          'metadata.lastUpdated': new Date()
+          'metadata.lastUpdated': new Date(),
         },
         { new: true, runValidators: true }
       ).populate('conferenceId', 'name code');
@@ -451,8 +456,11 @@ router.delete(
 
       // Check if church has teams
       const Team = require('../models/Team');
-      const teamCount = await Team.countDocuments({ churchId: id, isActive: true });
-      
+      const teamCount = await Team.countDocuments({
+        churchId: id,
+        isActive: true,
+      });
+
       if (teamCount > 0) {
         return res.status(409).json({
           success: false,
@@ -474,7 +482,10 @@ router.delete(
       res.status(500).json({
         success: false,
         message: 'Failed to delete church',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -488,7 +499,10 @@ router.get(
     try {
       const { id } = req.params;
 
-      const church = await Church.findById(id).populate('conferenceId', 'name code');
+      const church = await Church.findById(id).populate(
+        'conferenceId',
+        'name code'
+      );
       if (!church) {
         return res.status(404).json({
           success: false,
@@ -508,14 +522,17 @@ router.get(
             code: church.code,
             conference: church.conferenceId,
           },
-          statistics
+          statistics,
         },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Failed to get church statistics',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -548,7 +565,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to get church hierarchy',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }

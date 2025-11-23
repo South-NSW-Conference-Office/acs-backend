@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const Service = require('../models/Service');
-const Team = require('../models/Team');
+// const Team = require('../models/Team');
 const {
   authenticateToken,
   authorizeHierarchical,
   authorizeServiceAccess,
-  requireSuperAdmin
+  // requireSuperAdmin
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
@@ -22,28 +22,29 @@ const hierarchicalAuthService = require('../services/hierarchicalAuthService');
  */
 router.get('/accessible', authenticateToken, async (req, res) => {
   try {
-    const userHierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
-    
+    const userHierarchyPath =
+      await hierarchicalAuthService.getUserHierarchyPath(req.user);
+
     if (!userHierarchyPath) {
       return res.status(403).json({
         success: false,
         message: 'No hierarchy access found',
       });
     }
-    
+
     // Get accessible services using hierarchical path
     const services = await Service.findAccessibleServices(userHierarchyPath);
-    
+
     res.json({
       success: true,
       count: services.length,
       data: services,
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Failed to fetch accessible services',
-      error: error.message 
+      error: error.message,
     });
   }
 });
@@ -158,7 +159,7 @@ router.post(
         locations,
         contactInfo,
         eligibility,
-        capacity
+        capacity,
       } = req.body;
 
       if (!name || !teamId) {
@@ -170,7 +171,7 @@ router.post(
 
       // Validate team exists and user can access it
       const team = await hierarchicalAuthService.getEntity('team', teamId);
-      
+
       if (!team || !team.isActive) {
         return res.status(404).json({
           success: false,
@@ -205,7 +206,7 @@ router.post(
         eligibility: eligibility || {},
         capacity: capacity || {},
         status: 'active',
-        createdBy: req.user._id
+        createdBy: req.user._id,
       });
 
       await service.save();
@@ -249,7 +250,7 @@ router.put(
       // Update service
       Object.assign(service, updates);
       service.updatedBy = req.user._id;
-      
+
       await service.save();
 
       res.json({
@@ -282,7 +283,7 @@ router.delete(
       // Soft delete
       service.status = 'archived';
       service.updatedBy = req.user._id;
-      
+
       await service.save();
 
       res.json({
@@ -313,7 +314,7 @@ router.post(
 
       service.status = 'active';
       service.updatedBy = req.user._id;
-      
+
       await service.save();
 
       res.json({
@@ -369,7 +370,7 @@ router.get('/public', async (req, res) => {
     // Populate minimal data for public view
     await Service.populate(services, [
       { path: 'teamId', select: 'name type' },
-      { path: 'churchId', select: 'name' }
+      { path: 'churchId', select: 'name' },
     ]);
 
     res.json({

@@ -76,7 +76,7 @@ class UserService {
         query.$or = [
           { 'unionAssignments.role': roleId },
           { 'conferenceAssignments.role': roleId },
-          { 'churchAssignments.role': roleId }
+          { 'churchAssignments.role': roleId },
         ];
       }
 
@@ -125,9 +125,15 @@ class UserService {
         .populate('unionAssignments.union', 'name code')
         .populate('unionAssignments.role', 'name displayName level permissions')
         .populate('conferenceAssignments.conference', 'name code')
-        .populate('conferenceAssignments.role', 'name displayName level permissions')
+        .populate(
+          'conferenceAssignments.role',
+          'name displayName level permissions'
+        )
         .populate('churchAssignments.church', 'name')
-        .populate('churchAssignments.role', 'name displayName level permissions')
+        .populate(
+          'churchAssignments.role',
+          'name displayName level permissions'
+        )
         .select('-password')
         .lean();
 
@@ -457,15 +463,11 @@ class UserService {
     return validated;
   }
 
-  static async getUserAccessibleOrganizations(userId) {
-    try {
-      // Legacy method - now returns empty array since organizations are replaced by hierarchical system
-      // Use AuthorizationService.getUserUnionAccess, getUserConferenceAccess, or getUserChurchAccess instead
-      console.warn('getUserAccessibleOrganizations is deprecated. Use hierarchical access methods instead.');
-      return [];
-    } catch (error) {
-      return [];
-    }
+  static async getUserAccessibleOrganizations() {
+    // Legacy method - now returns empty array since organizations are replaced by hierarchical system
+    // Use AuthorizationService.getUserUnionAccess, getUserConferenceAccess, or getUserChurchAccess instead
+    // Deprecated: use hierarchical access methods instead
+    return [];
   }
 
   static async canUserAccessUser(

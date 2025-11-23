@@ -216,28 +216,41 @@ router.get('/available-for-role', authorize('roles.read'), async (req, res) => {
   try {
     const { roleLevel } = req.query;
 
+    // Check if current user is super admin (has wildcard permissions)
+    const isSuperAdmin =
+      req.user.permissions &&
+      (req.user.permissions.includes('*') ||
+        req.user.permissions.includes('all'));
+
     // Get all permissions grouped
     const groupedPermissions = await Permission.getGroupedPermissions();
 
     // Define hierarchical access rules
     const getHierarchyLevel = (level) => {
       switch (level) {
-        case 'union': return 0;      // Highest level
-        case 'conference': return 1; // Middle level  
-        case 'church': return 2;     // Lowest level
-        default: return 2;           // Default to most restrictive
+        case 'union':
+          return 0; // Highest level
+        case 'conference':
+          return 1; // Middle level
+        case 'church':
+          return 2; // Lowest level
+        default:
+          return 2; // Default to most restrictive
       }
     };
 
     const categoryHierarchyRequirements = {
-      'system': 0,        // Union level only
-      'organizations': 0, // Union level only (manage organizational hierarchy)
-      'users': 1,         // Conference level and above (manage users across organizations)
-      'roles': 1,         // Conference level and above (manage roles)
-      'teams': 2,         // Church level and above (all levels can manage teams)
-      'services': 2,      // Church level and above (all levels can manage services) 
-      'stories': 2,       // Church level and above (all levels can manage stories)
-      'dashboard': 2,     // Church level and above (all levels can view dashboards)
+      system: -1, // Only super admin (special case)
+      unions: 0, // Union level only (manage unions)
+      conferences: 0, // Union level and above (union admins can manage conferences)
+      churches: 0, // Union level and above (union admins can manage churches)
+      users: 1, // Conference level and above (manage users across organizations)
+      roles: 1, // Conference level and above (manage roles)
+      teams: 2, // Church level and above (all levels can manage teams)
+      services: 2, // Church level and above (all levels can manage services)
+      stories: 2, // Church level and above (all levels can manage stories)
+      dashboard: 2, // Church level and above (all levels can view dashboards)
+      media: 2, // Church level and above (all levels can manage media)
     };
 
     const userHierarchyLevel = getHierarchyLevel(roleLevel);
@@ -247,9 +260,18 @@ router.get('/available-for-role', authorize('roles.read'), async (req, res) => {
 
     for (const [categoryName, data] of Object.entries(groupedPermissions)) {
       const requiredLevel = categoryHierarchyRequirements[categoryName];
-      
+
+      // Special handling for system permissions - only super admin can see them
+      if (categoryName === 'system' && !isSuperAdmin) {
+        continue;
+      }
+
       // Skip categories that require higher hierarchy level
-      if (requiredLevel !== undefined && userHierarchyLevel > requiredLevel) {
+      if (
+        requiredLevel !== undefined &&
+        requiredLevel !== -1 &&
+        userHierarchyLevel > requiredLevel
+      ) {
         continue;
       }
 

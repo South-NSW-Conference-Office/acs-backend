@@ -1,8 +1,8 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { authenticateToken, authorize } = require('../middleware/auth');
-const authorizationService = require('../services/authorizationService');
+const { authenticateToken } = require('../middleware/auth');
+// const authorizationService = require('../services/authorizationService');
 const { AuditLog } = require('../middleware/auditLog');
 
 const router = express.Router();
@@ -13,7 +13,7 @@ const requireSuperAdmin = async (req, res, next) => {
     if (!req.user || !req.user.isSuperAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Super admin access required'
+        message: 'Super admin access required',
       });
     }
     next();
@@ -21,13 +21,19 @@ const requireSuperAdmin = async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      err: error.message
+      err: error.message,
     });
   }
 };
 
 // Log super admin actions for audit trail
-const logSuperAdminAction = async (action, targetUser, performedBy, req, details = {}) => {
+const logSuperAdminAction = async (
+  action,
+  targetUser,
+  performedBy,
+  req,
+  details = {}
+) => {
   try {
     const auditEntry = new AuditLog({
       userId: performedBy._id,
@@ -42,96 +48,91 @@ const logSuperAdminAction = async (action, targetUser, performedBy, req, details
       metadata: {
         targetUserEmail: targetUser.email,
         targetUserName: targetUser.name,
-        ...details
-      }
+        ...details,
+      },
     });
     await auditEntry.save();
   } catch (error) {
-    console.error('Error logging super admin action:', error);
+    // Error logging super admin action
   }
 };
 
 // GET /api/super-admin/users - Get all users with super admin status
-router.get(
-  '/users',
-  authenticateToken,
-  requireSuperAdmin,
-  async (req, res) => {
-    try {
-      // Get all users with isSuperAdmin flag or super_admin role
-      const superAdminUsers = await User.find({
-        $or: [
-          { isSuperAdmin: true },
-          { 'organizations.role': { $exists: true } }
-        ]
-      })
+router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    // Get all users with isSuperAdmin flag or super_admin role
+    const superAdminUsers = await User.find({
+      $or: [
+        { isSuperAdmin: true },
+        { 'organizations.role': { $exists: true } },
+      ],
+    })
       .populate('organizations.organization')
       .populate('organizations.role')
       .select('-password')
       .sort({ createdAt: -1 });
 
-      // Filter to only include actual super admins
-      const filteredUsers = superAdminUsers.filter(user => {
-        if (user.isSuperAdmin) return true;
-        
-        // Check if user has super_admin role
-        return user.organizations.some(org => 
-          org.role && org.role.name === 'super_admin'
-        );
-      });
+    // Filter to only include actual super admins
+    const filteredUsers = superAdminUsers.filter((user) => {
+      if (user.isSuperAdmin) return true;
 
-      // Get all regular users for potential promotion
-      const regularUsers = await User.find({
-        isSuperAdmin: { $ne: true },
-        isActive: true,
-        verified: true
-      })
+      // Check if user has super_admin role
+      return user.organizations.some(
+        (org) => org.role && org.role.name === 'super_admin'
+      );
+    });
+
+    // Get all regular users for potential promotion
+    const regularUsers = await User.find({
+      isSuperAdmin: { $ne: true },
+      isActive: true,
+      verified: true,
+    })
       .populate('organizations.organization')
       .populate('organizations.role')
       .select('-password')
       .sort({ name: 1 });
 
-      // Filter out users who already have super_admin role
-      const eligibleUsers = regularUsers.filter(user => {
-        return !user.organizations.some(org => 
-          org.role && org.role.name === 'super_admin'
-        );
-      });
+    // Filter out users who already have super_admin role
+    const eligibleUsers = regularUsers.filter((user) => {
+      return !user.organizations.some(
+        (org) => org.role && org.role.name === 'super_admin'
+      );
+    });
 
-      res.json({
-        success: true,
-        data: {
-          superAdmins: filteredUsers.map(user => ({
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isSuperAdmin: user.isSuperAdmin || false,
-            avatar: user.avatar,
-            organizations: user.organizations,
-            createdAt: user.createdAt,
-            lastLogin: user.lastLogin,
-            isActive: user.isActive
-          })),
-          eligibleUsers: eligibleUsers.map(user => ({
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-            organizations: user.organizations,
-            verified: user.verified
-          }))
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching super admin users:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        err: error.message
-      });
-    }
+    res.json({
+      success: true,
+      data: {
+        superAdmins: filteredUsers.map((user) => ({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          isSuperAdmin: user.isSuperAdmin || false,
+          avatar: user.avatar,
+          organizations: user.organizations,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin,
+          isActive: user.isActive,
+        })),
+        eligibleUsers: eligibleUsers.map((user) => ({
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          organizations: user.organizations,
+          verified: user.verified,
+        })),
+      },
+    });
+  } catch (error) {
+    // Error fetching super admin users
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      err: error.message,
+    });
   }
-);
+});
 
 // POST /api/super-admin/grant - Grant super admin privileges
 router.post(
@@ -140,7 +141,7 @@ router.post(
   requireSuperAdmin,
   [
     body('userId').isMongoId().withMessage('Valid user ID required'),
-    body('reason').optional().isString().withMessage('Reason must be a string')
+    body('reason').optional().isString().withMessage('Reason must be a string'),
   ],
   async (req, res) => {
     try {
@@ -149,7 +150,7 @@ router.post(
         return res.status(400).json({
           success: false,
           message: 'Validation failed',
-          errors: errors.array()
+          errors: errors.array(),
         });
       }
 
@@ -159,7 +160,7 @@ router.post(
       if (userId === req.user._id.toString()) {
         return res.status(400).json({
           success: false,
-          message: 'Cannot modify your own super admin status'
+          message: 'Cannot modify your own super admin status',
         });
       }
 
@@ -167,7 +168,7 @@ router.post(
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: 'User not found'
+          message: 'User not found',
         });
       }
 
@@ -175,7 +176,7 @@ router.post(
       if (user.isSuperAdmin) {
         return res.status(400).json({
           success: false,
-          message: 'User is already a super admin'
+          message: 'User is already a super admin',
         });
       }
 
@@ -184,13 +185,9 @@ router.post(
       await user.save();
 
       // Log the action
-      await logSuperAdminAction(
-        'grant_super_admin',
-        user,
-        req.user,
-        req,
-        { reason }
-      );
+      await logSuperAdminAction('grant_super_admin', user, req.user, req, {
+        reason,
+      });
 
       // Send notification email (if email service is configured)
       // await emailService.sendSuperAdminGrantedEmail(user, req.user, reason);
@@ -202,15 +199,15 @@ router.post(
           id: user._id,
           name: user.name,
           email: user.email,
-          isSuperAdmin: user.isSuperAdmin
-        }
+          isSuperAdmin: user.isSuperAdmin,
+        },
       });
     } catch (error) {
-      console.error('Error granting super admin privileges:', error);
+      // Error granting super admin privileges
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message
+        err: error.message,
       });
     }
   }
@@ -223,7 +220,7 @@ router.post(
   requireSuperAdmin,
   [
     body('userId').isMongoId().withMessage('Valid user ID required'),
-    body('reason').optional().isString().withMessage('Reason must be a string')
+    body('reason').optional().isString().withMessage('Reason must be a string'),
   ],
   async (req, res) => {
     try {
@@ -232,7 +229,7 @@ router.post(
         return res.status(400).json({
           success: false,
           message: 'Validation failed',
-          errors: errors.array()
+          errors: errors.array(),
         });
       }
 
@@ -242,7 +239,7 @@ router.post(
       if (userId === req.user._id.toString()) {
         return res.status(400).json({
           success: false,
-          message: 'Cannot revoke your own super admin status'
+          message: 'Cannot revoke your own super admin status',
         });
       }
 
@@ -250,7 +247,7 @@ router.post(
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: 'User not found'
+          message: 'User not found',
         });
       }
 
@@ -258,20 +255,21 @@ router.post(
       if (!user.isSuperAdmin) {
         return res.status(400).json({
           success: false,
-          message: 'User is not a super admin'
+          message: 'User is not a super admin',
         });
       }
 
       // Count remaining super admins
-      const superAdminCount = await User.countDocuments({ 
+      const superAdminCount = await User.countDocuments({
         isSuperAdmin: true,
-        _id: { $ne: userId }
+        _id: { $ne: userId },
       });
 
       if (superAdminCount < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Cannot revoke super admin privileges. At least one super admin must remain in the system.'
+          message:
+            'Cannot revoke super admin privileges. At least one super admin must remain in the system.',
         });
       }
 
@@ -280,13 +278,9 @@ router.post(
       await user.save();
 
       // Log the action
-      await logSuperAdminAction(
-        'revoke_super_admin',
-        user,
-        req.user,
-        req,
-        { reason }
-      );
+      await logSuperAdminAction('revoke_super_admin', user, req.user, req, {
+        reason,
+      });
 
       // Send notification email (if email service is configured)
       // await emailService.sendSuperAdminRevokedEmail(user, req.user, reason);
@@ -298,15 +292,15 @@ router.post(
           id: user._id,
           name: user.name,
           email: user.email,
-          isSuperAdmin: user.isSuperAdmin
-        }
+          isSuperAdmin: user.isSuperAdmin,
+        },
       });
     } catch (error) {
-      console.error('Error revoking super admin privileges:', error);
+      // Error revoking super admin privileges
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message
+        err: error.message,
       });
     }
   }
@@ -318,8 +312,14 @@ router.get(
   authenticateToken,
   requireSuperAdmin,
   [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1-100')
+    query('page')
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage('Page must be positive integer'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage('Limit must be between 1-100'),
   ],
   async (req, res) => {
     try {
@@ -328,7 +328,7 @@ router.get(
         return res.status(400).json({
           success: false,
           message: 'Validation failed',
-          errors: errors.array()
+          errors: errors.array(),
         });
       }
 
@@ -337,15 +337,15 @@ router.get(
       const skip = (page - 1) * limit;
 
       const logs = await AuditLog.find({
-        targetResource: 'super_admin'
+        targetResource: 'super_admin',
       })
-      .populate('userId', 'name email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
       const totalCount = await AuditLog.countDocuments({
-        targetResource: 'super_admin'
+        targetResource: 'super_admin',
       });
 
       res.json({
@@ -356,66 +356,62 @@ router.get(
             page,
             limit,
             totalCount,
-            totalPages: Math.ceil(totalCount / limit)
-          }
-        }
+            totalPages: Math.ceil(totalCount / limit),
+          },
+        },
       });
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
+      // Error fetching audit logs
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message
+        err: error.message,
       });
     }
   }
 );
 
 // GET /api/super-admin/stats - Get super admin statistics
-router.get(
-  '/stats',
-  authenticateToken,
-  requireSuperAdmin,
-  async (req, res) => {
-    try {
-      const superAdminCount = await User.countDocuments({ isSuperAdmin: true });
-      const totalUsers = await User.countDocuments({ isActive: true });
-      const verifiedUsers = await User.countDocuments({ 
-        isActive: true, 
-        verified: true 
-      });
+router.get('/stats', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const superAdminCount = await User.countDocuments({ isSuperAdmin: true });
+    const totalUsers = await User.countDocuments({ isActive: true });
+    const verifiedUsers = await User.countDocuments({
+      isActive: true,
+      verified: true,
+    });
 
-      // Get recent super admin actions
-      const recentActions = await AuditLog.find({
-        targetResource: 'super_admin'
-      })
+    // Get recent super admin actions
+    const recentActions = await AuditLog.find({
+      targetResource: 'super_admin',
+    })
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
       .limit(5);
 
-      res.json({
-        success: true,
-        data: {
-          stats: {
-            superAdminCount,
-            totalUsers,
-            verifiedUsers,
-            percentageSuperAdmins: totalUsers > 0 
-              ? ((superAdminCount / totalUsers) * 100).toFixed(2) 
-              : 0
-          },
-          recentActions
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching super admin stats:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        err: error.message
-      });
-    }
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          superAdminCount,
+          totalUsers,
+          verifiedUsers,
+          percentageSuperAdmins:
+            totalUsers > 0
+              ? ((superAdminCount / totalUsers) * 100).toFixed(2)
+              : 0,
+        },
+        recentActions,
+      },
+    });
+  } catch (error) {
+    // Error fetching super admin stats
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      err: error.message,
+    });
   }
-);
+});
 
 module.exports = router;

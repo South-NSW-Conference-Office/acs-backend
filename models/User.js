@@ -264,7 +264,7 @@ userSchema.methods.getPermissionsForUnion = async function (unionId) {
   if (!this.unionAssignments || !Array.isArray(this.unionAssignments)) {
     return { role: null, permissions: [] };
   }
-  
+
   const assignment = this.unionAssignments.find(
     (assignment) => assignment.union.toString() === unionId.toString()
   );
@@ -290,10 +290,13 @@ userSchema.methods.getPermissionsForUnion = async function (unionId) {
 
 // Get user permissions for a specific conference
 userSchema.methods.getPermissionsForConference = async function (conferenceId) {
-  if (!this.conferenceAssignments || !Array.isArray(this.conferenceAssignments)) {
+  if (
+    !this.conferenceAssignments ||
+    !Array.isArray(this.conferenceAssignments)
+  ) {
     return { role: null, permissions: [] };
   }
-  
+
   const assignment = this.conferenceAssignments.find(
     (assignment) => assignment.conference.toString() === conferenceId.toString()
   );
@@ -322,7 +325,7 @@ userSchema.methods.getPermissionsForChurch = async function (churchId) {
   if (!this.churchAssignments || !Array.isArray(this.churchAssignments)) {
     return { role: null, permissions: [] };
   }
-  
+
   const assignment = this.churchAssignments.find(
     (assignment) => assignment.church.toString() === churchId.toString()
   );
@@ -349,21 +352,34 @@ userSchema.methods.getPermissionsForChurch = async function (churchId) {
 // Get user permissions for a specific team
 userSchema.methods.getPermissionsForTeam = async function (teamId) {
   // Check if user is super admin first
-  const hasSuperAdminRole = this.isSuperAdmin || 
-    (this.unionAssignments && this.unionAssignments.some((assignment) => assignment.role?.name === 'super_admin')) ||
-    (this.conferenceAssignments && this.conferenceAssignments.some((assignment) => assignment.role?.name === 'super_admin')) ||
-    (this.churchAssignments && this.churchAssignments.some((assignment) => assignment.role?.name === 'super_admin'));
+  const hasSuperAdminRole =
+    this.isSuperAdmin ||
+    (this.unionAssignments &&
+      this.unionAssignments.some(
+        (assignment) => assignment.role?.name === 'super_admin'
+      )) ||
+    (this.conferenceAssignments &&
+      this.conferenceAssignments.some(
+        (assignment) => assignment.role?.name === 'super_admin'
+      )) ||
+    (this.churchAssignments &&
+      this.churchAssignments.some(
+        (assignment) => assignment.role?.name === 'super_admin'
+      ));
 
   // Check for wildcard permissions across hierarchical entities
   let hasWildcardPermissions = false;
   const allAssignments = [
     ...(this.unionAssignments || []),
     ...(this.conferenceAssignments || []),
-    ...(this.churchAssignments || [])
+    ...(this.churchAssignments || []),
   ];
 
   for (const assignment of allAssignments) {
-    if (assignment.role?.permissions?.includes('*') || assignment.role?.permissions?.includes('all')) {
+    if (
+      assignment.role?.permissions?.includes('*') ||
+      assignment.role?.permissions?.includes('all')
+    ) {
       hasWildcardPermissions = true;
       break;
     }
@@ -373,7 +389,7 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
   if (hasSuperAdminRole || hasWildcardPermissions) {
     return {
       teamRole: 'super_admin',
-      hierarchicalRole: 'super_admin', 
+      hierarchicalRole: 'super_admin',
       permissions: ['*'],
       team: teamId,
     };
@@ -420,7 +436,7 @@ userSchema.methods.getTeams = async function () {
   if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
     return [];
   }
-  
+
   await this.populate({
     path: 'teamAssignments.teamId',
     populate: { path: 'churchId', select: 'name' },
@@ -439,7 +455,7 @@ userSchema.methods.hasTeamRole = function (teamId, role) {
   if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
     return false;
   }
-  
+
   const assignment = this.teamAssignments.find(
     (team) => team.teamId.toString() === teamId.toString()
   );
@@ -452,7 +468,7 @@ userSchema.methods.isTeamLeader = function () {
   if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
     return false;
   }
-  
+
   return this.teamAssignments.some(
     (assignment) => assignment.role === 'leader'
   );
@@ -463,7 +479,7 @@ userSchema.methods.getLeadingTeams = async function () {
   if (!this.teamAssignments || !Array.isArray(this.teamAssignments)) {
     return [];
   }
-  
+
   const leadingAssignments = this.teamAssignments.filter(
     (assignment) => assignment.role === 'leader'
   );
@@ -477,7 +493,7 @@ userSchema.methods.getLeadingTeams = async function () {
     .populate([
       { path: 'unionId', select: 'name' },
       { path: 'conferenceId', select: 'name' },
-      { path: 'churchId', select: 'name' }
+      { path: 'churchId', select: 'name' },
     ])
     .lean();
 };

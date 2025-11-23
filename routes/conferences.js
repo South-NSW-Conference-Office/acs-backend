@@ -5,7 +5,6 @@ const Union = require('../models/Union');
 const {
   authenticateToken,
   authorizeHierarchical,
-  requireSuperAdmin,
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
@@ -41,16 +40,20 @@ router.get(
       }
 
       const { unionId, includeInactive } = req.query;
-      let query = {};
-      
+      const query = {};
+
       if (unionId) query.unionId = unionId;
       if (!includeInactive || includeInactive !== 'true') {
         query.isActive = true;
       }
 
       // Filter based on user's hierarchy access
-      const userLevel = await hierarchicalAuthService.getUserHighestLevel(req.user);
-      const userPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
+      const userLevel = await hierarchicalAuthService.getUserHighestLevel(
+        req.user
+      );
+      const userPath = await hierarchicalAuthService.getUserHierarchyPath(
+        req.user
+      );
 
       if (userLevel > 0 && userPath) {
         // Non-super admin users can only see conferences in their subtree
@@ -58,8 +61,8 @@ router.get(
       }
 
       const conferences = await Conference.find(query)
-        .populate('unionId', 'name code')
-        .select('name code territory headquarters contact leadership isActive establishedDate unionId')
+        .populate('unionId', 'name')
+        .select('name territory headquarters contact isActive unionId')
         .sort('name');
 
       res.json({
@@ -72,7 +75,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch conferences',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -101,7 +107,7 @@ router.get(
       }
 
       const conference = await Conference.findById(id)
-        .populate('unionId', 'name code')
+        .populate('unionId', 'name')
         .populate('churches');
 
       if (!conference) {
@@ -120,7 +126,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch conference',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -136,15 +145,7 @@ router.post(
       .trim()
       .isLength({ min: 2 })
       .withMessage('Conference name must be at least 2 characters'),
-    body('code')
-      .trim()
-      .isLength({ min: 2, max: 15 })
-      .withMessage('Conference code must be 2-15 characters')
-      .matches(/^[A-Z0-9]+$/)
-      .withMessage('Conference code must be uppercase letters/numbers only'),
-    body('unionId')
-      .isMongoId()
-      .withMessage('Valid union ID required'),
+    body('unionId').isMongoId().withMessage('Valid union ID required'),
     body('contact.email')
       .optional()
       .isEmail()
@@ -170,28 +171,13 @@ router.post(
         });
       }
 
-      // Check if code already exists within the union
-      if (req.body.code) {
-        const existingConference = await Conference.findOne({ 
-          unionId: req.body.unionId,
-          code: req.body.code.toUpperCase() 
-        });
-        if (existingConference) {
-          return res.status(409).json({
-            success: false,
-            message: 'Conference code already exists in this union',
-          });
-        }
-      }
-
       const conferenceData = {
         ...req.body,
-        ...(req.body.code && { code: req.body.code.toUpperCase() }),
         createdBy: req.user.id,
       };
 
       const conference = await Conference.create(conferenceData);
-      await conference.populate('unionId', 'name code');
+      await conference.populate('unionId', 'name');
 
       res.status(201).json({
         success: true,
@@ -220,13 +206,6 @@ router.put(
       .trim()
       .isLength({ min: 2 })
       .withMessage('Conference name must be at least 2 characters'),
-    body('code')
-      .optional()
-      .trim()
-      .isLength({ min: 2, max: 15 })
-      .withMessage('Conference code must be 2-15 characters')
-      .matches(/^[A-Z0-9]+$/)
-      .withMessage('Conference code must be uppercase letters/numbers only'),
     body('contact.email')
       .optional()
       .isEmail()
@@ -268,30 +247,14 @@ router.put(
         });
       }
 
-      // Check if code already exists in union (if being updated)
-      if (req.body.code) {
-        const existingConference = await Conference.findOne({ 
-          unionId: currentConference.unionId,
-          code: req.body.code.toUpperCase(),
-          _id: { $ne: id }
-        });
-        if (existingConference) {
-          return res.status(409).json({
-            success: false,
-            message: 'Conference code already exists in this union',
-          });
-        }
-        req.body.code = req.body.code.toUpperCase();
-      }
-
       const conference = await Conference.findByIdAndUpdate(
         id,
-        { 
+        {
           ...req.body,
-          'metadata.lastUpdated': new Date()
+          'metadata.lastUpdated': new Date(),
         },
         { new: true, runValidators: true }
-      ).populate('unionId', 'name code');
+      ).populate('unionId', 'name');
 
       res.json({
         success: true,
@@ -342,8 +305,11 @@ router.delete(
 
       // Check if conference has churches
       const Church = require('../models/Church');
-      const churchCount = await Church.countDocuments({ conferenceId: id, isActive: true });
-      
+      const churchCount = await Church.countDocuments({
+        conferenceId: id,
+        isActive: true,
+      });
+
       if (churchCount > 0) {
         return res.status(409).json({
           success: false,
@@ -365,7 +331,10 @@ router.delete(
       res.status(500).json({
         success: false,
         message: 'Failed to delete conference',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -379,7 +348,10 @@ router.get(
     try {
       const { id } = req.params;
 
-      const conference = await Conference.findById(id).populate('unionId', 'name code');
+      const conference = await Conference.findById(id).populate(
+        'unionId',
+        'name'
+      );
       if (!conference) {
         return res.status(404).json({
           success: false,
@@ -396,17 +368,19 @@ router.get(
           conference: {
             id: conference._id,
             name: conference.name,
-            code: conference.code,
             union: conference.unionId,
           },
-          statistics
+          statistics,
         },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Failed to get conference statistics',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -439,7 +413,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to get conference hierarchy',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }

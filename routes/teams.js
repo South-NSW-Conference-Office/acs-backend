@@ -3,8 +3,8 @@ const router = express.Router();
 const {
   authenticateToken,
   authorizeHierarchical,
-  authorizeTeamAccess,
-  requireSuperAdmin
+  // authorizeTeamAccess,
+  // requireSuperAdmin
 } = require('../middleware/hierarchicalAuth');
 const { authorize, authorizeWithTeam } = require('../middleware/auth');
 const { checkRoleQuota } = require('../middleware/quotaCheck');
@@ -24,10 +24,10 @@ router.get(
       const { type, includeInactive } = req.query;
 
       // Use new hierarchical method - only get teams for churches
-      const teams = await Team.getTeamsByChurch(
-        organizationId,
-        { type, includeInactive: includeInactive === 'true' }
-      );
+      const teams = await Team.getTeamsByChurch(organizationId, {
+        type,
+        includeInactive: includeInactive === 'true',
+      });
 
       res.json({
         success: true,
@@ -43,36 +43,33 @@ router.get(
 );
 
 // Get all teams accessible to user (hierarchical)
-router.get(
-  '/all',
-  authenticateToken,
-  async (req, res) => {
-    try {
-      // Get teams accessible based on user's hierarchy level
-      const userHierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
-      
-      if (!userHierarchyPath) {
-        return res.status(403).json({
-          success: false,
-          message: 'No hierarchy access found',
-        });
-      }
-      
-      // Get accessible teams using hierarchical path
-      const teams = await Team.getAccessibleTeams(userHierarchyPath);
-      
-      res.json({
-        success: true,
-        data: teams,
-      });
-    } catch (error) {
-      res.status(error.message.includes('permission') ? 403 : 400).json({
+router.get('/all', authenticateToken, async (req, res) => {
+  try {
+    // Get teams accessible based on user's hierarchy level
+    const userHierarchyPath =
+      await hierarchicalAuthService.getUserHierarchyPath(req.user);
+
+    if (!userHierarchyPath) {
+      return res.status(403).json({
         success: false,
-        message: error.message,
+        message: 'No hierarchy access found',
       });
     }
+
+    // Get accessible teams using hierarchical path
+    const teams = await Team.getAccessibleTeams(userHierarchyPath);
+
+    res.json({
+      success: true,
+      data: teams,
+    });
+  } catch (error) {
+    res.status(error.message.includes('permission') ? 403 : 400).json({
+      success: false,
+      message: error.message,
+    });
   }
-);
+});
 
 // Get user's teams
 router.get('/my-teams', authenticateToken, async (req, res) => {
@@ -184,7 +181,8 @@ router.post(
   auditLog('team.create'),
   async (req, res) => {
     try {
-      const { name, type, leaderId, description, maxMembers, churchId } = req.body;
+      const { name, type, leaderId, description, maxMembers, churchId } =
+        req.body;
 
       if (!name) {
         return res.status(400).json({
@@ -195,25 +193,31 @@ router.post(
 
       // Get user's church or use provided churchId (must be validated by middleware)
       let targetChurchId = churchId;
-      
+
       if (!targetChurchId) {
         // Get user's church assignment
-        const userChurch = await hierarchicalAuthService.getUserChurch(req.user);
-        
+        const userChurch = await hierarchicalAuthService.getUserChurch(
+          req.user
+        );
+
         if (!userChurch) {
           return res.status(403).json({
             success: false,
-            message: 'No church assignment found. Teams must be created under a church.',
+            message:
+              'No church assignment found. Teams must be created under a church.',
           });
         }
-        
+
         targetChurchId = userChurch._id;
       }
 
       // Validate user can create team in this church
-      const userHierarchyPath = await hierarchicalAuthService.getUserHierarchyPath(req.user);
-      const church = await hierarchicalAuthService.getEntity('organization', targetChurchId);
-      
+      await hierarchicalAuthService.getUserHierarchyPath(req.user);
+      const church = await hierarchicalAuthService.getEntity(
+        'organization',
+        targetChurchId
+      );
+
       if (!church || church.hierarchyLevel !== 'church') {
         return res.status(400).json({
           success: false,
@@ -242,7 +246,7 @@ router.post(
         leaderId,
         description,
         maxMembers: maxMembers || 50,
-        createdBy: req.user._id
+        createdBy: req.user._id,
       });
 
       res.status(201).json({
@@ -456,11 +460,10 @@ router.delete(
       }
 
       // Check permissions
-      const hasPermission =
-        await authorizationService.validateOrganizationAccess(
-          req.user,
-          team.organizationId
-        );
+      const hasPermission = await hierarchicalAuthService.canUserManageEntity(
+        req.user,
+        team.organizationId
+      );
 
       if (!hasPermission) {
         return res.status(403).json({

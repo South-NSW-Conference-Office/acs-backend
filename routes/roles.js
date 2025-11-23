@@ -31,7 +31,9 @@ router.post('/:id/reset', authorize('*'), async (req, res) => {
     }
 
     // Find the original role definition by name
-    const originalRoleDefinition = Role.defaultRoles.find(def => def.name === role.name);
+    const originalRoleDefinition = Role.defaultRoles.find(
+      (def) => def.name === role.name
+    );
     if (!originalRoleDefinition) {
       return res.status(404).json({
         success: false,
@@ -59,13 +61,7 @@ router.post('/:id/reset', authorize('*'), async (req, res) => {
     await role.save();
 
     // Log system role reset
-    console.log(`[AUDIT] System role reset to defaults by super admin: ${req.user.email}`, {
-      roleId: id,
-      roleName: role.name,
-      timestamp: new Date().toISOString(),
-      userEmail: req.user.email,
-      userId: req.user._id
-    });
+    // System role reset to defaults by super admin
 
     // Add warning header
     res.set('X-System-Role-Reset', 'true');
@@ -308,8 +304,9 @@ router.put(
       // Allow super admins to modify system roles with restrictions
       if (role.isSystem) {
         const { user } = req;
-        const isSuperAdmin = user.permissions?.includes('*') || user.permissions?.includes('all');
-        
+        const isSuperAdmin =
+          user.permissions?.includes('*') || user.permissions?.includes('all');
+
         if (!isSuperAdmin) {
           // Non-super admins can only modify isActive
           if (Object.keys(updates).some((key) => key !== 'isActive')) {
@@ -322,24 +319,19 @@ router.put(
         } else {
           // Super admins can modify system roles, but prevent certain critical changes
           const restrictedFields = ['isSystem']; // Prevent toggling system status
-          if (Object.keys(updates).some((key) => restrictedFields.includes(key))) {
+          if (
+            Object.keys(updates).some((key) => restrictedFields.includes(key))
+          ) {
             return res.status(403).json({
               success: false,
               message: 'Cannot modify system role status',
               error: 'The isSystem property cannot be changed',
             });
           }
-          
+
           // Log system role modification
-          console.log(`[AUDIT] System role modified by super admin: ${user.email}`, {
-            roleId: id,
-            roleName: role.name,
-            changes: updates,
-            timestamp: new Date().toISOString(),
-            userEmail: user.email,
-            userId: user._id
-          });
-          
+          // System role modified by super admin
+
           // Add warning header for system role modifications
           res.set('X-System-Role-Warning', 'true');
         }
@@ -392,8 +384,9 @@ router.delete('/:id', authorize('roles.delete'), async (req, res) => {
     // Allow only super admins to delete system roles
     if (role.isSystem) {
       const { user } = req;
-      const isSuperAdmin = user.permissions?.includes('*') || user.permissions?.includes('all');
-      
+      const isSuperAdmin =
+        user.permissions?.includes('*') || user.permissions?.includes('all');
+
       if (!isSuperAdmin) {
         return res.status(403).json({
           success: false,
@@ -401,23 +394,23 @@ router.delete('/:id', authorize('roles.delete'), async (req, res) => {
           error: 'Insufficient privileges to delete system role',
         });
       }
-      
+
       // Log system role deletion
-      console.log(`[AUDIT] System role deleted by super admin: ${user.email}`, {
-        roleId: id,
-        roleName: role.name,
-        timestamp: new Date().toISOString(),
-        userEmail: user.email,
-        userId: user._id
-      });
-      
+      // System role deleted by super admin
+
       // Add warning header for system role deletion
       res.set('X-System-Role-Warning', 'true');
     }
 
-    // Check if role is assigned to any users
+    // Check if role is assigned to any users across all hierarchy levels
     const User = require('../models/User');
-    const usersWithRole = await User.find({ 'organizations.role': id });
+    const usersWithRole = await User.find({
+      $or: [
+        { 'unionAssignments.role': id },
+        { 'conferenceAssignments.role': id },
+        { 'churchAssignments.role': id },
+      ],
+    });
 
     if (usersWithRole.length > 0) {
       return res.status(400).json({

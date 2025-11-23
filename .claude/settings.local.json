@@ -13,7 +13,13 @@
       "Bash(pnpm lint:*)",
       "Bash(pnpm build:*)",
       "Bash(npm run build)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(for file in scripts/debug-grouped-permissions.js scripts/fix-permission-categories.js scripts/fix-super-admin-permissions.js scripts/recreate-hierarchical-permissions-bypass.js)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(head:*)",
+      "Bash(done)",
+      "Bash(npm test)",
+      "Bash(npx jest test:*)"
     ],
     "deny": []
   }
