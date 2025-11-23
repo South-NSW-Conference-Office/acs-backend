@@ -22,7 +22,8 @@
       "Bash(npx jest test:*)",
       "Bash(npm run type-check:*)",
       "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git branch:*)"
     ],
     "deny": []
   }
