@@ -45,7 +45,7 @@ const teamSchema = new mongoose.Schema(
       default: [],
       index: true,
     },
-    
+
     category: {
       type: String,
       trim: true,
@@ -64,6 +64,27 @@ const teamSchema = new mongoose.Schema(
       maxlength: [500, 'Description must be less than 500 characters'],
     },
 
+    // IMAGE FIELDS
+    banner: {
+      url: String,
+      key: String, // Wasabi storage key for deletion
+      alt: String, // Accessibility text
+    },
+
+    profilePhoto: {
+      url: String,
+      key: String, // Wasabi storage key for deletion
+      alt: String, // Accessibility text
+    },
+
+    // LOCATION FIELD
+    location: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Location must be less than 200 characters'],
+      index: true,
+    },
+
     serviceIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -75,12 +96,6 @@ const teamSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
-    },
-
-    maxMembers: {
-      type: Number,
-      default: 50,
-      min: 1,
     },
 
     // FLEXIBLE SETTINGS - Customizable for any team type
@@ -162,12 +177,8 @@ teamSchema.virtual('members', {
 });
 
 // Methods
-teamSchema.methods.isFull = function () {
-  return this.memberCount >= this.maxMembers;
-};
 
 teamSchema.methods.canUserJoin = function (user) {
-  if (this.isFull()) return false;
   if (!this.isActive) return false;
 
   // Check if user is already a member
@@ -352,7 +363,7 @@ teamSchema.statics.findSimilarTeams = async function (teamId, options = {}) {
     _id: { $ne: teamId },
     isActive: true,
     'settings.collaborationEnabled': true,
-    $or: []
+    $or: [],
   };
 
   // Find teams with matching category
@@ -407,24 +418,69 @@ teamSchema.statics.getTeamsByUser = async function (userId) {
     .lean();
 };
 
-// Middleware - HIERARCHICAL ENFORCEMENT
-teamSchema.pre('save', async function (next) {
+// Pre-validate hook - runs before validation
+teamSchema.pre('validate', async function (next) {
   try {
-    // Build hierarchy path if modified
-    if (this.isModified('churchId') || !this.hierarchyPath) {
-      await this.buildHierarchyPath();
-    }
-
-    // Ensure member count doesn't exceed max
-    if (this.isModified('memberCount')) {
-      if (this.memberCount > this.maxMembers) {
-        this.memberCount = this.maxMembers;
+    // Always ensure hierarchyPath is set before validation
+    if (!this.hierarchyPath || this.isModified('churchId')) {
+      if (!this.churchId) {
+        throw new Error('Team must have a church assignment');
       }
+
+      const Church = mongoose.model('Church');
+      const church = await Church.findById(this.churchId);
+
+      if (!church) {
+        throw new Error('Church not found');
+      }
+
+      if (!church.isActive) {
+        throw new Error('Cannot assign team to inactive church');
+      }
+
+      // Ensure church has hierarchyPath
+      const churchPath = church.hierarchyPath || `church_${church._id}`;
+
+      // Use real _id if available, otherwise use temp
+      const teamId = this._id || 'temp';
+      this.hierarchyPath = `${churchPath}/team_${teamId}`;
     }
 
     next();
   } catch (error) {
+    // Handle validation error
     next(error);
+  }
+});
+
+// Middleware - HIERARCHICAL ENFORCEMENT
+teamSchema.pre('save', async function (next) {
+  try {
+    // Additional processing if needed
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Post-save hook to update hierarchy path with real _id
+teamSchema.post('save', async function (doc) {
+  try {
+    // Update hierarchy path with real _id if it was temporary
+    if (doc.hierarchyPath && doc.hierarchyPath.endsWith('/team_temp')) {
+      const Church = mongoose.model('Church');
+      const church = await Church.findById(doc.churchId);
+      if (church) {
+        const newPath = `${church.hierarchyPath}/team_${doc._id}`;
+        // Update without triggering middleware to avoid infinite loop
+        await this.constructor.updateOne(
+          { _id: doc._id },
+          { hierarchyPath: newPath }
+        );
+      }
+    }
+  } catch (error) {
+    // Handle hierarchy path error
   }
 });
 

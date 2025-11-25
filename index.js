@@ -238,7 +238,11 @@ const startServer = () => {
     },
     { path: '/api/teams', handler: teamRoutes, name: 'teams' },
     { path: '/api/team-types', handler: teamTypeRoutes, name: 'team-types' },
-    { path: '/api/assignments', handler: assignmentRoutes, name: 'assignments' },
+    {
+      path: '/api/assignments',
+      handler: assignmentRoutes,
+      name: 'assignments',
+    },
     { path: '/api/quota', handler: quotaRoutes, name: 'quota' },
     { path: '/api/profile', handler: profileRoutes, name: 'profile' },
     { path: '/api/media', handler: mediaRoutes, name: 'media' },

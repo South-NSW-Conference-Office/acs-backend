@@ -34,9 +34,9 @@ const authenticateToken = async (req, res, next) => {
         path: 'churchId',
         populate: {
           path: 'conferenceId',
-          populate: { path: 'unionId' }
-        }
-      }
+          populate: { path: 'unionId' },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
@@ -110,19 +110,6 @@ const authorize = (requiredPermission = {}) => {
       const churchId = req.headers['x-church-id'];
 
       // Determine the most specific context provided
-      let entityType = null;
-      let entityId = null;
-
-      if (churchId) {
-        entityType = 'church';
-        entityId = churchId;
-      } else if (conferenceId) {
-        entityType = 'conference';
-        entityId = conferenceId;
-      } else if (unionId) {
-        entityType = 'union';
-        entityId = unionId;
-      }
 
       let userPermissions = { role: null, permissions: [] };
 
@@ -130,24 +117,28 @@ const authorize = (requiredPermission = {}) => {
       if (req.user.teamAssignments && req.user.teamAssignments.length > 0) {
         // Use primary team or first active team for permissions
         const primaryTeamAssignment = req.user.teamAssignments.find(
-          assignment => assignment.teamId && assignment.status === 'active'
+          (assignment) => assignment.teamId && assignment.status === 'active'
         );
-        
+
         if (primaryTeamAssignment) {
           const teamPermissions = await req.user.getPermissionsForTeam(
             primaryTeamAssignment.teamId._id || primaryTeamAssignment.teamId
           );
-          
+
           if (teamPermissions && teamPermissions.permissions) {
             userPermissions = {
               role: {
                 id: teamPermissions.teamRole,
                 name: teamPermissions.teamRole,
-                displayName: teamPermissions.teamRole.charAt(0).toUpperCase() + teamPermissions.teamRole.slice(1),
+                displayName:
+                  teamPermissions.teamRole.charAt(0).toUpperCase() +
+                  teamPermissions.teamRole.slice(1),
                 level: 'team',
               },
               permissions: teamPermissions.permissions,
-              teamId: primaryTeamAssignment.teamId._id || primaryTeamAssignment.teamId,
+              teamId:
+                primaryTeamAssignment.teamId._id ||
+                primaryTeamAssignment.teamId,
             };
           }
         }

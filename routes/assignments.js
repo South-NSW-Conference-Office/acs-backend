@@ -4,11 +4,7 @@ const UniversalAssignmentService = require('../services/universalAssignmentServi
 const UserService = require('../services/userService');
 const Team = require('../models/Team');
 const { authenticateToken } = require('../middleware/auth');
-const {
-  AppError,
-  NotFoundError,
-  ValidationError,
-} = require('../middleware/errorHandler');
+const { NotFoundError } = require('../middleware/errorHandler');
 
 // Middleware to ensure user is authenticated
 router.use(authenticateToken);
@@ -26,7 +22,7 @@ router.post('/assign', async (req, res, next) => {
     if (!userId || !teamId) {
       return res.status(400).json({
         success: false,
-        error: 'User ID and Team ID are required'
+        error: 'User ID and Team ID are required',
       });
     }
 
@@ -35,20 +31,21 @@ router.post('/assign', async (req, res, next) => {
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid role. Must be: leader, coordinator, or member'
+        error: 'Invalid role. Must be: leader, coordinator, or member',
       });
     }
 
     // Check if requesting user has permission to assign to this team
-    const hasPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      teamId
-    );
+    const hasPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        teamId
+      );
 
     if (!hasPermission) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to assign users to this team'
+        error: 'Insufficient permissions to assign users to this team',
       });
     }
 
@@ -63,9 +60,8 @@ router.post('/assign', async (req, res, next) => {
     res.json({
       success: true,
       message: 'User successfully assigned to team',
-      assignment: result.assignment
+      assignment: result.assignment,
     });
-
   } catch (error) {
     next(error);
   }
@@ -83,30 +79,30 @@ router.delete('/remove', async (req, res, next) => {
     if (!userId || !teamId) {
       return res.status(400).json({
         success: false,
-        error: 'User ID and Team ID are required'
+        error: 'User ID and Team ID are required',
       });
     }
 
     // Check permission
-    const hasPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      teamId
-    );
+    const hasPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        teamId
+      );
 
     if (!hasPermission) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to remove users from this team'
+        error: 'Insufficient permissions to remove users from this team',
       });
     }
 
-    const result = await UniversalAssignmentService.removeUserFromTeam(userId, teamId);
+    await UniversalAssignmentService.removeUserFromTeam(userId, teamId);
 
     res.json({
       success: true,
-      message: 'User successfully removed from team'
+      message: 'User successfully removed from team',
     });
-
   } catch (error) {
     next(error);
   }
@@ -124,25 +120,27 @@ router.post('/move', async (req, res, next) => {
     if (!userId || !fromTeamId || !toTeamId) {
       return res.status(400).json({
         success: false,
-        error: 'User ID, from Team ID, and to Team ID are required'
+        error: 'User ID, from Team ID, and to Team ID are required',
       });
     }
 
     // Validate permissions for both teams
-    const fromPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      fromTeamId
-    );
-    
-    const toPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      toTeamId
-    );
+    const fromPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        fromTeamId
+      );
+
+    const toPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        toTeamId
+      );
 
     if (!fromPermission || !toPermission) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to move user between these teams'
+        error: 'Insufficient permissions to move user between these teams',
       });
     }
 
@@ -157,9 +155,8 @@ router.post('/move', async (req, res, next) => {
     res.json({
       success: true,
       message: 'User successfully moved between teams',
-      assignment: result.assignment
+      assignment: result.assignment,
     });
-
   } catch (error) {
     next(error);
   }
@@ -174,23 +171,29 @@ router.post('/bulk-assign', async (req, res, next) => {
   try {
     const { userIds, teamId, role = 'member' } = req.body;
 
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0 || !teamId) {
+    if (
+      !userIds ||
+      !Array.isArray(userIds) ||
+      userIds.length === 0 ||
+      !teamId
+    ) {
       return res.status(400).json({
         success: false,
-        error: 'User IDs array and Team ID are required'
+        error: 'User IDs array and Team ID are required',
       });
     }
 
     // Check permission
-    const hasPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      teamId
-    );
+    const hasPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        teamId
+      );
 
     if (!hasPermission) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to assign users to this team'
+        error: 'Insufficient permissions to assign users to this team',
       });
     }
 
@@ -204,9 +207,8 @@ router.post('/bulk-assign', async (req, res, next) => {
     res.json({
       success: true,
       message: `Bulk assignment completed: ${results.successful.length} successful, ${results.failed.length} failed`,
-      results: results
+      results: results,
     });
-
   } catch (error) {
     next(error);
   }
@@ -219,13 +221,14 @@ router.post('/bulk-assign', async (req, res, next) => {
  */
 router.get('/assignable-teams', async (req, res, next) => {
   try {
-    const teams = await UniversalAssignmentService.getAssignableTeams(req.user._id);
+    const teams = await UniversalAssignmentService.getAssignableTeams(
+      req.user._id
+    );
 
     res.json({
       success: true,
-      teams: teams
+      teams: teams,
     });
-
   } catch (error) {
     next(error);
   }
@@ -250,17 +253,17 @@ router.get('/user/:userId', async (req, res, next) => {
     if (!canAccess) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to view user assignments'
+        error: 'Insufficient permissions to view user assignments',
       });
     }
 
-    const assignments = await UniversalAssignmentService.getUserAssignments(userId);
+    const assignments =
+      await UniversalAssignmentService.getUserAssignments(userId);
 
     res.json({
       success: true,
-      assignments: assignments
+      assignments: assignments,
     });
-
   } catch (error) {
     next(error);
   }
@@ -286,20 +289,23 @@ router.get('/team-suggestions/:userId', async (req, res, next) => {
     if (!canAccess) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to view team suggestions for this user'
+        error:
+          'Insufficient permissions to view team suggestions for this user',
       });
     }
 
-    const suggestions = await UniversalAssignmentService.getTeamSuggestions(userId, {
-      limit: parseInt(limit),
-      includeCurrentTeams: includeCurrentTeams === 'true'
-    });
+    const suggestions = await UniversalAssignmentService.getTeamSuggestions(
+      userId,
+      {
+        limit: parseInt(limit),
+        includeCurrentTeams: includeCurrentTeams === 'true',
+      }
+    );
 
     res.json({
       success: true,
-      suggestions: suggestions
+      suggestions: suggestions,
     });
-
   } catch (error) {
     next(error);
   }
@@ -317,20 +323,21 @@ router.post('/invite-to-team', async (req, res, next) => {
     if (!teamId || !email) {
       return res.status(400).json({
         success: false,
-        error: 'Team ID and email are required'
+        error: 'Team ID and email are required',
       });
     }
 
     // Check permission
-    const hasPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      teamId
-    );
+    const hasPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        teamId
+      );
 
     if (!hasPermission) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to invite users to this team'
+        error: 'Insufficient permissions to invite users to this team',
       });
     }
 
@@ -345,9 +352,8 @@ router.post('/invite-to-team', async (req, res, next) => {
     res.json({
       success: true,
       message: 'Team invitation sent successfully',
-      invitation: result
+      invitation: result,
     });
-
   } catch (error) {
     next(error);
   }
@@ -363,15 +369,16 @@ router.get('/team/:teamId/members', async (req, res, next) => {
     const { teamId } = req.params;
 
     // Check if user can access this team
-    const hasPermission = await UniversalAssignmentService.validateAssignmentPermission(
-      req.user._id,
-      teamId
-    );
+    const hasPermission =
+      await UniversalAssignmentService.validateAssignmentPermission(
+        req.user._id,
+        teamId
+      );
 
     if (!hasPermission) {
       return res.status(403).json({
         success: false,
-        error: 'Insufficient permissions to view team members'
+        error: 'Insufficient permissions to view team members',
       });
     }
 
@@ -386,9 +393,8 @@ router.get('/team/:teamId/members', async (req, res, next) => {
       success: true,
       teamId: teamId,
       teamName: team.name,
-      members: members
+      members: members,
     });
-
   } catch (error) {
     next(error);
   }
@@ -401,21 +407,22 @@ router.get('/team/:teamId/members', async (req, res, next) => {
  */
 router.get('/accessible-teams', async (req, res, next) => {
   try {
-    const accessibleTeamIds = await UserService.getUserAccessibleTeams(req.user._id);
-    
-    const teams = await Team.find({ 
+    const accessibleTeamIds = await UserService.getUserAccessibleTeams(
+      req.user._id
+    );
+
+    const teams = await Team.find({
       _id: { $in: accessibleTeamIds },
-      isActive: true 
+      isActive: true,
     })
-    .populate('churchId', 'name')
-    .populate('leaderId', 'name email')
-    .sort({ name: 1 });
+      .populate('churchId', 'name')
+      .populate('leaderId', 'name email')
+      .sort({ name: 1 });
 
     res.json({
       success: true,
-      teams: teams
+      teams: teams,
     });
-
   } catch (error) {
     next(error);
   }

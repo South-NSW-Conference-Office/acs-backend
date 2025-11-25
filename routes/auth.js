@@ -247,7 +247,7 @@ router.post(
 
       const user = await User.findById(userId).populate({
         path: 'teamAssignments.teamId',
-        populate: { path: 'churchId', select: 'name' }
+        populate: { path: 'churchId', select: 'name' },
       });
 
       if (!user) {
@@ -327,7 +327,7 @@ router.post(
       // Find user and populate team data
       const user = await User.findOne({ email, isActive: true }).populate({
         path: 'teamAssignments.teamId',
-        populate: { path: 'churchId', select: 'name' }
+        populate: { path: 'churchId', select: 'name' },
       });
 
       if (!user) {

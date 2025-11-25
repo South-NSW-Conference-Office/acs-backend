@@ -1,25 +1,23 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
-const authorizationService = require('./authorizationService');
+const hierarchicalAuthService = require('./hierarchicalAuthService');
 
 class TeamService {
   /**
    * Create a new team
    */
   static async createTeam(data, createdBy) {
-    const { organizationId, leaderId, name, type, description, maxMembers } =
-      data;
+    const { churchId, leaderId, name, type, description } = data;
 
-    // Validate organization exists and user has permission
-    const hasPermission = await authorizationService.validateOrganizationAccess(
+    // Validate church exists and user has permission
+    const hasPermission = await hierarchicalAuthService.canUserManageEntity(
       createdBy,
-      organizationId
+      churchId,
+      'create'
     );
 
     if (!hasPermission) {
-      throw new Error(
-        'Insufficient permissions to create team in this organization'
-      );
+      throw new Error('Insufficient permissions to create team in this church');
     }
 
     // Validate leader if specified
@@ -29,24 +27,25 @@ class TeamService {
         throw new Error('Leader not found');
       }
 
-      // Check if leader belongs to the organization
-      const belongsToOrg = leader.organizations.some(
-        (org) => org.organization.toString() === organizationId.toString()
+      // Check if leader belongs to the church hierarchy
+      const canAccess = await hierarchicalAuthService.canUserManageEntity(
+        leader,
+        churchId,
+        'read'
       );
 
-      if (!belongsToOrg) {
-        throw new Error('Leader must belong to the organization');
+      if (!canAccess) {
+        throw new Error('Leader must have access to this church');
       }
     }
 
     // Create team
     const team = await Team.createTeam({
       name,
-      organizationId,
-      type: type || 'acs',
+      churchId,
+      category: type || 'acs',
       leaderId,
       description,
-      maxMembers: maxMembers || 50,
       createdBy: createdBy._id,
     });
 
@@ -63,9 +62,10 @@ class TeamService {
     }
 
     // Check permissions
-    const hasPermission = await authorizationService.validateOrganizationAccess(
+    const hasPermission = await hierarchicalAuthService.canUserManageEntity(
       updatedBy,
-      team.organizationId
+      team.churchId,
+      'update'
     );
 
     if (
@@ -79,7 +79,6 @@ class TeamService {
     const allowedUpdates = [
       'name',
       'description',
-      'maxMembers',
       'leaderId',
       'settings',
       'metadata',
@@ -101,12 +100,14 @@ class TeamService {
         throw new Error('New leader not found');
       }
 
-      const belongsToOrg = leader.organizations.some(
-        (org) => org.organization.toString() === team.organizationId.toString()
+      const canAccess = await hierarchicalAuthService.canUserManageEntity(
+        leader,
+        team.churchId,
+        'read'
       );
 
-      if (!belongsToOrg) {
-        throw new Error('New leader must belong to the organization');
+      if (!canAccess) {
+        throw new Error('New leader must have access to this church');
       }
     }
 
@@ -126,16 +127,17 @@ class TeamService {
       throw new Error('Team not found');
     }
 
-    // Check permissions - team leader or org admin can add members
-    const hasOrgPermission =
-      await authorizationService.validateOrganizationAccess(
+    // Check permissions - team leader or church admin can add members
+    const hasChurchPermission =
+      await hierarchicalAuthService.canUserManageEntity(
         addedBy,
-        team.organizationId
+        team.churchId,
+        'update'
       );
 
     const isTeamLeader = team.leaderId?.toString() === addedBy._id.toString();
 
-    if (!hasOrgPermission && !isTeamLeader) {
+    if (!hasChurchPermission && !isTeamLeader) {
       throw new Error('Insufficient permissions to add members to this team');
     }
 
@@ -155,25 +157,26 @@ class TeamService {
     }
 
     // Check permissions
-    const hasOrgPermission =
-      await authorizationService.validateOrganizationAccess(
+    const hasChurchPermission =
+      await hierarchicalAuthService.canUserManageEntity(
         removedBy,
-        team.organizationId
+        team.churchId,
+        'update'
       );
 
     const isTeamLeader = team.leaderId?.toString() === removedBy._id.toString();
     const isSelfRemoval = userId === removedBy._id.toString();
 
-    if (!hasOrgPermission && !isTeamLeader && !isSelfRemoval) {
+    if (!hasChurchPermission && !isTeamLeader && !isSelfRemoval) {
       throw new Error(
         'Insufficient permissions to remove members from this team'
       );
     }
 
-    // Prevent removing team leader unless by org admin
-    if (team.leaderId?.toString() === userId && !hasOrgPermission) {
+    // Prevent removing team leader unless by church admin
+    if (team.leaderId?.toString() === userId && !hasChurchPermission) {
       throw new Error(
-        'Cannot remove team leader without organization admin permissions'
+        'Cannot remove team leader without church admin permissions'
       );
     }
 
@@ -184,33 +187,34 @@ class TeamService {
   }
 
   /**
-   * Get teams for organization
+   * Get teams for church
    */
-  static async getOrganizationTeams(organizationId, user, options = {}) {
-    // Check if user can view teams in this organization
-    const hasPermission = await authorizationService.validateOrganizationAccess(
+  static async getChurchTeams(churchId, user, options = {}) {
+    // Check if user can view teams in this church
+    const hasPermission = await hierarchicalAuthService.canUserManageEntity(
       user,
-      organizationId
+      churchId,
+      'read'
     );
 
     if (!hasPermission) {
-      // Check if user is member of any team in this org
+      // Check if user is member of any team in this church
       const userTeams = await Team.getTeamsByUser(user._id);
 
-      const orgTeams = userTeams.filter(
-        (team) => team.organizationId.toString() === organizationId.toString()
+      const churchTeams = userTeams.filter(
+        (team) => team.churchId.toString() === churchId.toString()
       );
 
-      if (orgTeams.length === 0) {
-        throw new Error('No permission to view teams in this organization');
+      if (churchTeams.length === 0) {
+        throw new Error('No permission to view teams in this church');
       }
 
       // Return only user's teams
-      return orgTeams;
+      return churchTeams;
     }
 
-    // Return all teams for organization
-    const allTeams = await Team.getTeamsByOrganization(organizationId, options);
+    // Return all teams for church
+    const allTeams = await Team.getTeamsByChurch(churchId, options);
 
     return allTeams;
   }
@@ -220,7 +224,7 @@ class TeamService {
    */
   static async getTeamDetails(teamId, user) {
     const team = await Team.findById(teamId)
-      .populate('organizationId', 'name type')
+      .populate('churchId', 'name hierarchyLevel')
       .populate('leaderId', 'name email avatar')
       .populate('createdBy', 'name email')
       .populate('serviceIds', 'name');
@@ -230,10 +234,11 @@ class TeamService {
     }
 
     // Check permissions
-    const hasOrgPermission =
-      await authorizationService.validateOrganizationAccess(
+    const hasChurchPermission =
+      await hierarchicalAuthService.canUserManageEntity(
         user,
-        team.organizationId._id
+        team.churchId._id,
+        'read'
       );
 
     // Check if user is team member
@@ -241,13 +246,13 @@ class TeamService {
       (assignment) => assignment.teamId.toString() === teamId
     );
 
-    if (!hasOrgPermission && !isMember) {
+    if (!hasChurchPermission && !isMember) {
       throw new Error('No permission to view this team');
     }
 
     // Get members if authorized
     let members = [];
-    if (hasOrgPermission || isMember) {
+    if (hasChurchPermission || isMember) {
       members = await team.getMembers();
     }
 
@@ -274,15 +279,16 @@ class TeamService {
     }
 
     // Check permissions
-    const hasOrgPermission =
-      await authorizationService.validateOrganizationAccess(
+    const hasChurchPermission =
+      await hierarchicalAuthService.canUserManageEntity(
         updatedBy,
-        team.organizationId
+        team.churchId,
+        'update'
       );
 
     const isTeamLeader = team.leaderId?.toString() === updatedBy._id.toString();
 
-    if (!hasOrgPermission && !isTeamLeader) {
+    if (!hasChurchPermission && !isTeamLeader) {
       throw new Error('Insufficient permissions to update member roles');
     }
 
@@ -317,7 +323,7 @@ class TeamService {
    * Search teams
    */
   static async searchTeams(query, user, options = {}) {
-    const { organizationId, type, includeInactive = false } = options;
+    const { churchId, type, includeInactive = false } = options;
 
     const searchQuery = {};
 
@@ -326,25 +332,22 @@ class TeamService {
       searchQuery.$text = { $search: query };
     }
 
-    // Filter by organization if specified
-    if (organizationId) {
-      const hasPermission =
-        await authorizationService.validateOrganizationAccess(
-          user,
-          organizationId
-        );
+    // Filter by church if specified
+    if (churchId) {
+      const hasPermission = await hierarchicalAuthService.canUserManageEntity(
+        user,
+        churchId,
+        'read'
+      );
 
       if (!hasPermission) {
         // Return only user's teams
         const userTeams = await Team.getTeamsByUser(user._id);
         return userTeams.filter((team) => {
-          if (
-            organizationId &&
-            team.organizationId.toString() !== organizationId
-          ) {
+          if (churchId && team.churchId.toString() !== churchId) {
             return false;
           }
-          if (type && team.type !== type) {
+          if (type && team.category !== type) {
             return false;
           }
           if (!includeInactive && !team.isActive) {
@@ -354,23 +357,22 @@ class TeamService {
         });
       }
 
-      searchQuery.organizationId = organizationId;
+      searchQuery.churchId = churchId;
     } else {
-      // Get all organizations user can access
-      const accessibleOrgs =
-        await authorizationService.getAccessibleOrganizations(
-          user,
-          'teams.read'
-        );
-
-      searchQuery.organizationId = {
-        $in: accessibleOrgs.map((org) => org._id),
-      };
+      // Get accessible teams based on user's hierarchy
+      const userHierarchy =
+        await hierarchicalAuthService.getUserHierarchyPath(user);
+      if (userHierarchy) {
+        const accessibleTeams = await Team.getAccessibleTeams(userHierarchy);
+        searchQuery._id = {
+          $in: accessibleTeams.map((team) => team._id),
+        };
+      }
     }
 
     // Add filters
     if (type) {
-      searchQuery.type = type;
+      searchQuery.category = type;
     }
 
     if (!includeInactive) {
@@ -378,75 +380,12 @@ class TeamService {
     }
 
     const teams = await Team.find(searchQuery)
-      .populate('organizationId', 'name')
+      .populate('churchId', 'name')
       .populate('leaderId', 'name email')
       .limit(options.limit || 50)
       .skip(options.skip || 0);
 
     return teams;
-  }
-
-  /**
-   * Get team statistics
-   */
-  static async getTeamStatistics(teamId, user) {
-    const team = await Team.findById(teamId);
-    if (!team) {
-      throw new Error('Team not found');
-    }
-
-    // Check permissions
-    const hasPermission = await authorizationService.validateOrganizationAccess(
-      user,
-      team.organizationId
-    );
-
-    const isTeamLeader = team.leaderId?.toString() === user._id.toString();
-    const isMember = user.teamAssignments?.some(
-      (a) => a.teamId.toString() === teamId
-    );
-
-    if (!hasPermission && !isTeamLeader && !isMember) {
-      throw new Error('No permission to view team statistics');
-    }
-
-    // Get member statistics
-    const members = await User.find({
-      'teamAssignments.teamId': teamId,
-    }).select('teamAssignments');
-
-    const roleCount = {
-      leader: 0,
-      member: 0,
-      communications: 0,
-    };
-
-    members.forEach((member) => {
-      const assignment = member.teamAssignments.find(
-        (a) => a.teamId.toString() === teamId
-      );
-      if (assignment) {
-        roleCount[assignment.role]++;
-      }
-    });
-
-    // Get service statistics if applicable
-    const Service = require('../models/Service');
-    const serviceCount = await Service.countDocuments({
-      _id: { $in: team.serviceIds },
-    });
-
-    return {
-      teamId: team._id,
-      name: team.name,
-      memberCount: team.memberCount,
-      maxMembers: team.maxMembers,
-      capacity: (team.memberCount / team.maxMembers) * 100,
-      roleDistribution: roleCount,
-      serviceCount,
-      isActive: team.isActive,
-      createdAt: team.createdAt,
-    };
   }
 }
 

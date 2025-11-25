@@ -187,39 +187,47 @@ userSchema.methods.getAccessibleChurches = async function () {
 
   await this.populate({
     path: 'teamAssignments.teamId',
-    populate: { path: 'churchId', select: 'name hierarchyPath' }
+    populate: { path: 'churchId', select: 'name hierarchyPath' },
   });
 
-  const churchIds = [...new Set(
-    this.teamAssignments
-      .filter(assignment => assignment.teamId && assignment.teamId.churchId)
-      .map(assignment => assignment.teamId.churchId._id)
-  )];
+  const churchIds = [
+    ...new Set(
+      this.teamAssignments
+        .filter((assignment) => assignment.teamId && assignment.teamId.churchId)
+        .map((assignment) => assignment.teamId.churchId._id)
+    ),
+  ];
 
   const Church = mongoose.model('Church');
   return Church.find({ _id: { $in: churchIds } })
     .populate('conferenceId', 'name')
-    .populate({ 
+    .populate({
       path: 'conferenceId',
-      populate: { path: 'unionId', select: 'name' }
+      populate: { path: 'unionId', select: 'name' },
     });
 };
 
 // Get all conferences user has access to through team memberships
 userSchema.methods.getAccessibleConferences = async function () {
   const churches = await this.getAccessibleChurches();
-  const conferenceIds = [...new Set(churches.map(church => church.conferenceId._id))];
-  
+  const conferenceIds = [
+    ...new Set(churches.map((church) => church.conferenceId._id)),
+  ];
+
   const Conference = mongoose.model('Conference');
-  return Conference.find({ _id: { $in: conferenceIds } })
-    .populate('unionId', 'name');
+  return Conference.find({ _id: { $in: conferenceIds } }).populate(
+    'unionId',
+    'name'
+  );
 };
 
-// Get all unions user has access to through team memberships  
+// Get all unions user has access to through team memberships
 userSchema.methods.getAccessibleUnions = async function () {
   const conferences = await this.getAccessibleConferences();
-  const unionIds = [...new Set(conferences.map(conference => conference.unionId._id))];
-  
+  const unionIds = [
+    ...new Set(conferences.map((conference) => conference.unionId._id)),
+  ];
+
   const Union = mongoose.model('Union');
   return Union.find({ _id: { $in: unionIds } });
 };
@@ -227,45 +235,45 @@ userSchema.methods.getAccessibleUnions = async function () {
 // Calculate user's current organizational scope
 userSchema.methods.getOrganizationalScope = async function () {
   const teams = await this.getTeams();
-  
+
   await this.populate({
     path: 'teamAssignments.teamId',
     populate: {
       path: 'churchId',
       populate: {
         path: 'conferenceId',
-        populate: { path: 'unionId' }
-      }
-    }
+        populate: { path: 'unionId' },
+      },
+    },
   });
-  
+
   const churches = new Set();
   const conferences = new Set();
   const unions = new Set();
   const hierarchyPaths = [];
-  
-  this.teamAssignments.forEach(assignment => {
+
+  this.teamAssignments.forEach((assignment) => {
     if (assignment.teamId && assignment.teamId.churchId) {
       const church = assignment.teamId.churchId;
       churches.add(church._id.toString());
       hierarchyPaths.push(assignment.teamId.hierarchyPath);
-      
+
       if (church.conferenceId) {
         conferences.add(church.conferenceId._id.toString());
-        
+
         if (church.conferenceId.unionId) {
           unions.add(church.conferenceId.unionId._id.toString());
         }
       }
     }
   });
-  
+
   return {
-    teams: teams.map(t => t._id.toString()),
+    teams: teams.map((t) => t._id.toString()),
     churches: Array.from(churches),
     conferences: Array.from(conferences),
     unions: Array.from(unions),
-    hierarchyPaths: hierarchyPaths
+    hierarchyPaths: hierarchyPaths,
   };
 };
 
@@ -299,7 +307,7 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
   });
 
   const team = assignment.teamId;
-  
+
   // Base permissions based on team role
   let basePermissions = [];
   switch (assignment.role) {
@@ -310,7 +318,7 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
         'team.members.manage',
         'team.services.create',
         'team.services.manage',
-        'church.view'
+        'church.view',
       ];
       break;
     case 'coordinator':
@@ -318,15 +326,11 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
         'team.participate',
         'team.services.manage',
         'team.view',
-        'church.view'
+        'church.view',
       ];
       break;
     case 'member':
-      basePermissions = [
-        'team.participate',
-        'team.view',
-        'church.view'
-      ];
+      basePermissions = ['team.participate', 'team.view', 'church.view'];
       break;
     default:
       basePermissions = ['team.view'];
@@ -359,7 +363,7 @@ userSchema.methods.getTeams = async function () {
   });
 
   return this.teamAssignments
-    .filter(assignment => assignment.status === 'active')
+    .filter((assignment) => assignment.status === 'active')
     .map((assignment) => ({
       team: assignment.teamId,
       role: assignment.role,
@@ -376,7 +380,8 @@ userSchema.methods.hasTeamRole = function (teamId, role) {
   }
 
   const assignment = this.teamAssignments.find(
-    (team) => team.teamId.toString() === teamId.toString() && team.status === 'active'
+    (team) =>
+      team.teamId.toString() === teamId.toString() && team.status === 'active'
   );
 
   return assignment && assignment.role === role;
@@ -389,7 +394,8 @@ userSchema.methods.isTeamLeader = function () {
   }
 
   return this.teamAssignments.some(
-    (assignment) => assignment.role === 'leader' && assignment.status === 'active'
+    (assignment) =>
+      assignment.role === 'leader' && assignment.status === 'active'
   );
 };
 
@@ -400,7 +406,8 @@ userSchema.methods.getLeadingTeams = async function () {
   }
 
   const leadingAssignments = this.teamAssignments.filter(
-    (assignment) => assignment.role === 'leader' && assignment.status === 'active'
+    (assignment) =>
+      assignment.role === 'leader' && assignment.status === 'active'
   );
 
   if (!leadingAssignments.length) return [];
@@ -414,12 +421,16 @@ userSchema.methods.getLeadingTeams = async function () {
 };
 
 // Add user to team - universal assignment method
-userSchema.methods.addToTeam = async function (teamId, role = 'member', invitedBy = null) {
+userSchema.methods.addToTeam = async function (
+  teamId,
+  role = 'member',
+  invitedBy = null
+) {
   // Check if user is already in this team
   const existingAssignment = this.teamAssignments.find(
-    assignment => assignment.teamId.toString() === teamId.toString()
+    (assignment) => assignment.teamId.toString() === teamId.toString()
   );
-  
+
   if (existingAssignment) {
     // Update existing assignment
     existingAssignment.role = role;
@@ -434,15 +445,15 @@ userSchema.methods.addToTeam = async function (teamId, role = 'member', invitedB
       status: 'active',
       joinedAt: new Date(),
       invitedBy: invitedBy,
-      permissions: []
+      permissions: [],
     });
   }
-  
+
   // Set as primary team if user doesn't have one
   if (!this.primaryTeam) {
     this.primaryTeam = teamId;
   }
-  
+
   await this.save();
   return this;
 };
@@ -450,16 +461,15 @@ userSchema.methods.addToTeam = async function (teamId, role = 'member', invitedB
 // Remove user from team
 userSchema.methods.removeFromTeam = async function (teamId) {
   this.teamAssignments = this.teamAssignments.filter(
-    assignment => assignment.teamId.toString() !== teamId.toString()
+    (assignment) => assignment.teamId.toString() !== teamId.toString()
   );
-  
+
   // Update primary team if it was removed
   if (this.primaryTeam && this.primaryTeam.toString() === teamId.toString()) {
-    this.primaryTeam = this.teamAssignments.length > 0 
-      ? this.teamAssignments[0].teamId 
-      : null;
+    this.primaryTeam =
+      this.teamAssignments.length > 0 ? this.teamAssignments[0].teamId : null;
   }
-  
+
   await this.save();
   return this;
 };

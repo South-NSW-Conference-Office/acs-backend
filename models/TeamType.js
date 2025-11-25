@@ -13,12 +13,6 @@ const teamTypeSchema = new mongoose.Schema(
       trim: true,
       maxlength: 200,
     },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: true,
-      index: true,
-    },
     isActive: {
       type: Boolean,
       default: true,
@@ -27,12 +21,6 @@ const teamTypeSchema = new mongoose.Schema(
       type: Boolean,
       default: false, // Set to true for system-wide default types
     },
-    permissions: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -44,46 +32,37 @@ const teamTypeSchema = new mongoose.Schema(
   }
 );
 
-// Compound index to ensure unique names per organization
-teamTypeSchema.index({ name: 1, organizationId: 1 }, { unique: true });
+// Ensure unique names globally
+teamTypeSchema.index({ name: 1 }, { unique: true });
 
-// Static method to create default team types for an organization
-teamTypeSchema.statics.createDefaultTypes = async function (
-  organizationId,
-  createdBy
-) {
+// Static method to create default team types
+teamTypeSchema.statics.createDefaultTypes = async function (createdBy) {
   const defaultTypes = [
     {
       name: 'ACS Service',
       description:
         'Primary community service teams for outreach and aid programs',
-      organizationId,
       createdBy,
       isDefault: true,
-      permissions: ['services.*', 'stories.*', 'users.read'],
     },
     {
       name: 'Communications',
       description:
         'Teams focused on outreach, marketing, and community engagement',
-      organizationId,
       createdBy,
       isDefault: true,
-      permissions: ['services.manage', 'stories.*', 'users.read'],
     },
     {
       name: 'General',
       description: 'Administrative and support teams',
-      organizationId,
       createdBy,
       isDefault: true,
-      permissions: ['users.read'],
     },
   ];
 
   try {
     // Check if default types already exist
-    const existingTypes = await this.find({ organizationId, isDefault: true });
+    const existingTypes = await this.find({ isDefault: true });
 
     if (existingTypes.length === 0) {
       await this.insertMany(defaultTypes);
@@ -100,7 +79,6 @@ teamTypeSchema.statics.createDefaultTypes = async function (
 teamTypeSchema.methods.getTeams = function () {
   return mongoose.model('Team').find({
     type: this.name,
-    organizationId: this.organizationId,
   });
 };
 
@@ -110,9 +88,6 @@ teamTypeSchema.virtual('teamCount', {
   localField: 'name',
   foreignField: 'type',
   count: true,
-  match: function () {
-    return { organizationId: this.organizationId };
-  },
 });
 
 // Ensure virtuals are included when converting to JSON

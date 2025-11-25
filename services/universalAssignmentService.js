@@ -1,8 +1,5 @@
 const User = require('../models/User');
 const Team = require('../models/Team');
-const Church = require('../models/Church');
-const Conference = require('../models/Conference');
-const Union = require('../models/Union');
 const {
   AppError,
   NotFoundError,
@@ -13,7 +10,12 @@ class UniversalAssignmentService {
   /**
    * Assign user to any team - universal assignment with no organizational restrictions
    */
-  static async assignUserToTeam(userId, teamId, role = 'member', assignedBy = null) {
+  static async assignUserToTeam(
+    userId,
+    teamId,
+    role = 'member',
+    assignedBy = null
+  ) {
     try {
       // 1. Validate user exists
       const user = await User.findById(userId);
@@ -26,7 +28,7 @@ class UniversalAssignmentService {
       if (!team) {
         throw new NotFoundError('Team');
       }
-      
+
       if (!team.isActive) {
         throw new AppError('Cannot assign user to inactive team', 400);
       }
@@ -39,7 +41,7 @@ class UniversalAssignmentService {
 
       // 4. Check if user is already assigned to this team
       const existingAssignment = user.teamAssignments.find(
-        assignment => assignment.teamId.toString() === teamId.toString()
+        (assignment) => assignment.teamId.toString() === teamId.toString()
       );
 
       if (existingAssignment) {
@@ -56,7 +58,7 @@ class UniversalAssignmentService {
           status: 'active',
           joinedAt: new Date(),
           invitedBy: assignedBy,
-          permissions: []
+          permissions: [],
         });
       }
 
@@ -79,10 +81,9 @@ class UniversalAssignmentService {
           role: role,
           teamName: team.name,
           churchName: team.churchId?.name,
-          status: 'active'
-        }
+          status: 'active',
+        },
       };
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to assign user to team', 500);
@@ -107,7 +108,7 @@ class UniversalAssignmentService {
       // Remove team assignment
       const originalLength = user.teamAssignments.length;
       user.teamAssignments = user.teamAssignments.filter(
-        assignment => assignment.teamId.toString() !== teamId.toString()
+        (assignment) => assignment.teamId.toString() !== teamId.toString()
       );
 
       if (user.teamAssignments.length === originalLength) {
@@ -115,10 +116,14 @@ class UniversalAssignmentService {
       }
 
       // Update primary team if it was removed
-      if (user.primaryTeam && user.primaryTeam.toString() === teamId.toString()) {
-        user.primaryTeam = user.teamAssignments.length > 0 
-          ? user.teamAssignments[0].teamId 
-          : null;
+      if (
+        user.primaryTeam &&
+        user.primaryTeam.toString() === teamId.toString()
+      ) {
+        user.primaryTeam =
+          user.teamAssignments.length > 0
+            ? user.teamAssignments[0].teamId
+            : null;
       }
 
       await user.save();
@@ -128,9 +133,8 @@ class UniversalAssignmentService {
 
       return {
         success: true,
-        message: 'User removed from team successfully'
+        message: 'User removed from team successfully',
       };
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to remove user from team', 500);
@@ -140,20 +144,30 @@ class UniversalAssignmentService {
   /**
    * Move user between teams - no organizational restrictions
    */
-  static async moveUserBetweenTeams(userId, fromTeamId, toTeamId, newRole = 'member', movedBy = null) {
+  static async moveUserBetweenTeams(
+    userId,
+    fromTeamId,
+    toTeamId,
+    newRole = 'member',
+    movedBy = null
+  ) {
     try {
       // 1. Remove from old team
       await this.removeUserFromTeam(userId, fromTeamId);
 
       // 2. Add to new team
-      const result = await this.assignUserToTeam(userId, toTeamId, newRole, movedBy);
+      const result = await this.assignUserToTeam(
+        userId,
+        toTeamId,
+        newRole,
+        movedBy
+      );
 
       return {
         success: true,
         message: 'User moved between teams successfully',
-        assignment: result.assignment
+        assignment: result.assignment,
       };
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to move user between teams', 500);
@@ -163,23 +177,33 @@ class UniversalAssignmentService {
   /**
    * Bulk assign multiple users to a team
    */
-  static async bulkAssignUsersToTeam(userIds, teamId, role = 'member', assignedBy = null) {
+  static async bulkAssignUsersToTeam(
+    userIds,
+    teamId,
+    role = 'member',
+    assignedBy = null
+  ) {
     const results = {
       successful: [],
-      failed: []
+      failed: [],
     };
 
     for (const userId of userIds) {
       try {
-        const result = await this.assignUserToTeam(userId, teamId, role, assignedBy);
+        const result = await this.assignUserToTeam(
+          userId,
+          teamId,
+          role,
+          assignedBy
+        );
         results.successful.push({
           userId: userId,
-          assignment: result.assignment
+          assignment: result.assignment,
         });
       } catch (error) {
         results.failed.push({
           userId: userId,
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -206,20 +230,19 @@ class UniversalAssignmentService {
 
       // Get admin's organizational scope through their team memberships
       const adminScope = await admin.getOrganizationalScope();
-      
+
       // Find teams within admin's accessible churches
       if (adminScope.churches.length > 0) {
-        return Team.find({ 
+        return Team.find({
           churchId: { $in: adminScope.churches },
-          isActive: true 
+          isActive: true,
         })
-        .populate('churchId', 'name')
-        .sort({ name: 1 });
+          .populate('churchId', 'name')
+          .sort({ name: 1 });
       }
 
       // If admin has no team assignments, return empty array
       return [];
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to fetch assignable teams', 500);
@@ -248,11 +271,10 @@ class UniversalAssignmentService {
 
       // Get admin's organizational scope
       const adminScope = await admin.getOrganizationalScope();
-      
+
       // Check if team's church is within admin's scope
       const teamChurchId = team.churchId._id.toString();
       return adminScope.churches.includes(teamChurchId);
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       return false; // Default to no permission on error
@@ -264,25 +286,24 @@ class UniversalAssignmentService {
    */
   static async getUserAssignments(userId) {
     try {
-      const user = await User.findById(userId)
-        .populate({
-          path: 'teamAssignments.teamId',
+      const user = await User.findById(userId).populate({
+        path: 'teamAssignments.teamId',
+        populate: {
+          path: 'churchId',
           populate: {
-            path: 'churchId',
-            populate: {
-              path: 'conferenceId',
-              populate: { path: 'unionId' }
-            }
-          }
-        });
+            path: 'conferenceId',
+            populate: { path: 'unionId' },
+          },
+        },
+      });
 
       if (!user) {
         throw new NotFoundError('User');
       }
 
       const assignments = user.teamAssignments
-        .filter(assignment => assignment.status === 'active')
-        .map(assignment => {
+        .filter((assignment) => assignment.status === 'active')
+        .map((assignment) => {
           const team = assignment.teamId;
           const church = team?.churchId;
           const conference = church?.conferenceId;
@@ -298,16 +319,16 @@ class UniversalAssignmentService {
             joinedAt: assignment.joinedAt,
             church: {
               id: church?._id,
-              name: church?.name
+              name: church?.name,
             },
             conference: {
               id: conference?._id,
-              name: conference?.name
+              name: conference?.name,
             },
             union: {
               id: union?._id,
-              name: union?.name
-            }
+              name: union?.name,
+            },
           };
         });
 
@@ -315,9 +336,8 @@ class UniversalAssignmentService {
         userId: userId,
         primaryTeam: user.primaryTeam,
         assignments: assignments,
-        organizationalScope: await user.getOrganizationalScope()
+        organizationalScope: await user.getOrganizationalScope(),
       };
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to fetch user assignments', 500);
@@ -331,7 +351,7 @@ class UniversalAssignmentService {
     try {
       const memberCount = await User.countDocuments({
         'teamAssignments.teamId': teamId,
-        'teamAssignments.status': 'active'
+        'teamAssignments.status': 'active',
       });
 
       await Team.findByIdAndUpdate(teamId, { memberCount });
@@ -339,7 +359,7 @@ class UniversalAssignmentService {
       return memberCount;
     } catch (error) {
       // Don't throw error - this is a background operation
-      console.error('Failed to update team member count:', error);
+      // Silently handle error for background operation
     }
   }
 
@@ -358,12 +378,12 @@ class UniversalAssignmentService {
       // Build suggestion query
       const query = {
         isActive: true,
-        'settings.isPubliclyVisible': true
+        'settings.isPubliclyVisible': true,
       };
 
       // Exclude teams user is already part of unless specifically requested
       if (!includeCurrentTeams && user.teamAssignments.length > 0) {
-        const currentTeamIds = user.teamAssignments.map(a => a.teamId);
+        const currentTeamIds = user.teamAssignments.map((a) => a.teamId);
         query._id = { $nin: currentTeamIds };
       }
 
@@ -373,7 +393,7 @@ class UniversalAssignmentService {
         .limit(limit)
         .lean();
 
-      return suggestedTeams.map(team => ({
+      return suggestedTeams.map((team) => ({
         teamId: team._id,
         teamName: team.name,
         category: team.category,
@@ -381,11 +401,9 @@ class UniversalAssignmentService {
         description: team.description,
         church: team.churchId?.name,
         memberCount: team.memberCount,
-        maxMembers: team.maxMembers,
         canJoin: !team.settings?.requireApproval,
-        leader: team.leaderId?.name
+        leader: team.leaderId?.name,
       }));
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to fetch team suggestions', 500);
@@ -395,7 +413,12 @@ class UniversalAssignmentService {
   /**
    * Create team invitation for user
    */
-  static async createTeamInvitation(teamId, email, role = 'member', invitedBy = null, personalMessage = '') {
+  static async createTeamInvitation(
+    teamId,
+    email,
+    role = 'member',
+    invitedBy = null
+  ) {
     try {
       const team = await Team.findById(teamId).populate('churchId');
       if (!team) {
@@ -404,11 +427,11 @@ class UniversalAssignmentService {
 
       // Check if user already exists
       let user = await User.findOne({ email });
-      
+
       if (user) {
         // User exists - add team assignment with pending status
         const existingAssignment = user.teamAssignments.find(
-          assignment => assignment.teamId.toString() === teamId.toString()
+          (assignment) => assignment.teamId.toString() === teamId.toString()
         );
 
         if (existingAssignment) {
@@ -421,7 +444,7 @@ class UniversalAssignmentService {
           status: 'pending',
           joinedAt: new Date(),
           invitedBy: invitedBy,
-          permissions: []
+          permissions: [],
         });
 
         await user.save();
@@ -431,14 +454,16 @@ class UniversalAssignmentService {
           email: email,
           name: email.split('@')[0], // Temporary name
           verified: false,
-          teamAssignments: [{
-            teamId: teamId,
-            role: role,
-            status: 'pending',
-            joinedAt: new Date(),
-            invitedBy: invitedBy,
-            permissions: []
-          }]
+          teamAssignments: [
+            {
+              teamId: teamId,
+              role: role,
+              status: 'pending',
+              joinedAt: new Date(),
+              invitedBy: invitedBy,
+              permissions: [],
+            },
+          ],
         });
 
         await user.save();
@@ -452,9 +477,8 @@ class UniversalAssignmentService {
         userId: user._id,
         teamId: teamId,
         teamName: team.name,
-        invitationStatus: 'sent'
+        invitationStatus: 'sent',
       };
-
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to create team invitation', 500);

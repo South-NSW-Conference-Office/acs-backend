@@ -1,8 +1,5 @@
 const User = require('../models/User');
 const Team = require('../models/Team');
-const Church = require('../models/Church');
-const Conference = require('../models/Conference');
-const Union = require('../models/Union');
 const UniversalAssignmentService = require('./universalAssignmentService');
 const {
   AppError,
@@ -52,7 +49,8 @@ class UserService {
 
       // Apply team-based filtering
       if (!userPermissions.permissions?.includes('*') && requestingUserId) {
-        const accessibleTeams = await this.getUserAccessibleTeams(requestingUserId);
+        const accessibleTeams =
+          await this.getUserAccessibleTeams(requestingUserId);
 
         if (teamId) {
           // Check if requesting user can access the specified team
@@ -74,8 +72,11 @@ class UserService {
 
       // Filter by church (through team assignments)
       if (churchId) {
-        const churchTeams = await Team.find({ churchId, isActive: true }).select('_id');
-        const churchTeamIds = churchTeams.map(team => team._id);
+        const churchTeams = await Team.find({
+          churchId,
+          isActive: true,
+        }).select('_id');
+        const churchTeamIds = churchTeams.map((team) => team._id);
         query['teamAssignments.teamId'] = { $in: churchTeamIds };
       }
 
@@ -88,7 +89,7 @@ class UserService {
       const users = await User.find(query)
         .populate({
           path: 'teamAssignments.teamId',
-          populate: { path: 'churchId', select: 'name' }
+          populate: { path: 'churchId', select: 'name' },
         })
         .populate('primaryTeam', 'name')
         .select('-password')
@@ -131,9 +132,9 @@ class UserService {
             path: 'churchId',
             populate: {
               path: 'conferenceId',
-              populate: { path: 'unionId' }
-            }
-          }
+              populate: { path: 'unionId' },
+            },
+          },
         })
         .populate('primaryTeam', 'name category tags')
         .select('-password')
@@ -193,16 +194,19 @@ class UserService {
           throw new NotFoundError(`Team with ID ${teamAssignment.teamId}`);
         }
         if (!team.isActive) {
-          throw new AppError(`Cannot assign user to inactive team: ${team.name}`, 400);
+          throw new AppError(
+            `Cannot assign user to inactive team: ${team.name}`,
+            400
+          );
         }
-        
+
         validatedTeamAssignments.push({
           teamId: teamAssignment.teamId,
           role: teamAssignment.role || 'member',
           status: 'active',
           joinedAt: new Date(),
           invitedBy: createdBy,
-          permissions: teamAssignment.permissions || []
+          permissions: teamAssignment.permissions || [],
         });
       }
 
@@ -217,9 +221,10 @@ class UserService {
         country: country || 'Australia',
         verified: process.env.NODE_ENV === 'development', // Auto-verify in development
         teamAssignments: validatedTeamAssignments,
-        primaryTeam: validatedTeamAssignments.length > 0 
-          ? validatedTeamAssignments[0].teamId 
-          : null,
+        primaryTeam:
+          validatedTeamAssignments.length > 0
+            ? validatedTeamAssignments[0].teamId
+            : null,
       };
 
       // Only add password if provided (for users who need to set it later)
@@ -240,20 +245,23 @@ class UserService {
 
       // Update team member counts
       for (const assignment of validatedTeamAssignments) {
-        await UniversalAssignmentService.updateTeamMemberCount(assignment.teamId);
+        await UniversalAssignmentService.updateTeamMemberCount(
+          assignment.teamId
+        );
       }
 
       // Populate team details for email
       await user.populate({
         path: 'teamAssignments.teamId',
-        populate: { path: 'churchId', select: 'name' }
+        populate: { path: 'churchId', select: 'name' },
       });
 
       // Prepare user details for email (preserving existing invitation system)
       const primaryTeam = user.teamAssignments[0]?.teamId;
       const userWithDetails = {
         ...user.toObject(),
-        organizationName: primaryTeam?.churchId?.name || 'Adventist Community Services',
+        organizationName:
+          primaryTeam?.churchId?.name || 'Adventist Community Services',
         roleName: user.teamAssignments[0]?.role || 'Team Member',
         teamName: primaryTeam?.name,
       };
@@ -268,7 +276,7 @@ class UserService {
         } catch (emailError) {
           // Failed to send verification email
           // Don't fail user creation if email fails
-          console.error('Failed to send verification email:', emailError);
+          // Silently handle email error
         }
       }
 
@@ -348,9 +356,19 @@ class UserService {
   // TEAM ASSIGNMENT METHODS - Replacing organizational assignment
 
   // Assign user to team
-  static async assignUserToTeam(userId, teamId, role = 'member', assignedBy = null) {
+  static async assignUserToTeam(
+    userId,
+    teamId,
+    role = 'member',
+    assignedBy = null
+  ) {
     try {
-      return await UniversalAssignmentService.assignUserToTeam(userId, teamId, role, assignedBy);
+      return await UniversalAssignmentService.assignUserToTeam(
+        userId,
+        teamId,
+        role,
+        assignedBy
+      );
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to assign user to team', 500);
@@ -360,7 +378,10 @@ class UserService {
   // Remove user from team
   static async removeUserFromTeam(userId, teamId) {
     try {
-      return await UniversalAssignmentService.removeUserFromTeam(userId, teamId);
+      return await UniversalAssignmentService.removeUserFromTeam(
+        userId,
+        teamId
+      );
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError('Failed to remove user from team', 500);
@@ -388,20 +409,20 @@ class UserService {
       // Super admins can access all teams
       if (user.isSuperAdmin) {
         const allTeams = await Team.find({ isActive: true }).select('_id');
-        return allTeams.map(team => team._id.toString());
+        return allTeams.map((team) => team._id.toString());
       }
 
       // Get user's organizational scope through team memberships
       const scope = await user.getOrganizationalScope();
-      
+
       // Find teams within user's accessible churches
       if (scope.churches.length > 0) {
-        const accessibleTeams = await Team.find({ 
+        const accessibleTeams = await Team.find({
           churchId: { $in: scope.churches },
-          isActive: true 
+          isActive: true,
         }).select('_id');
-        
-        return accessibleTeams.map(team => team._id.toString());
+
+        return accessibleTeams.map((team) => team._id.toString());
       }
 
       return [];
@@ -451,8 +472,8 @@ class UserService {
       const targetUserScope = await targetUser.getOrganizationalScope();
 
       // Check for shared churches
-      const sharedChurches = requestingUserScope.churches.filter(
-        churchId => targetUserScope.churches.includes(churchId)
+      const sharedChurches = requestingUserScope.churches.filter((churchId) =>
+        targetUserScope.churches.includes(churchId)
       );
 
       if (sharedChurches.length > 0) {
@@ -461,7 +482,7 @@ class UserService {
 
       // Check for shared conferences
       const sharedConferences = requestingUserScope.conferences.filter(
-        conferenceId => targetUserScope.conferences.includes(conferenceId)
+        (conferenceId) => targetUserScope.conferences.includes(conferenceId)
       );
 
       if (sharedConferences.length > 0) {
@@ -469,14 +490,13 @@ class UserService {
       }
 
       // Check for shared unions
-      const sharedUnions = requestingUserScope.unions.filter(
-        unionId => targetUserScope.unions.includes(unionId)
+      const sharedUnions = requestingUserScope.unions.filter((unionId) =>
+        targetUserScope.unions.includes(unionId)
       );
 
       return sharedUnions.length > 0;
-
     } catch (error) {
-      console.error('Error checking user access:', error);
+      // Silently handle access check error
       return false;
     }
   }

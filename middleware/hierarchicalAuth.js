@@ -37,9 +37,9 @@ const authenticateToken = async (req, res, next) => {
         path: 'churchId',
         populate: {
           path: 'conferenceId',
-          populate: { path: 'unionId' }
-        }
-      }
+          populate: { path: 'unionId' },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
