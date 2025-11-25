@@ -5,27 +5,69 @@ const TeamType = require('../models/TeamType');
 const Team = require('../models/Team');
 const logger = require('../services/loggerService');
 
-// Get team types for an organization
+// Get team types for current user
 router.get(
-  '/organization/:organizationId',
+  '/user/:userId',
   authenticateToken,
   authorize('teams.read'),
   async (req, res) => {
-    // GET /api/team-types/organization/:organizationId called
+    try {
+      const { userId } = req.params;
+      const { includeInactive } = req.query;
+
+      // Verify the user is requesting their own data or has admin permissions
+      if (req.user._id.toString() !== userId && !req.user.isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to access team types for this user',
+        });
+      }
+
+      const filter = {};
+      if (includeInactive !== 'true') {
+        filter.isActive = true;
+      }
+
+      const teamTypes = await TeamType.find(filter).sort({
+        isDefault: -1,
+        name: 1,
+      }); // Default types first
+
+      res.json({
+        success: true,
+        data: teamTypes,
+      });
+    } catch (error) {
+      logger.error('Error fetching user team types:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch team types',
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get team types
+router.get(
+  '/all',
+  authenticateToken,
+  authorize('teams.read'),
+  async (req, res) => {
+    // GET /api/team-types/all called
 
     try {
-      const { organizationId } = req.params;
       const { includeInactive } = req.query;
 
       // console.log('⚙️ Query parameters:');
       // console.log('  includeInactive:', includeInactive);
 
-      const filter = { organizationId };
+      // Include only default team types (no org-specific types anymore)
+      const filter = {
+        isDefault: true, // Only global default team types
+      };
       if (includeInactive !== 'true') {
         filter.isActive = true;
-        // console.log('🔍 Filter: Only active team types');
-      } else {
-        // console.log('👻 Filter: Including inactive team types');
       }
 
       // console.log('📋 MongoDB filter:', filter);
@@ -44,21 +86,27 @@ router.get(
         // console.warn('⚠️ No team types found in database');
         // console.log('🔍 Debugging: Let\'s check what exists...');
 
-        // Debug: Check all team types regardless of organization
+        // Debug: Check all team types
         const allTeamTypes = await TeamType.find({}).select(
-          'name organizationId isActive isDefault'
+          'name isActive isDefault'
         );
         logger.debug(
           `🌐 All team types in database: ${allTeamTypes.length} found`
         );
 
-        // Check if organization exists
-        const Organization = require('../models/Organization');
-        const org = await Organization.findById(organizationId);
-        if (org) {
-          // console.log('✅ Organization exists:', org.name);
-        } else {
-          // console.error('❌ Organization not found with ID:', organizationId);
+        // Log what we found for debugging
+        logger.debug(
+          `Found ${allTeamTypes.length} total team types in database`
+        );
+        logger.debug(
+          `Found ${allTeamTypes.filter((t) => t.isDefault).length} default types`
+        );
+
+        // If no organization-specific types exist, check if we need to initialize defaults
+        if (allTeamTypes.filter((t) => t.isDefault).length === 0) {
+          logger.warn(
+            'No default team types found. They may need to be initialized.'
+          );
         }
       }
 
@@ -66,8 +114,7 @@ router.get(
       const Team = require('../models/Team');
       for (const teamType of teamTypes) {
         const manualCount = await Team.countDocuments({
-          type: teamType.name,
-          organizationId: teamType.organizationId,
+          category: teamType.name,
         });
         // console.log(`📊 TeamType "${teamType.name}": virtual count = ${teamType.teamCount}, manual count = ${manualCount}`);
         logger.debug(
@@ -134,13 +181,7 @@ router.post(
   authorize('teams.manage'),
   async (req, res) => {
     try {
-      const { name, description, permissions } = req.body;
-
-      // Get organization from authenticated user context
-      const organizationId =
-        req.authorizedOrgId ||
-        req.user.primaryOrganization?._id ||
-        req.user.primaryOrganization;
+      const { name, description } = req.body;
 
       if (!name) {
         return res.status(400).json({
@@ -149,18 +190,9 @@ router.post(
         });
       }
 
-      if (!organizationId) {
-        return res.status(400).json({
-          success: false,
-          message: 'No organization context available',
-        });
-      }
-
       const teamType = new TeamType({
         name,
         description,
-        organizationId,
-        permissions: permissions || [],
         createdBy: req.user._id,
       });
 
@@ -169,7 +201,6 @@ router.post(
       logger.audit('teamType.create', {
         userId: req.user._id,
         teamTypeId: teamType._id,
-        organizationId,
       });
 
       res.status(201).json({
@@ -181,8 +212,7 @@ router.post(
       if (error.code === 11000) {
         return res.status(409).json({
           success: false,
-          message:
-            'A team type with this name already exists in this organization',
+          message: 'A team type with this name already exists',
         });
       }
 
@@ -203,7 +233,7 @@ router.put(
   authorize('teams.manage'),
   async (req, res) => {
     try {
-      const { name, description, permissions, isActive } = req.body;
+      const { name, description, isActive } = req.body;
 
       const teamType = await TeamType.findById(req.params.id);
 
@@ -225,7 +255,6 @@ router.put(
       // Update fields
       if (name) teamType.name = name;
       if (description !== undefined) teamType.description = description;
-      if (permissions) teamType.permissions = permissions;
       if (isActive !== undefined) teamType.isActive = isActive;
 
       await teamType.save();
@@ -245,8 +274,7 @@ router.put(
       if (error.code === 11000) {
         return res.status(409).json({
           success: false,
-          message:
-            'A team type with this name already exists in this organization',
+          message: 'A team type with this name already exists',
         });
       }
 
@@ -286,8 +314,7 @@ router.delete(
 
       // Check if any teams are using this type
       const teamsCount = await Team.countDocuments({
-        type: teamType.name,
-        organizationId: teamType.organizationId,
+        category: teamType.name,
       });
 
       if (teamsCount > 0) {
@@ -319,16 +346,14 @@ router.delete(
   }
 );
 
-// Initialize default team types for an organization
+// Initialize default team types
 router.post(
-  '/initialize/:organizationId',
+  '/initialize',
   authenticateToken,
-  authorize('organizations.manage'),
+  authorize('teams.manage'),
   async (req, res) => {
     try {
-      const { organizationId } = req.params;
-
-      await TeamType.createDefaultTypes(organizationId, req.user._id);
+      await TeamType.createDefaultTypes(req.user._id);
 
       res.json({
         success: true,

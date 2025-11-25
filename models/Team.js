@@ -39,11 +39,18 @@ const teamSchema = new mongoose.Schema(
       immutable: true,
     },
 
-    type: {
+    // FLEXIBLE TEAM CATEGORIZATION - No restrictions, any type allowed
+    tags: {
+      type: [String],
+      default: [],
+      index: true,
+    },
+
+    category: {
       type: String,
-      required: true,
       trim: true,
-      enum: ['acs', 'youth', 'music', 'outreach', 'education', 'other'], // Standardize
+      index: true,
+      // No enum restrictions - teams can be any type
     },
 
     leaderId: {
@@ -55,6 +62,27 @@ const teamSchema = new mongoose.Schema(
     description: {
       type: String,
       maxlength: [500, 'Description must be less than 500 characters'],
+    },
+
+    // IMAGE FIELDS
+    banner: {
+      url: String,
+      key: String, // Wasabi storage key for deletion
+      alt: String, // Accessibility text
+    },
+
+    profilePhoto: {
+      url: String,
+      key: String, // Wasabi storage key for deletion
+      alt: String, // Accessibility text
+    },
+
+    // LOCATION FIELD
+    location: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Location must be less than 200 characters'],
+      index: true,
     },
 
     serviceIds: [
@@ -70,12 +98,7 @@ const teamSchema = new mongoose.Schema(
       min: 0,
     },
 
-    maxMembers: {
-      type: Number,
-      default: 50,
-      min: 1,
-    },
-
+    // FLEXIBLE SETTINGS - Customizable for any team type
     settings: {
       allowSelfJoin: {
         type: Boolean,
@@ -88,15 +111,30 @@ const teamSchema = new mongoose.Schema(
       visibility: {
         type: String,
         enum: ['public', 'private', 'church'],
-        default: 'church',
+        default: 'public', // Default to public for community engagement
+      },
+      isPubliclyVisible: {
+        type: Boolean,
+        default: true, // Show on website for cross-promotion
+      },
+      allowCrossChurchMembers: {
+        type: Boolean,
+        default: false, // Can accept members from other churches
+      },
+      collaborationEnabled: {
+        type: Boolean,
+        default: true, // Allow collaboration with similar teams
       },
     },
 
+    // FLEXIBLE METADATA - Can store any additional team information
     metadata: {
-      region: String,
-      conference: String,
-      district: String,
-      customFields: mongoose.Schema.Types.Mixed,
+      ministry: String, // e.g., 'community_services', 'youth_ministry', 'music'
+      focus: [String], // e.g., ['food_assistance', 'elderly_care']
+      targetAudience: [String], // e.g., ['seniors', 'families', 'youth']
+      serviceArea: String, // Geographic area served
+      meetingSchedule: String, // When the team meets
+      customFields: mongoose.Schema.Types.Mixed, // Any additional data
     },
 
     isActive: {
@@ -120,12 +158,15 @@ const teamSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for performance - HIERARCHICAL OPTIMIZATION
-teamSchema.index({ churchId: 1, type: 1 });
+// Indexes for performance - FLEXIBLE TEAM OPTIMIZATION
+teamSchema.index({ churchId: 1, category: 1 });
+teamSchema.index({ churchId: 1, tags: 1 });
 teamSchema.index({ hierarchyPath: 1 });
 teamSchema.index({ leaderId: 1 });
-teamSchema.index({ name: 'text' });
+teamSchema.index({ name: 'text', description: 'text', tags: 'text' });
+teamSchema.index({ 'settings.isPubliclyVisible': 1, isActive: 1 });
 teamSchema.index({ createdAt: -1 });
+teamSchema.index({ tags: 1, 'metadata.ministry': 1 }); // For team discovery
 
 // Virtual for member assignments (will be stored in User model)
 teamSchema.virtual('members', {
@@ -136,12 +177,8 @@ teamSchema.virtual('members', {
 });
 
 // Methods
-teamSchema.methods.isFull = function () {
-  return this.memberCount >= this.maxMembers;
-};
 
 teamSchema.methods.canUserJoin = function (user) {
-  if (this.isFull()) return false;
   if (!this.isActive) return false;
 
   // Check if user is already a member
@@ -259,9 +296,9 @@ teamSchema.statics.createTeam = async function (data) {
   return team;
 };
 
-// Get teams by church (updated method name for clarity)
+// Get teams by church with flexible filtering
 teamSchema.statics.getTeamsByChurch = async function (churchId, options = {}) {
-  const { includeInactive = false, type } = options;
+  const { includeInactive = false, category, tags, ministry } = options;
 
   const query = { churchId };
 
@@ -269,8 +306,16 @@ teamSchema.statics.getTeamsByChurch = async function (churchId, options = {}) {
     query.isActive = true;
   }
 
-  if (type) {
-    query.type = type;
+  if (category) {
+    query.category = category;
+  }
+
+  if (tags && tags.length > 0) {
+    query.tags = { $in: tags };
+  }
+
+  if (ministry) {
+    query['metadata.ministry'] = ministry;
   }
 
   const teams = await this.find(query)
@@ -280,6 +325,71 @@ teamSchema.statics.getTeamsByChurch = async function (churchId, options = {}) {
     .lean();
 
   return teams;
+};
+
+// Get publicly visible teams for discovery
+teamSchema.statics.getPublicTeams = async function (options = {}) {
+  const { category, tags, limit = 50, skip = 0 } = options;
+
+  const query = {
+    isActive: true,
+    'settings.isPubliclyVisible': true,
+  };
+
+  if (category) {
+    query.category = category;
+  }
+
+  if (tags && tags.length > 0) {
+    query.tags = { $in: tags };
+  }
+
+  return this.find(query)
+    .populate('churchId', 'name')
+    .populate('leaderId', 'name email')
+    .sort({ name: 1 })
+    .limit(limit)
+    .skip(skip)
+    .lean();
+};
+
+// Find similar teams for collaboration
+teamSchema.statics.findSimilarTeams = async function (teamId, options = {}) {
+  const team = await this.findById(teamId);
+  if (!team) return [];
+
+  const { limit = 10 } = options;
+  const query = {
+    _id: { $ne: teamId },
+    isActive: true,
+    'settings.collaborationEnabled': true,
+    $or: [],
+  };
+
+  // Find teams with matching category
+  if (team.category) {
+    query.$or.push({ category: team.category });
+  }
+
+  // Find teams with matching tags
+  if (team.tags && team.tags.length > 0) {
+    query.$or.push({ tags: { $in: team.tags } });
+  }
+
+  // Find teams with matching ministry
+  if (team.metadata?.ministry) {
+    query.$or.push({ 'metadata.ministry': team.metadata.ministry });
+  }
+
+  if (query.$or.length === 0) {
+    return []; // No similarity criteria
+  }
+
+  return this.find(query)
+    .populate('churchId', 'name')
+    .populate('leaderId', 'name email')
+    .limit(limit)
+    .lean();
 };
 
 // NEW: Get teams accessible to a user based on hierarchy
@@ -308,24 +418,69 @@ teamSchema.statics.getTeamsByUser = async function (userId) {
     .lean();
 };
 
-// Middleware - HIERARCHICAL ENFORCEMENT
-teamSchema.pre('save', async function (next) {
+// Pre-validate hook - runs before validation
+teamSchema.pre('validate', async function (next) {
   try {
-    // Build hierarchy path if modified
-    if (this.isModified('churchId') || !this.hierarchyPath) {
-      await this.buildHierarchyPath();
-    }
-
-    // Ensure member count doesn't exceed max
-    if (this.isModified('memberCount')) {
-      if (this.memberCount > this.maxMembers) {
-        this.memberCount = this.maxMembers;
+    // Always ensure hierarchyPath is set before validation
+    if (!this.hierarchyPath || this.isModified('churchId')) {
+      if (!this.churchId) {
+        throw new Error('Team must have a church assignment');
       }
+
+      const Church = mongoose.model('Church');
+      const church = await Church.findById(this.churchId);
+
+      if (!church) {
+        throw new Error('Church not found');
+      }
+
+      if (!church.isActive) {
+        throw new Error('Cannot assign team to inactive church');
+      }
+
+      // Ensure church has hierarchyPath
+      const churchPath = church.hierarchyPath || `church_${church._id}`;
+
+      // Use real _id if available, otherwise use temp
+      const teamId = this._id || 'temp';
+      this.hierarchyPath = `${churchPath}/team_${teamId}`;
     }
 
     next();
   } catch (error) {
+    // Handle validation error
     next(error);
+  }
+});
+
+// Middleware - HIERARCHICAL ENFORCEMENT
+teamSchema.pre('save', async function (next) {
+  try {
+    // Additional processing if needed
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Post-save hook to update hierarchy path with real _id
+teamSchema.post('save', async function (doc) {
+  try {
+    // Update hierarchy path with real _id if it was temporary
+    if (doc.hierarchyPath && doc.hierarchyPath.endsWith('/team_temp')) {
+      const Church = mongoose.model('Church');
+      const church = await Church.findById(doc.churchId);
+      if (church) {
+        const newPath = `${church.hierarchyPath}/team_${doc._id}`;
+        // Update without triggering middleware to avoid infinite loop
+        await this.constructor.updateOne(
+          { _id: doc._id },
+          { hierarchyPath: newPath }
+        );
+      }
+    }
+  } catch (error) {
+    // Handle hierarchy path error
   }
 });
 

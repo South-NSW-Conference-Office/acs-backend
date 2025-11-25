@@ -245,9 +245,10 @@ router.post(
         });
       }
 
-      const user = await User.findById(userId).populate(
-        'unionAssignments.role conferenceAssignments.role churchAssignments.role'
-      );
+      const user = await User.findById(userId).populate({
+        path: 'teamAssignments.teamId',
+        populate: { path: 'churchId', select: 'name' },
+      });
 
       if (!user) {
         return res.status(404).json({
@@ -323,10 +324,11 @@ router.post(
 
       const { email, password } = req.body;
 
-      // Find user and populate role data
-      const user = await User.findOne({ email, isActive: true }).populate(
-        'unionAssignments.role conferenceAssignments.role churchAssignments.role'
-      );
+      // Find user and populate team data
+      const user = await User.findOne({ email, isActive: true }).populate({
+        path: 'teamAssignments.teamId',
+        populate: { path: 'churchId', select: 'name' },
+      });
 
       if (!user) {
         return res.status(401).json({

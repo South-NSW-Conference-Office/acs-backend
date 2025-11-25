@@ -28,9 +28,16 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.userId).populate(
-      'unionAssignments.role conferenceAssignments.role churchAssignments.role teamAssignments.teamId'
-    );
+    const user = await User.findById(decoded.userId).populate({
+      path: 'teamAssignments.teamId',
+      populate: {
+        path: 'churchId',
+        populate: {
+          path: 'conferenceId',
+          populate: { path: 'unionId' },
+        },
+      },
+    });
 
     if (!user || !user.isActive) {
       return res.status(401).json({
@@ -103,73 +110,35 @@ const authorize = (requiredPermission = {}) => {
       const churchId = req.headers['x-church-id'];
 
       // Determine the most specific context provided
-      let entityType = null;
-      let entityId = null;
-
-      if (churchId) {
-        entityType = 'church';
-        entityId = churchId;
-      } else if (conferenceId) {
-        entityType = 'conference';
-        entityId = conferenceId;
-      } else if (unionId) {
-        entityType = 'union';
-        entityId = unionId;
-      }
 
       let userPermissions = { role: null, permissions: [] };
 
-      // Get permissions based on the most specific context
-      if (entityType && entityId) {
-        switch (entityType) {
-          case 'church':
-            userPermissions = await req.user.getPermissionsForChurch(entityId);
-            break;
-          case 'conference':
-            userPermissions =
-              await req.user.getPermissionsForConference(entityId);
-            break;
-          case 'union':
-            userPermissions = await req.user.getPermissionsForUnion(entityId);
-            break;
-        }
-      }
+      // TEAM-CENTRIC AUTHORIZATION - Get permissions from team assignments
+      if (req.user.teamAssignments && req.user.teamAssignments.length > 0) {
+        // Use primary team or first active team for permissions
+        const primaryTeamAssignment = req.user.teamAssignments.find(
+          (assignment) => assignment.teamId && assignment.status === 'active'
+        );
 
-      // If no specific permissions found, try to find any role assignment
-      if (!userPermissions.role) {
-        // Check for any union assignment
-        if (req.user.unionAssignments && req.user.unionAssignments.length > 0) {
-          const assignment = req.user.unionAssignments[0];
-          if (assignment.role) {
+        if (primaryTeamAssignment) {
+          const teamPermissions = await req.user.getPermissionsForTeam(
+            primaryTeamAssignment.teamId._id || primaryTeamAssignment.teamId
+          );
+
+          if (teamPermissions && teamPermissions.permissions) {
             userPermissions = {
-              role: assignment.role,
-              permissions: assignment.role.permissions || [],
-            };
-          }
-        }
-        // Check for any conference assignment
-        else if (
-          req.user.conferenceAssignments &&
-          req.user.conferenceAssignments.length > 0
-        ) {
-          const assignment = req.user.conferenceAssignments[0];
-          if (assignment.role) {
-            userPermissions = {
-              role: assignment.role,
-              permissions: assignment.role.permissions || [],
-            };
-          }
-        }
-        // Check for any church assignment
-        else if (
-          req.user.churchAssignments &&
-          req.user.churchAssignments.length > 0
-        ) {
-          const assignment = req.user.churchAssignments[0];
-          if (assignment.role) {
-            userPermissions = {
-              role: assignment.role,
-              permissions: assignment.role.permissions || [],
+              role: {
+                id: teamPermissions.teamRole,
+                name: teamPermissions.teamRole,
+                displayName:
+                  teamPermissions.teamRole.charAt(0).toUpperCase() +
+                  teamPermissions.teamRole.slice(1),
+                level: 'team',
+              },
+              permissions: teamPermissions.permissions,
+              teamId:
+                primaryTeamAssignment.teamId._id ||
+                primaryTeamAssignment.teamId,
             };
           }
         }
@@ -257,24 +226,8 @@ const requireSuperAdmin = async (req, res, next) => {
       });
     }
 
-    // Check if user has super admin role in any hierarchical entity
-    const hasSuperAdminRole =
-      req.user.isSuperAdmin ||
-      (req.user.unionAssignments &&
-        req.user.unionAssignments.some(
-          (assignment) =>
-            assignment.role && assignment.role.name === 'super_admin'
-        )) ||
-      (req.user.conferenceAssignments &&
-        req.user.conferenceAssignments.some(
-          (assignment) =>
-            assignment.role && assignment.role.name === 'super_admin'
-        )) ||
-      (req.user.churchAssignments &&
-        req.user.churchAssignments.some(
-          (assignment) =>
-            assignment.role && assignment.role.name === 'super_admin'
-        ));
+    // Check if user has super admin role - simplified for team-centric approach
+    const hasSuperAdminRole = req.user.isSuperAdmin;
 
     if (!hasSuperAdminRole) {
       return res.status(403).json({
@@ -350,7 +303,7 @@ const authorizeWithTeam = (requiredPermission = {}) => {
       if (teamId) {
         const teamPermissions = await req.user.getPermissionsForTeam(teamId);
 
-        if (!teamPermissions.orgRole) {
+        if (!teamPermissions.teamRole) {
           return res.status(403).json({
             success: false,
             message: 'No access to this team',
@@ -375,10 +328,10 @@ const authorizeWithTeam = (requiredPermission = {}) => {
 
         req.teamPermissions = teamPermissions;
         req.teamId = teamId;
-        req.organizationId = teamPermissions.organization;
+        req.churchId = teamPermissions.church; // Set church context from team
         next();
       } else {
-        // Fall back to organization authorization
+        // Fall back to standard authorization
         return authorize(requiredPermission)(req, res, next);
       }
     } catch (error) {
