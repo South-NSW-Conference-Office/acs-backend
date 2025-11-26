@@ -47,26 +47,46 @@ router.get(
 // Get all teams accessible to user (hierarchical)
 router.get('/all', authenticateToken, async (req, res) => {
   try {
-    // Get teams accessible based on user's hierarchy level
-    const userHierarchyPath =
-      await hierarchicalAuthService.getUserHierarchyPath(req.user);
+    // Check if user is super admin first
+    const isSuperAdmin =
+      req.user.isSuperAdmin ||
+      (req.user.organizations &&
+        req.user.organizations.some(
+          (org) =>
+            org.role &&
+            (org.role.isSuperAdmin || org.role.permissions?.includes('*'))
+        ));
 
-    if (userHierarchyPath === null) {
-      return res.status(403).json({
-        success: false,
-        message: 'No hierarchy access found',
-      });
+    let teams;
+
+    if (isSuperAdmin) {
+      // Super admin gets all teams
+      teams = await Team.find({ isActive: true })
+        .populate('churchId', 'name hierarchyLevel')
+        .populate('leaderId', 'name email')
+        .sort('name');
+    } else {
+      // Get teams accessible based on user's hierarchy level
+      const userHierarchyPath =
+        await hierarchicalAuthService.getUserHierarchyPath(req.user);
+
+      if (userHierarchyPath === null) {
+        return res.status(403).json({
+          success: false,
+          message: 'No hierarchy access found',
+        });
+      }
+
+      // Get accessible teams using hierarchical path
+      teams = await Team.getAccessibleTeams(userHierarchyPath);
     }
-
-    // Get accessible teams using hierarchical path
-    const teams = await Team.getAccessibleTeams(userHierarchyPath);
 
     res.json({
       success: true,
       data: teams,
     });
   } catch (error) {
-    res.status(error.message.includes('permission') ? 403 : 400).json({
+    res.status(error.message.includes('permission') ? 403 : 500).json({
       success: false,
       message: error.message,
     });

@@ -8,12 +8,6 @@ const serviceEventSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    organization: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: true,
-      index: true,
-    },
     name: {
       type: String,
       required: true,
@@ -139,7 +133,6 @@ const serviceEventSchema = new mongoose.Schema(
 );
 
 serviceEventSchema.index({ service: 1, start: 1 });
-serviceEventSchema.index({ organization: 1, start: 1 });
 serviceEventSchema.index({ name: 'text', description: 'text', tags: 'text' });
 
 serviceEventSchema.virtual('isUpcoming').get(function () {
@@ -165,16 +158,6 @@ serviceEventSchema.virtual('spotsAvailable').get(function () {
 });
 
 serviceEventSchema.pre('save', async function (next) {
-  if (this.isNew && !this.organization) {
-    const service = await mongoose
-      .model('Service')
-      .findById(this.service)
-      .select('organization');
-    if (service) {
-      this.organization = service.organization;
-    }
-  }
-
   if (this.isModified()) {
     this.updatedBy = this.createdBy;
   }
@@ -194,9 +177,8 @@ serviceEventSchema.methods.canBeViewedBy = function (user) {
   if (this.visibility === 'public') return true;
   if (!user) return false;
 
-  return user.organizations.some((org) =>
-    org.organization.equals(this.organization)
-  );
+  // TODO: Implement team-based access control
+  return false;
 };
 
 serviceEventSchema.statics.findUpcoming = function (filters = {}) {
@@ -206,7 +188,6 @@ serviceEventSchema.statics.findUpcoming = function (filters = {}) {
     status: 'published',
   })
     .populate('service', 'name type')
-    .populate('organization', 'name type')
     .sort('start');
 };
 

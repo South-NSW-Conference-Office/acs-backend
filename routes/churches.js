@@ -73,7 +73,7 @@ router.get(
 
       const churches = await Church.find(query)
         .populate('conferenceId', 'name code')
-        .select('name code location contact demographics isActive conferenceId')
+        .select('name code location contact isActive conferenceId')
         .sort('name');
 
       res.json({

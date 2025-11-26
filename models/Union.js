@@ -98,7 +98,6 @@ const unionSchema = new mongoose.Schema(
     },
 
     metadata: {
-      membershipCount: Number,
       churchCount: Number,
       lastUpdated: { type: Date, default: Date.now },
     },
