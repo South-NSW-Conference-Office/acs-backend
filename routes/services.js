@@ -32,16 +32,16 @@ router.get('/manageable', authenticateToken, async (req, res) => {
     const manageableOrgIds = await getManageableOrganizations(req.user);
 
     const services = await Service.find({
-      organization: { $in: manageableOrgIds },
+      teamId: { $in: manageableOrgIds },
     })
-      .populate('organization', 'name type')
+      .populate('teamId', 'name category')
       .sort('-createdAt');
 
     res.json({
       success: true,
       count: services.length,
       services,
-      organizations: manageableOrgIds,
+      teams: manageableOrgIds,
     });
   } catch (error) {
     // Error fetching manageable services
@@ -50,23 +50,20 @@ router.get('/manageable', authenticateToken, async (req, res) => {
 });
 
 /**
- * GET /services/organizations
- * Get organizations where user can create services
+ * GET /services/teams
+ * Get teams where user can create services
  */
-router.get('/organizations', authenticateToken, async (req, res) => {
+router.get('/teams', authenticateToken, async (req, res) => {
   try {
-    const organizations = await getManageableOrganizations(
-      req.user,
-      'services.create'
-    );
+    const teams = await getManageableOrganizations(req.user, 'services.create');
 
     res.json({
       success: true,
-      organizations,
+      teams,
     });
   } catch (error) {
-    // Error fetching organizations
-    res.status(500).json({ error: 'Failed to fetch organizations' });
+    // Error fetching teams
+    res.status(500).json({ error: 'Failed to fetch teams' });
   }
 });
 
@@ -80,12 +77,12 @@ router.get('/organizations', authenticateToken, async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const { type, organization, search, lat, lng, radius } = req.query;
+    const { type, team, search, lat, lng, radius } = req.query;
 
     const query = { status: 'active' };
 
     if (type) query.type = type;
-    if (organization) query.organization = organization;
+    if (team) query.teamId = team;
 
     let services;
 
@@ -101,7 +98,7 @@ router.get('/', async (req, res) => {
         ...query,
         $text: { $search: search },
       })
-        .populate('organization', 'name type')
+        .populate('teamId', 'name category')
         .sort({ score: { $meta: 'textScore' } });
     } else {
       // Standard query
@@ -126,7 +123,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const service = await Service.findById(req.params.id)
-      .populate('organization', 'name type parent')
+      .populate('teamId', 'name category')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -229,9 +226,30 @@ router.post(
   requireServicePermission('services.create'),
   async (req, res) => {
     try {
+      // Validate scheduling data if present
+      if (req.body.scheduling) {
+        // Set lastUpdated for scheduling
+        req.body.scheduling.lastUpdated = new Date();
+
+        // Basic validation for events
+        if (req.body.scheduling.events) {
+          for (const event of req.body.scheduling.events) {
+            if (event.startDateTime && event.endDateTime) {
+              const startDate = new Date(event.startDateTime);
+              const endDate = new Date(event.endDateTime);
+              if (startDate >= endDate) {
+                return res.status(400).json({
+                  error: 'Event end time must be after start time',
+                });
+              }
+            }
+          }
+        }
+      }
+
       const serviceData = {
         ...req.body,
-        organization: req.authorizedOrgId,
+        teamId: req.authorizedOrgId,
         createdBy: req.user._id,
         updatedBy: req.user._id,
       };
@@ -239,7 +257,7 @@ router.post(
       const service = new Service(serviceData);
       await service.save();
 
-      await service.populate('organization', 'name type');
+      await service.populate('teamId', 'name category');
 
       res.status(201).json({
         success: true,
@@ -271,22 +289,43 @@ router.put(
       // Verify permission for this specific service
       const hasPermission = await canManageService(
         req.user,
-        service.organization,
+        service.teamId,
         'services.update'
       );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot update this service' });
       }
 
-      // Prevent changing organization
-      delete req.body.organization;
+      // Prevent changing team
+      delete req.body.teamId;
       delete req.body.createdBy;
+
+      // Validate scheduling data if present
+      if (req.body.scheduling) {
+        // Set lastUpdated for scheduling
+        req.body.scheduling.lastUpdated = new Date();
+
+        // Basic validation for events
+        if (req.body.scheduling.events) {
+          for (const event of req.body.scheduling.events) {
+            if (event.startDateTime && event.endDateTime) {
+              const startDate = new Date(event.startDateTime);
+              const endDate = new Date(event.endDateTime);
+              if (startDate >= endDate) {
+                return res.status(400).json({
+                  error: 'Event end time must be after start time',
+                });
+              }
+            }
+          }
+        }
+      }
 
       Object.assign(service, req.body);
       service.updatedBy = req.user._id;
 
       await service.save();
-      await service.populate('organization', 'name type');
+      await service.populate('teamId', 'name category');
 
       res.json({
         success: true,
@@ -318,7 +357,7 @@ router.delete(
       // Verify permission for this specific service
       const hasPermission = await canManageService(
         req.user,
-        service.organization,
+        service.teamId,
         'services.delete'
       );
       if (!hasPermission) {
@@ -363,14 +402,14 @@ router.put(
       // Verify permission
       const hasPermission = await canManageService(
         req.user,
-        service.organization,
+        service.teamId,
         'services.update'
       );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot update this service' });
       }
 
-      // Delete old banner if exists
+      // Delete old primary image if exists
       if (service.primaryImage?.key) {
         await storageService.deleteImage(service.primaryImage.key);
       }
@@ -393,13 +432,82 @@ router.put(
 
       res.json({
         success: true,
-        message: 'Banner image uploaded successfully',
+        message: 'Primary image uploaded successfully',
         image: service.primaryImage,
       });
     } catch (error) {
       // Banner upload error occurred
       res.status(500).json({
-        error: 'Failed to upload banner image',
+        error: 'Failed to upload primary image',
+        details:
+          process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+);
+
+/**
+ * PUT /services/:id/banner/media
+ * Set service banner using existing media file
+ */
+router.put(
+  '/:id/banner/media',
+  authenticateToken,
+  requireServicePermission('services.update'),
+  async (req, res) => {
+    try {
+      const service = await Service.findById(req.params.id);
+
+      if (!service) {
+        return res.status(404).json({ error: 'Service not found' });
+      }
+
+      // Verify permission
+      const hasPermission = await canManageService(
+        req.user,
+        service.teamId,
+        'services.update'
+      );
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Cannot update this service' });
+      }
+
+      const { mediaFileId, alt } = req.body;
+
+      if (!mediaFileId) {
+        return res.status(400).json({ error: 'Media file ID is required' });
+      }
+
+      // Get media file details
+      const MediaFile = require('../models/MediaFile');
+      const mediaFile = await MediaFile.findById(mediaFileId);
+
+      if (!mediaFile) {
+        return res.status(404).json({ error: 'Media file not found' });
+      }
+
+      // Delete old primary image if exists
+      if (service.primaryImage?.key) {
+        await storageService.deleteImage(service.primaryImage.key);
+      }
+
+      // Update service with media file
+      service.primaryImage = {
+        url: mediaFile.url,
+        key: mediaFile.key,
+        alt: alt || mediaFile.alt || '',
+      };
+      service.updatedBy = req.user._id;
+      await service.save();
+
+      res.json({
+        success: true,
+        message: 'Primary image updated successfully',
+        image: service.primaryImage,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to update primary image with media file',
         details:
           process.env.NODE_ENV === 'development' ? error.message : undefined,
       });
@@ -428,7 +536,7 @@ router.post(
       // Verify permission
       const hasPermission = await canManageService(
         req.user,
-        service.organization,
+        service.teamId,
         'services.update'
       );
       if (!hasPermission) {
@@ -500,7 +608,7 @@ router.delete(
       // Verify permission
       const hasPermission = await canManageService(
         req.user,
-        service.organization,
+        service.teamId,
         'services.update'
       );
       if (!hasPermission) {
@@ -585,7 +693,7 @@ router.post(
 
       const hasPermission = await canManageService(
         req.user,
-        service.organization,
+        service.teamId,
         'services.manage'
       );
       if (!hasPermission) {
@@ -595,7 +703,7 @@ router.post(
       const eventData = {
         ...req.body,
         service: service._id,
-        organization: service.organization,
+        teamId: service.teamId,
         createdBy: req.user._id,
         updatedBy: req.user._id,
       };
@@ -632,7 +740,7 @@ router.post(
     try {
       const storyData = {
         ...req.body,
-        organization: req.authorizedOrgId,
+        teamId: req.authorizedOrgId,
         createdBy: req.user._id,
         updatedBy: req.user._id,
       };
@@ -640,7 +748,7 @@ router.post(
       const story = new Story(storyData);
       await story.save();
 
-      await story.populate('organization', 'name type');
+      await story.populate('teamId', 'name category');
       if (story.service) {
         await story.populate('service', 'name type');
       }
@@ -675,22 +783,22 @@ router.put(
       // Verify permission for this specific story
       const hasPermission = await canManageService(
         req.user,
-        story.organization,
+        story.teamId,
         'stories.update'
       );
       if (!hasPermission) {
         return res.status(403).json({ error: 'Cannot update this story' });
       }
 
-      // Prevent changing organization
-      delete req.body.organization;
+      // Prevent changing team
+      delete req.body.teamId;
       delete req.body.createdBy;
 
       Object.assign(story, req.body);
       story.updatedBy = req.user._id;
 
       await story.save();
-      await story.populate('organization', 'name type');
+      await story.populate('teamId', 'name category');
 
       res.json({
         success: true,
@@ -721,7 +829,7 @@ router.post(
 
       const hasPermission = await canManageService(
         req.user,
-        story.organization,
+        story.teamId,
         'stories.manage'
       );
       if (!hasPermission) {

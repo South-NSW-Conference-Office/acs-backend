@@ -387,4 +387,34 @@ router.get('/public', async (req, res) => {
   }
 });
 
+/**
+ * GET /services/:id/images
+ * Get all service images (public endpoint - no auth required)
+ */
+router.get('/:id/images', async (req, res) => {
+  try {
+    const service = await Service.findById(req.params.id).select(
+      'primaryImage gallery'
+    );
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        error: 'Service not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      banner: service.primaryImage,
+      gallery: service.gallery || [],
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch service images',
+    });
+  }
+});
+
 module.exports = router;

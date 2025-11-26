@@ -78,7 +78,7 @@ teamTypeSchema.statics.createDefaultTypes = async function (createdBy) {
 // Instance method to get teams using this type
 teamTypeSchema.methods.getTeams = function () {
   return mongoose.model('Team').find({
-    type: this.name,
+    category: this.name,
   });
 };
 
@@ -86,7 +86,7 @@ teamTypeSchema.methods.getTeams = function () {
 teamTypeSchema.virtual('teamCount', {
   ref: 'Team',
   localField: 'name',
-  foreignField: 'type',
+  foreignField: 'category',
   count: true,
 });
 

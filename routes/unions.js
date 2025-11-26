@@ -342,7 +342,7 @@ router.delete(
         });
       }
 
-      // Check if union has conferences
+      // Check if union has any subordinate entities - BLOCK deletion if any exist
       const Conference = require('../models/Conference');
       const conferenceCount = await Conference.countDocuments({
         unionId: id,
@@ -352,28 +352,133 @@ router.delete(
       if (conferenceCount > 0) {
         return res.status(409).json({
           success: false,
-          message: `Cannot delete union: ${conferenceCount} active conferences still exist`,
+          message: `Cannot delete union: ${conferenceCount} active conferences still exist. Please delete all conferences first.`,
+          details: {
+            blockingEntities: {
+              conferences: conferenceCount,
+              level: 'conference',
+              action: 'Delete all conferences in this union first',
+            },
+          },
         });
       }
 
-      // Soft delete
+      // Also check for orphaned churches/teams/services (should not exist if conferences are properly deleted)
+      const Church = require('../models/Church');
+      const churchCount = await Church.countDocuments({
+        hierarchyPath: { $regex: `^${union.hierarchyPath}/` },
+        isActive: true,
+      });
+
+      if (churchCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot delete union: ${churchCount} active churches still exist. Please delete all churches first.`,
+          details: {
+            blockingEntities: {
+              churches: churchCount,
+              level: 'church',
+              action: 'Delete all churches in this union first',
+            },
+          },
+        });
+      }
+
+      const Team = require('../models/Team');
+      const teamCount = await Team.countDocuments({
+        hierarchyPath: { $regex: `^${union.hierarchyPath}/` },
+        isActive: true,
+      });
+
+      if (teamCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot delete union: ${teamCount} active teams still exist. Please delete all teams first.`,
+          details: {
+            blockingEntities: {
+              teams: teamCount,
+              level: 'team',
+              action: 'Delete all teams in this union first',
+            },
+          },
+        });
+      }
+
+      const Service = require('../models/Service');
+      const serviceCount = await Service.countDocuments({
+        hierarchyPath: { $regex: `^${union.hierarchyPath}/` },
+        status: { $ne: 'archived' },
+      });
+
+      if (serviceCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot delete union: ${serviceCount} active services still exist. Please delete all services first.`,
+          details: {
+            blockingEntities: {
+              services: serviceCount,
+              level: 'service',
+              action: 'Delete all services in this union first',
+            },
+          },
+        });
+      }
+
+      // Only proceed with deletion if NO subordinate entities exist
       union.isActive = false;
       union.metadata.lastUpdated = new Date();
+      union.deletedAt = new Date();
+      union.deletedBy = req.user.id;
       await union.save();
 
       res.json({
         success: true,
-        message: 'Union deactivated successfully',
-        data: union,
+        message: `Union "${union.name}" has been successfully deleted.`,
+        data: {
+          union: union,
+        },
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to delete union',
-        error:
+      // Provide more specific error messages
+      let statusCode = 500;
+      let message = 'Failed to delete union';
+
+      if (error.message.includes('not found')) {
+        statusCode = 404;
+        message = 'Union not found';
+      } else if (
+        error.message.includes('permission') ||
+        error.message.includes('authorized')
+      ) {
+        statusCode = 403;
+        message = 'You do not have permission to delete this union';
+      } else if (
+        error.message.includes('hierarchy') ||
+        error.message.includes('cascade')
+      ) {
+        statusCode = 409;
+        message = error.message; // Show the specific hierarchy error
+      } else if (error.message.includes('validation')) {
+        statusCode = 400;
+        message = error.message; // Show the validation error
+      } else {
+        // For other errors, show the actual error message in development
+        message =
           process.env.NODE_ENV === 'development'
             ? error.message
-            : 'Internal server error',
+            : 'An error occurred while deleting the union';
+      }
+
+      res.status(statusCode).json({
+        success: false,
+        message: message,
+        error:
+          process.env.NODE_ENV === 'development'
+            ? {
+                stack: error.stack,
+                details: error.message,
+              }
+            : undefined,
       });
     }
   }

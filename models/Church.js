@@ -114,30 +114,6 @@ const churchSchema = new mongoose.Schema(
       },
     },
 
-    // Church demographics and statistics
-    demographics: {
-      membershipCount: {
-        active: { type: Number, default: 0 },
-        total: { type: Number, default: 0 },
-        baptisms: { type: Number, default: 0 },
-        transfers: { type: Number, default: 0 },
-        lastUpdated: Date,
-      },
-      attendance: {
-        sabbathService: Number,
-        sabbathSchool: Number,
-        prayerMeeting: Number,
-        lastUpdated: Date,
-      },
-      ageGroups: {
-        children: Number, // 0-12
-        youth: Number, // 13-17
-        youngAdults: Number, // 18-35
-        adults: Number, // 36-64
-        seniors: Number, // 65+
-      },
-    },
-
     // Facilities and services
     facilities: {
       sanctuary: {
@@ -336,25 +312,6 @@ churchSchema.pre('save', async function (next) {
     // Update metadata timestamp
     this.metadata.lastUpdated = new Date();
 
-    // Calculate totals from components
-    if (this.demographics) {
-      const age = this.demographics.ageGroups;
-      if (age) {
-        const totalFromAgeGroups =
-          (age.children || 0) +
-          (age.youth || 0) +
-          (age.youngAdults || 0) +
-          (age.adults || 0) +
-          (age.seniors || 0);
-        if (
-          totalFromAgeGroups > 0 &&
-          !this.demographics.membershipCount.total
-        ) {
-          this.demographics.membershipCount.total = totalFromAgeGroups;
-        }
-      }
-    }
-
     next();
   } catch (error) {
     next(error);
@@ -502,7 +459,7 @@ churchSchema.statics.getActiveChurches = function (conferenceId = null) {
   if (conferenceId) query.conferenceId = conferenceId;
 
   return this.find(query)
-    .select('name code hierarchyPath location contact demographics')
+    .select('name code hierarchyPath location contact')
     .populate('conferenceId', 'name code')
     .sort('name');
 };

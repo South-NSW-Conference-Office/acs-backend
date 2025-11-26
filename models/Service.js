@@ -16,24 +16,23 @@ const serviceSchema = new mongoose.Schema(
     churchId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Church',
-      required: true,
     },
     type: {
       type: String,
-      enum: [
-        'food_distribution',
-        'clothing_assistance',
-        'disaster_relief',
-        'health_services',
-        'education_support',
-        'elderly_care',
-        'youth_programs',
-        'community_service',
-        'financial_assistance',
-        'counseling_services',
-        'other',
-      ],
-      default: 'community_service',
+      required: true,
+      validate: {
+        validator: async function (value) {
+          // Validate against dynamic service types from database
+          const ServiceType = require('./ServiceType');
+          const serviceType = await ServiceType.findOne({
+            value: value,
+            isActive: true,
+          });
+          return !!serviceType;
+        },
+        message:
+          'Invalid service type. Please select from available service types.',
+      },
     },
     descriptionShort: {
       type: String,
@@ -56,16 +55,24 @@ const serviceSchema = new mongoose.Schema(
     ],
     locations: [
       {
-        type: {
+        label: {
           type: String,
-          enum: ['Point'],
+          default: 'Main Location',
+        },
+        address: {
+          street: String,
+          suburb: String,
+          state: String,
+          postcode: String,
         },
         coordinates: {
-          type: [Number],
-          index: '2dsphere',
+          lat: Number,
+          lng: Number,
         },
-        address: String,
-        name: String,
+        isMobile: {
+          type: Boolean,
+          default: false,
+        },
       },
     ],
     contactInfo: {
@@ -88,14 +95,142 @@ const serviceSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    primaryImage: {
+      url: {
+        type: String,
+        default: null,
+      },
+      key: {
+        type: String,
+        default: null,
+      },
+      alt: {
+        type: String,
+        default: '',
+      },
+    },
+    gallery: [
+      {
+        url: {
+          type: String,
+          required: true,
+        },
+        key: {
+          type: String,
+          required: true,
+        },
+        thumbnailUrl: {
+          type: String,
+        },
+        thumbnailKey: {
+          type: String,
+        },
+        alt: {
+          type: String,
+          default: '',
+        },
+        caption: {
+          type: String,
+          default: '',
+        },
+        type: {
+          type: String,
+          enum: ['image', 'video'],
+          default: 'image',
+        },
+      },
+    ],
     hierarchyPath: {
       type: String,
-      required: true,
+    },
+    // Service Availability and Scheduling
+    availability: {
+      type: String,
+      enum: ['always_open', 'set_times', 'set_events', null],
+      default: null,
+    },
+    scheduling: {
+      weeklySchedule: {
+        timezone: {
+          type: String,
+          default: 'Australia/Sydney',
+        },
+        schedule: [
+          {
+            dayOfWeek: {
+              type: Number,
+              min: 0,
+              max: 6,
+            },
+            timeSlots: [
+              {
+                startTime: String, // HH:mm format
+                endTime: String, // HH:mm format
+              },
+            ],
+            isEnabled: {
+              type: Boolean,
+              default: false,
+            },
+          },
+        ],
+      },
+      events: [
+        {
+          name: {
+            type: String,
+            required: true,
+            maxlength: 100,
+          },
+          description: {
+            type: String,
+            maxlength: 500,
+          },
+          startDateTime: {
+            type: Date,
+            required: true,
+          },
+          endDateTime: {
+            type: Date,
+            required: true,
+          },
+          timezone: {
+            type: String,
+            default: 'Australia/Sydney',
+          },
+          isRecurring: {
+            type: Boolean,
+            default: false,
+          },
+          recurrencePattern: {
+            type: {
+              type: String,
+              enum: ['daily', 'weekly', 'monthly'],
+            },
+            interval: {
+              type: Number,
+              min: 1,
+              max: 52,
+            },
+            endDate: Date,
+            daysOfWeek: [
+              {
+                type: Number,
+                min: 0,
+                max: 6,
+              },
+            ],
+          },
+        },
+      ],
+      lastUpdated: {
+        type: Date,
+        default: Date.now,
+      },
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -132,12 +267,33 @@ serviceSchema.pre('save', async function (next) {
       }
 
       this.churchId = team.churchId._id;
-      this.hierarchyPath = `${team.hierarchyPath}/service_${this._id}`;
+      // For new documents, _id might not exist yet, so use a placeholder and update in post-save
+      if (this.isNew) {
+        this.hierarchyPath = `${team.hierarchyPath}/service_new`;
+      } else {
+        this.hierarchyPath = `${team.hierarchyPath}/service_${this._id}`;
+      }
     } catch (error) {
       return next(error);
     }
   }
   next();
+});
+
+// Post-save middleware to update hierarchyPath with correct _id for new documents
+serviceSchema.post('save', async function (doc) {
+  if (doc.hierarchyPath && doc.hierarchyPath.includes('/service_new')) {
+    try {
+      const Team = mongoose.model('Team');
+      const team = await Team.findById(doc.teamId);
+      if (team) {
+        doc.hierarchyPath = `${team.hierarchyPath}/service_${doc._id}`;
+        await doc.save();
+      }
+    } catch (error) {
+      // Error updating hierarchyPath - fail silently to avoid breaking the save operation
+    }
+  }
 });
 
 // Static method to find services accessible to user based on hierarchy

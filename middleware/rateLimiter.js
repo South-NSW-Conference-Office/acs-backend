@@ -389,8 +389,11 @@ function applyRateLimiters(app) {
   app.use('/api/profile/avatar', RateLimiterFactory.fileUploadLimiter);
   app.use('/api/services/:id/images', RateLimiterFactory.fileUploadLimiter);
 
-  // Admin routes
-  app.use('/api/admin/*', RateLimiterFactory.adminOperationLimiter);
+  // Admin routes - only apply rate limiting to write operations, not GET requests
+  app.post('/api/admin/*', RateLimiterFactory.adminOperationLimiter);
+  app.put('/api/admin/*', RateLimiterFactory.adminOperationLimiter);
+  app.patch('/api/admin/*', RateLimiterFactory.adminOperationLimiter);
+  app.delete('/api/admin/*', RateLimiterFactory.adminOperationLimiter);
   app.use('/api/users/:userId/roles', RateLimiterFactory.adminOperationLimiter);
   app.delete(
     '/api/organizations/:id',

@@ -8,12 +8,6 @@ const volunteerRoleSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    organization: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: true,
-      index: true,
-    },
     title: {
       type: String,
       required: true,
@@ -147,7 +141,6 @@ const volunteerRoleSchema = new mongoose.Schema(
 );
 
 volunteerRoleSchema.index({ title: 'text', description: 'text', tags: 'text' });
-volunteerRoleSchema.index({ organization: 1, status: 1 });
 volunteerRoleSchema.index({ service: 1, status: 1 });
 
 volunteerRoleSchema.virtual('isOpen').get(function () {
@@ -167,16 +160,6 @@ volunteerRoleSchema.virtual('isActive').get(function () {
 });
 
 volunteerRoleSchema.pre('save', async function (next) {
-  if (this.isNew && !this.organization) {
-    const service = await mongoose
-      .model('Service')
-      .findById(this.service)
-      .select('organization');
-    if (service) {
-      this.organization = service.organization;
-    }
-  }
-
   if (
     this.positionsFilled >= this.numberOfPositions &&
     this.status === 'open'
@@ -195,9 +178,8 @@ volunteerRoleSchema.methods.canBeViewedBy = function (user) {
   if (this.visibility === 'public' && this.status === 'open') return true;
   if (!user) return false;
 
-  return user.organizations.some((org) =>
-    org.organization.equals(this.organization)
-  );
+  // TODO: Implement team-based access control
+  return false;
 };
 
 volunteerRoleSchema.methods.fillPosition = function (count = 1) {
@@ -226,7 +208,6 @@ volunteerRoleSchema.statics.findOpenRoles = function (filters = {}) {
     $expr: { $lt: ['$positionsFilled', '$numberOfPositions'] },
   })
     .populate('service', 'name type')
-    .populate('organization', 'name type')
     .sort('-createdAt');
 };
 

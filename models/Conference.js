@@ -132,7 +132,6 @@ const conferenceSchema = new mongoose.Schema(
 
     metadata: {
       churchCount: { type: Number, default: 0 },
-      membershipCount: Number,
       lastReportDate: Date,
       lastUpdated: { type: Date, default: Date.now },
     },

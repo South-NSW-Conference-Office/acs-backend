@@ -7,12 +7,6 @@ const storySchema = new mongoose.Schema(
       ref: 'Service',
       index: true,
     },
-    organization: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: true,
-      index: true,
-    },
     title: {
       type: String,
       required: true,
@@ -36,7 +30,7 @@ const storySchema = new mongoose.Schema(
     },
     storyType: {
       type: String,
-      enum: ['beneficiary', 'volunteer', 'donor', 'community', 'organization'],
+      enum: ['beneficiary', 'volunteer', 'donor', 'community'],
       default: 'community',
     },
     impactMetrics: [
@@ -192,7 +186,6 @@ storySchema.index({
   tags: 'text',
 });
 storySchema.index({ slug: 1 });
-storySchema.index({ organization: 1, status: 1 });
 storySchema.index({ service: 1, status: 1 });
 storySchema.index({ publishedAt: -1 });
 storySchema.index({ isFeatured: 1, featuredOrder: 1 });
@@ -273,9 +266,8 @@ storySchema.methods.canBeViewedBy = function (user) {
   if (this.visibility === 'public' && this.status === 'published') return true;
   if (!user) return false;
 
-  return user.organizations.some((org) =>
-    org.organization.equals(this.organization)
-  );
+  // TODO: Implement team-based access control
+  return false;
 };
 
 storySchema.statics.findPublished = function (filters = {}) {
@@ -284,7 +276,6 @@ storySchema.statics.findPublished = function (filters = {}) {
     status: 'published',
   })
     .populate('service', 'name type')
-    .populate('organization', 'name type')
     .sort('-publishedAt');
 };
 
@@ -295,7 +286,6 @@ storySchema.statics.findFeatured = function (limit = 5) {
     $or: [{ featuredUntil: null }, { featuredUntil: { $gt: new Date() } }],
   })
     .populate('service', 'name type')
-    .populate('organization', 'name type')
     .sort('featuredOrder -publishedAt')
     .limit(limit);
 };

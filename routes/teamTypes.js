@@ -13,7 +13,7 @@ router.get(
   async (req, res) => {
     try {
       const { userId } = req.params;
-      const { includeInactive } = req.query;
+      const { includeInactive, includeTeamCounts } = req.query;
 
       // Verify the user is requesting their own data or has admin permissions
       if (req.user._id.toString() !== userId && !req.user.isSuperAdmin) {
@@ -28,7 +28,14 @@ router.get(
         filter.isActive = true;
       }
 
-      const teamTypes = await TeamType.find(filter).sort({
+      let query = TeamType.find(filter);
+
+      // Only populate team counts if requested
+      if (includeTeamCounts === 'true') {
+        query = query.populate('teamCount');
+      }
+
+      const teamTypes = await query.sort({
         isDefault: -1,
         name: 1,
       }); // Default types first
