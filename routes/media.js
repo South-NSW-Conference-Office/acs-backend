@@ -548,4 +548,27 @@ router.get('/test-bucket', requireSuperAdmin, async (req, res) => {
   }
 });
 
+// GET /api/media/debug-config - Debug storage configuration (temporary)
+router.get('/debug-config', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      config: {
+        endpoint: process.env.WASABI_ENDPOINT || 'not set',
+        region: process.env.WASABI_REGION || 'not set',
+        bucket: process.env.WASABI_BUCKET || 'not set',
+        hasAccessKey: !!process.env.WASABI_ACCESS_KEY_ID,
+        hasSecretKey: !!process.env.WASABI_SECRET_ACCESS_KEY,
+        nodeEnv: process.env.NODE_ENV,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get config',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
