@@ -3,9 +3,10 @@ const { body, validationResult, query } = require('express-validator');
 const User = require('../models/User');
 const Role = require('../models/Role');
 // const Organization = require('../models/Organization') // REMOVED - Using hierarchical models
-const Union = require('../models/Union');
-const Conference = require('../models/Conference');
-const Church = require('../models/Church');
+// Models no longer needed for organization-based assignments
+// const Union = require('../models/Union');
+// const Conference = require('../models/Conference');
+// const Church = require('../models/Church');
 const UserService = require('../services/userService');
 const {
   authenticateToken,
@@ -17,6 +18,98 @@ const authorizationService = require('../services/authorizationService');
 const secureQueryBuilder = require('../utils/secureQueryBuilder');
 
 const router = express.Router();
+
+// Helper function to derive hierarchical assignments from teamAssignments
+async function deriveHierarchicalAssignments(user) {
+  if (!user.teamAssignments || user.teamAssignments.length === 0) {
+    return {
+      unionAssignments: [],
+      conferenceAssignments: [],
+      churchAssignments: [],
+    };
+  }
+
+  const unionAssignments = [];
+  const conferenceAssignments = [];
+  const churchAssignments = [];
+
+  const processedUnions = new Set();
+  const processedConferences = new Set();
+  const processedChurches = new Set();
+
+  // Process each team assignment to derive hierarchical assignments
+  for (const teamAssignment of user.teamAssignments) {
+    if (!teamAssignment.teamId || !teamAssignment.teamId.churchId) continue;
+
+    const church = teamAssignment.teamId.churchId;
+    const churchId = typeof church === 'object' ? church._id : church;
+
+    // Add church assignment if not already processed
+    if (!processedChurches.has(churchId.toString())) {
+      processedChurches.add(churchId.toString());
+      churchAssignments.push({
+        church: church,
+        role: {
+          name: teamAssignment.role,
+          displayName:
+            teamAssignment.role.charAt(0).toUpperCase() +
+            teamAssignment.role.slice(1),
+        },
+        assignedAt: teamAssignment.joinedAt || new Date(),
+        assignedBy: teamAssignment.invitedBy,
+      });
+    }
+
+    // If church has conference info, add conference assignment
+    if (church.conferenceId) {
+      const conference = church.conferenceId;
+      const conferenceId =
+        typeof conference === 'object' ? conference._id : conference;
+
+      if (!processedConferences.has(conferenceId.toString())) {
+        processedConferences.add(conferenceId.toString());
+        conferenceAssignments.push({
+          conference: conference,
+          role: {
+            name: teamAssignment.role,
+            displayName:
+              teamAssignment.role.charAt(0).toUpperCase() +
+              teamAssignment.role.slice(1),
+          },
+          assignedAt: teamAssignment.joinedAt || new Date(),
+          assignedBy: teamAssignment.invitedBy,
+        });
+      }
+    }
+
+    // If conference has union info, add union assignment
+    if (church.conferenceId && church.conferenceId.unionId) {
+      const union = church.conferenceId.unionId;
+      const unionId = typeof union === 'object' ? union._id : union;
+
+      if (!processedUnions.has(unionId.toString())) {
+        processedUnions.add(unionId.toString());
+        unionAssignments.push({
+          union: union,
+          role: {
+            name: teamAssignment.role,
+            displayName:
+              teamAssignment.role.charAt(0).toUpperCase() +
+              teamAssignment.role.slice(1),
+          },
+          assignedAt: teamAssignment.joinedAt || new Date(),
+          assignedBy: teamAssignment.invitedBy,
+        });
+      }
+    }
+  }
+
+  return {
+    unionAssignments,
+    conferenceAssignments,
+    churchAssignments,
+  };
+}
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -65,9 +158,23 @@ router.get(
       );
 
       const users = await User.find(query)
-        .populate('organizations.organization', 'name type')
-        .populate('organizations.role', 'name displayName level')
-        .populate('primaryOrganization', 'name type')
+        .populate({
+          path: 'teamAssignments.teamId',
+          select: 'name churchId',
+          populate: {
+            path: 'churchId',
+            select: 'name conferenceId',
+            populate: {
+              path: 'conferenceId',
+              select: 'name unionId',
+              populate: {
+                path: 'unionId',
+                select: 'name',
+              },
+            },
+          },
+        })
+        .populate('primaryTeam', 'name')
         .select('-password')
         .limit(limit)
         .skip(skip)
@@ -78,10 +185,23 @@ router.get(
       res.json({
         success: true,
         message: 'Users retrieved successfully',
-        users: users.map((user) => ({
-          ...user.toJSON(),
-          id: user._id,
-        })),
+        users: await Promise.all(
+          users.map(async (user) => {
+            const userJson = user.toJSON();
+
+            // Derive hierarchical assignments from teamAssignments
+            const hierarchicalAssignments =
+              await deriveHierarchicalAssignments(user);
+
+            // Add backward compatibility fields for frontend
+            return {
+              ...userJson,
+              id: user._id,
+              ...hierarchicalAssignments,
+              organizations: [], // Empty for backward compatibility
+            };
+          })
+        ),
         pagination: {
           total,
           limit,
@@ -118,8 +238,18 @@ router.get('/:userId/roles', authorize('users.read'), async (req, res) => {
     }
 
     const user = await User.findById(userId)
-      .populate('organizations.organization')
-      .populate('organizations.role')
+      .populate({
+        path: 'teamAssignments.teamId',
+        populate: {
+          path: 'churchId',
+          select: 'name',
+          populate: {
+            path: 'conferenceId',
+            select: 'name',
+            populate: { path: 'unionId', select: 'name' },
+          },
+        },
+      })
       .select('-password');
 
     if (!user) {
@@ -161,121 +291,14 @@ router.post(
         });
       }
 
-      const { userId } = req.params;
-      const { organizationId, roleName } = req.body;
-
-      // Check if requesting user can manage this user
-      const canAccess = await authorizationService.canAccessUser(
-        req.user,
-        userId
-      );
-      if (!canAccess) {
-        return res.status(403).json({
-          success: false,
-          message: 'You do not have permission to manage this user',
-        });
-      }
-
-      // Check if requesting user can manage the target organization
-      const canManageOrg =
-        await authorizationService.validateOrganizationAccess(
-          req.user,
-          organizationId
-        );
-      if (!canManageOrg) {
-        return res.status(403).json({
-          success: false,
-          message:
-            'You do not have permission to assign roles in this organization',
-        });
-      }
-
-      // Find user
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found',
-        });
-      }
-
-      // Find organization (try all hierarchical types)
-      let organization = null;
-
-      // Try as Union first
-      organization = await Union.findById(organizationId);
-      if (!organization) {
-        // Try as Conference
-        organization = await Conference.findById(organizationId);
-      }
-      if (!organization) {
-        // Try as Church
-        organization = await Church.findById(organizationId);
-      }
-
-      if (!organization) {
-        return res.status(404).json({
-          success: false,
-          message: 'Organization not found',
-        });
-      }
-
-      // Find role
-      const role = await Role.findOne({ name: roleName, isActive: true });
-      if (!role) {
-        return res.status(404).json({
-          success: false,
-          message: 'Role not found',
-        });
-      }
-
-      // Security check: Only super admins can assign super admin roles
-      if (role.name === 'super_admin') {
-        const requesterIsSuperAdmin =
-          await authorizationService.isUserSuperAdmin(req.user);
-
-        if (!requesterIsSuperAdmin) {
-          return res.status(403).json({
-            success: false,
-            message: 'Only super administrators can assign super admin roles',
-          });
-        }
-      }
-
-      // Check if user already has a role in this organization
-      const existingAssignment = user.organizations.find(
-        (org) => org.organization.toString() === organizationId
-      );
-
-      if (existingAssignment) {
-        // Update existing assignment
-        existingAssignment.role = role._id;
-        existingAssignment.assignedAt = new Date();
-        existingAssignment.assignedBy = req.user._id;
-      } else {
-        // Add new assignment
-        user.organizations.push({
-          organization: organizationId,
-          role: role._id,
-          assignedAt: new Date(),
-          assignedBy: req.user._id,
-        });
-      }
-
-      // Set as primary organization if user doesn't have one
-      if (!user.primaryOrganization) {
-        user.primaryOrganization = organizationId;
-      }
-
-      await user.save();
-
-      // Populate and return updated user
-      await user.populate('organizations.organization organizations.role');
-
-      res.json({
-        success: true,
-        message: 'Role assigned successfully',
-        data: user.organizations,
+      // Note: Organization-based role assignment is deprecated in the new team-centric system
+      // Users should be assigned to teams instead
+      return res.status(400).json({
+        success: false,
+        message:
+          'Direct organization role assignment is deprecated. Please assign users to teams instead.',
+        details:
+          'The system has migrated to a team-centric model where users are assigned to teams rather than directly to organizations.',
       });
     } catch (error) {
       // Error assigning role
@@ -294,35 +317,13 @@ router.delete(
   authorize('users.assign_role'),
   async (req, res) => {
     try {
-      const { userId, organizationId } = req.params;
-
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found',
-        });
-      }
-
-      // Remove organization assignment
-      user.organizations = user.organizations.filter(
-        (org) => org.organization.toString() !== organizationId
-      );
-
-      // Clear primary organization if it was removed
-      if (user.primaryOrganization?.toString() === organizationId) {
-        user.primaryOrganization =
-          user.organizations.length > 0
-            ? user.organizations[0].organization
-            : null;
-      }
-
-      await user.save();
-
-      res.json({
-        success: true,
-        message: 'Role revoked successfully',
-        data: user.organizations,
+      // Note: Organization-based role revocation is deprecated in the new team-centric system
+      return res.status(400).json({
+        success: false,
+        message:
+          'Direct organization role revocation is deprecated. Please manage team assignments instead.',
+        details:
+          'The system has migrated to a team-centric model where users are assigned to teams rather than directly to organizations.',
       });
     } catch (error) {
       // Error revoking role
@@ -385,10 +386,10 @@ router.post(
       .optional()
       .isBoolean()
       .withMessage('Verified must be boolean'),
-    body('primaryOrganization')
+    body('primaryTeam')
       .optional()
       .isMongoId()
-      .withMessage('Valid organization ID required'),
+      .withMessage('Valid team ID required'),
     body('organizations')
       .optional()
       .isArray()
@@ -537,10 +538,10 @@ router.put(
       .optional()
       .isBoolean()
       .withMessage('isActive must be boolean'),
-    body('primaryOrganization')
+    body('primaryTeam')
       .optional()
       .isMongoId()
-      .withMessage('Valid organization ID required'),
+      .withMessage('Valid team ID required'),
   ],
   async (req, res) => {
     try {
@@ -585,9 +586,23 @@ router.put(
         { $set: updates },
         { new: true, runValidators: true }
       )
-        .populate(
-          'organizations.organization organizations.role primaryOrganization'
-        )
+        .populate({
+          path: 'teamAssignments.teamId',
+          select: 'name churchId',
+          populate: {
+            path: 'churchId',
+            select: 'name conferenceId',
+            populate: {
+              path: 'conferenceId',
+              select: 'name unionId',
+              populate: {
+                path: 'unionId',
+                select: 'name',
+              },
+            },
+          },
+        })
+        .populate('primaryTeam', 'name')
         .select('-password');
 
       if (!user) {
@@ -603,6 +618,8 @@ router.put(
         data: {
           ...user.toJSON(),
           id: user._id,
+          ...(await deriveHierarchicalAssignments(user)),
+          organizations: [], // Empty for backward compatibility
         },
       });
     } catch (error) {
@@ -855,8 +872,18 @@ router.get(
       }
 
       const users = await User.find(query)
-        .populate('organizations.organization', 'name type')
-        .populate('organizations.role', 'name displayName level')
+        .populate({
+          path: 'teamAssignments.teamId',
+          populate: {
+            path: 'churchId',
+            select: 'name',
+            populate: {
+              path: 'conferenceId',
+              select: 'name',
+              populate: { path: 'unionId', select: 'name' },
+            },
+          },
+        })
         .select('-password')
         .limit(parseInt(limit))
         .skip(parseInt(skip))

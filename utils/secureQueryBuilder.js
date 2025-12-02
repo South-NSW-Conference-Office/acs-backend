@@ -18,27 +18,12 @@ class SecureQueryBuilder {
     const { includeOwnData = true } = options;
 
     // Check if user is superadmin - if so, return unrestricted query
-    if (await authorizationService.isUserSuperAdmin(user)) {
+    if (authorizationService.isSuperAdmin(user)) {
       return { ...baseQuery }; // No restrictions for superadmin
     }
 
-    // Get organizations user can manage
-    const manageableOrgs =
-      await authorizationService.getManageableOrganizations(user, 'users.read');
-
-    if (manageableOrgs.length === 0 && !includeOwnData) {
-      // User has no permission to view other users
-      return { _id: null }; // Impossible condition
-    }
-
+    // For team-centric system, super admins see all, others see team members
     const conditions = [];
-
-    // Include users from manageable organizations
-    if (manageableOrgs.length > 0) {
-      conditions.push({
-        'organizations.organization': { $in: manageableOrgs },
-      });
-    }
 
     // Include own data if requested
     if (includeOwnData) {
@@ -96,21 +81,12 @@ class SecureQueryBuilder {
    */
   async buildLegacyOrganizationQuery(user, baseQuery = {}) {
     // Check if user is superadmin - if so, return unrestricted query
-    if (await authorizationService.isUserSuperAdmin(user)) {
+    if (authorizationService.isSuperAdmin(user)) {
       return { ...baseQuery, isActive: true }; // Only filter for active organizations
     }
 
-    const accessibleOrgs =
-      await authorizationService.getAccessibleOrganizations(user);
-
-    if (accessibleOrgs.length === 0) {
-      return { _id: null }; // Impossible condition
-    }
-
-    return {
-      ...baseQuery,
-      _id: { $in: accessibleOrgs },
-    };
+    // Legacy method - return no results since organizations are deprecated
+    return { _id: null }; // No access in new team-centric system
   }
 
   /**
