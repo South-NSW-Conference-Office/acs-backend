@@ -765,14 +765,15 @@ router.delete('/:userId', authorize('users.delete'), async (req, res) => {
     }
 
     // Prevent deletion of users with higher-level roles
-    const userHasHigherRole = user.organizations.some((org) => {
-      return (
-        org.role?.name === 'super_admin' &&
-        !req.user.organizations.some(
-          (reqOrg) => reqOrg.role?.name === 'super_admin'
-        )
-      );
-    });
+    const userHasHigherRole =
+      user.organizations?.some((org) => {
+        return (
+          org.role?.name === 'super_admin' &&
+          !req.user.organizations?.some(
+            (reqOrg) => reqOrg.role?.name === 'super_admin'
+          )
+        );
+      }) || false;
 
     if (userHasHigherRole) {
       return res.status(403).json({

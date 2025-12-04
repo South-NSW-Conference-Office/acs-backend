@@ -19,8 +19,24 @@ class EmailService {
     });
   }
 
+  // Get appropriate frontend URL based on environment
+  getFrontendUrl() {
+    const frontendUrl = process.env.FRONTEND_URL;
+
+    // If in development and the URL contains localhost, use http instead of https
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      frontendUrl &&
+      frontendUrl.includes('localhost')
+    ) {
+      return frontendUrl.replace('https://', 'http://');
+    }
+
+    return frontendUrl;
+  }
+
   async sendPasswordResetEmail(userEmail, resetToken) {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${this.getFrontendUrl()}/reset-password?token=${resetToken}`;
 
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
@@ -134,7 +150,7 @@ class EmailService {
 
   // Send verification email
   async sendVerificationEmail(user, verificationToken) {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${this.getFrontendUrl()}/verify-email?token=${verificationToken}`;
     const expirationTime = this.getExpirationTime();
     const expirationHours = Math.round(
       (expirationTime - Date.now()) / (1000 * 60 * 60)
@@ -239,7 +255,7 @@ This is an automated message. Please do not reply to this email.
           <p>Your email has been successfully verified. You now have full access to the Adventist Community Services Australia system.</p>
 
           <h3>Next Steps:</h3>
-          <p>You can log in at: <a href="${process.env.FRONTEND_URL}/login">${process.env.FRONTEND_URL}/login</a></p>
+          <p>You can log in at: <a href="${this.getFrontendUrl()}/login">${this.getFrontendUrl()}/login</a></p>
 
           <p>Best regards,<br>
           Adventist Community Services Australia</p>
@@ -257,7 +273,7 @@ Hello ${user.name},
 
 Your email has been successfully verified. You now have full access to the Adventist Community Services Australia system.
 
-You can log in at: ${process.env.FRONTEND_URL}/login
+You can log in at: ${this.getFrontendUrl()}/login
 
 Best regards,
 Adventist Community Services Australia
@@ -285,7 +301,7 @@ Adventist Community Services Australia
   // Send organization setup invitation email
   async sendOrganizationSetupInvitation(user, organization, invitedBy) {
     const verificationToken = user.emailVerificationToken;
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${this.getFrontendUrl()}/verify-email?token=${verificationToken}`;
     const expirationTime = user.emailVerificationExpires;
     const expirationDays = Math.round(
       (expirationTime - Date.now()) / (1000 * 60 * 60 * 24)

@@ -8,12 +8,20 @@ const logger = require('../services/loggerService');
  */
 const checkRoleQuota = async (req, res, next) => {
   try {
-    // Extract role and organization info from request
+    // Extract role and entity info from request
     const roleId = req.body.roleId || req.body.role;
-    const organizationId =
+
+    // Support both new format (entityId/entityType) and legacy format (organizationId)
+    const entityId =
+      req.body.entityId ||
+      req.body.conferenceId ||
+      req.body.unionId ||
+      req.body.churchId ||
       req.body.organizationId ||
       req.organizationId ||
       req.headers['x-organization-id'];
+
+    const entityType = req.body.entityType || 'church'; // Default to 'church' for backward compatibility
 
     if (!roleId) {
       // No role specified, proceed without quota check
@@ -37,8 +45,17 @@ const checkRoleQuota = async (req, res, next) => {
       return next();
     }
 
-    // Check current quota status
-    const quotaStatus = await role.checkQuota(organizationId);
+    // For conference scope quotas, entityId is required
+    if (role.quotaLimits.scope === 'conference' && !entityId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Error checking role quota',
+        err: 'Entity ID required for conference scope quota check',
+      });
+    }
+
+    // Check current quota status with both entityId and entityType
+    const quotaStatus = await role.checkQuota(entityId, entityType);
 
     if (!quotaStatus.allowed) {
       return res.status(403).json({
@@ -115,7 +132,7 @@ const checkBulkQuota = async (req, res, next) => {
         continue;
       }
 
-      const quotaStatus = await role.checkQuota(organizationId);
+      const quotaStatus = await role.checkQuota(organizationId, 'church'); // Default entity type for bulk operations
       const wouldExceed =
         quotaStatus.current + count > role.quotaLimits.maxUsers;
 
@@ -236,7 +253,7 @@ const checkRoleChangeQuota = async (req, res, next) => {
 
     // Check quota for new role
     if (newRole.quotaLimits && newRole.quotaLimits.maxUsers) {
-      const quotaStatus = await newRole.checkQuota(organizationId);
+      const quotaStatus = await newRole.checkQuota(organizationId, 'church'); // Default entity type for role changes
 
       if (!quotaStatus.allowed) {
         return res.status(403).json({

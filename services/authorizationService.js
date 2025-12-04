@@ -2,6 +2,7 @@
 const Union = require('../models/Union');
 const Conference = require('../models/Conference');
 const Church = require('../models/Church');
+const logger = require('./loggerService');
 // const User = require('../models/User');
 
 /**
@@ -270,6 +271,119 @@ class AuthorizationService {
   async canAccessChurch(user, churchId) {
     const accessibleChurches = await this.getUserChurchAccess(user);
     return accessibleChurches.includes(churchId.toString());
+  }
+
+  /**
+   * Check if user can access another user (for viewing, editing, deleting)
+   * @param {Object} user - Requesting user object
+   * @param {String} targetUserId - Target user ID to check access for
+   * @returns {Boolean} - True if user can access the target user
+   */
+  async canAccessUser(user, targetUserId) {
+    try {
+      if (!user || !targetUserId) {
+        return false;
+      }
+
+      // Super admin can access all users
+      if (this.isSuperAdmin(user)) {
+        return true;
+      }
+
+      // Users can always access themselves
+      if (user._id.toString() === targetUserId.toString()) {
+        return true;
+      }
+
+      // Load the target user to check their assignments
+      const User = require('../models/User');
+      const targetUser = await User.findById(targetUserId)
+        .populate('unionAssignments.role')
+        .populate('conferenceAssignments.role')
+        .populate('churchAssignments.role');
+
+      if (!targetUser) {
+        return false;
+      }
+
+      // Get the requesting user's accessible entities
+      const accessibleUnions = await this.getUserUnionAccess(user);
+      const accessibleConferences = await this.getUserConferenceAccess(user);
+      const accessibleChurches = await this.getUserChurchAccess(user);
+
+      // Safely build target user assignments array
+      const targetUserAssignments = [];
+
+      // Add union assignments (safely)
+      if (
+        targetUser.unionAssignments &&
+        Array.isArray(targetUser.unionAssignments)
+      ) {
+        for (const assignment of targetUser.unionAssignments) {
+          if (assignment && assignment.union) {
+            targetUserAssignments.push({
+              type: 'union',
+              entityId: assignment.union.toString(),
+            });
+          }
+        }
+      }
+
+      // Add conference assignments (safely)
+      if (
+        targetUser.conferenceAssignments &&
+        Array.isArray(targetUser.conferenceAssignments)
+      ) {
+        for (const assignment of targetUser.conferenceAssignments) {
+          if (assignment && assignment.conference) {
+            targetUserAssignments.push({
+              type: 'conference',
+              entityId: assignment.conference.toString(),
+            });
+          }
+        }
+      }
+
+      // Add church assignments (safely)
+      if (
+        targetUser.churchAssignments &&
+        Array.isArray(targetUser.churchAssignments)
+      ) {
+        for (const assignment of targetUser.churchAssignments) {
+          if (assignment && assignment.church) {
+            targetUserAssignments.push({
+              type: 'church',
+              entityId: assignment.church.toString(),
+            });
+          }
+        }
+      }
+
+      // If target user has no assignments, only super admin or self can access
+      if (targetUserAssignments.length === 0) {
+        return false;
+      }
+
+      // Check if any of the target user's assignments fall within requesting user's scope
+      return targetUserAssignments.some((assignment) => {
+        switch (assignment.type) {
+          case 'union':
+            return accessibleUnions.includes(assignment.entityId);
+          case 'conference':
+            return accessibleConferences.includes(assignment.entityId);
+          case 'church':
+            return accessibleChurches.includes(assignment.entityId);
+          default:
+            return false;
+        }
+      });
+    } catch (error) {
+      logger.error('Error in canAccessUser:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return false;
+    }
   }
 
   /**
