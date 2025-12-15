@@ -21,6 +21,15 @@ logs/
 
 # Testing
 coverage/
+test/
+tests/
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+scripts/test*.js
+scripts/test*.ts
 
 # Uploads
 uploads/
@@ -47,6 +56,9 @@ Thumbs.db
 # Cache directories
 .cache/
 .parcel-cache/
+
+# Claude Code settings
+.claude/
 
 # Runtime data
 pids/
