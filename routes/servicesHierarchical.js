@@ -113,6 +113,101 @@ router.get(
   }
 );
 
+// ============================================
+// PUBLIC ROUTES (No authentication required)
+// These must be defined BEFORE /:id to prevent matching 'public' as an ID
+// ============================================
+
+/**
+ * GET /services/public/:id
+ * Get single service by ID (public view)
+ */
+router.get('/public/:id', async (req, res) => {
+  try {
+    const service = await Service.findById(req.params.id)
+      .populate('teamId', 'name type')
+      .populate('churchId', 'name');
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found',
+      });
+    }
+
+    // Only return active services publicly
+    if (service.status !== 'active') {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not available',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: service,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch service',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /services/public
+ * Get all active services (public view)
+ */
+router.get('/public', async (req, res) => {
+  try {
+    const { type, church, search, lat, lng, radius } = req.query;
+
+    const query = { status: 'active' };
+
+    if (type) query.type = type;
+    if (church) query.churchId = church;
+
+    let services;
+
+    if (lat && lng) {
+      // Geographic search
+      services = await Service.findNearby(
+        { lat: parseFloat(lat), lng: parseFloat(lng) },
+        radius ? parseFloat(radius) * 1000 : 50000
+      );
+    } else if (search) {
+      // Text search
+      services = await Service.find({
+        ...query,
+        $text: { $search: search },
+      }).score({ score: { $meta: 'textScore' } });
+    } else {
+      // Standard query
+      services = await Service.find(query);
+    }
+
+    // Populate minimal data for public view
+    await Service.populate(services, [
+      { path: 'teamId', select: 'name type' },
+      { path: 'churchId', select: 'name' },
+    ]);
+
+    res.json({
+      success: true,
+      count: services.length,
+      data: services,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch services',
+      error: error.message,
+    });
+  }
+});
+
 /**
  * GET /services/:id
  * Get specific service details
@@ -330,62 +425,6 @@ router.post(
     }
   }
 );
-
-// ============================================
-// PUBLIC ROUTES (No authentication required)
-// ============================================
-
-/**
- * GET /services/public
- * Get all active services (public view)
- */
-router.get('/public', async (req, res) => {
-  try {
-    const { type, church, search, lat, lng, radius } = req.query;
-
-    const query = { status: 'active' };
-
-    if (type) query.type = type;
-    if (church) query.churchId = church;
-
-    let services;
-
-    if (lat && lng) {
-      // Geographic search
-      services = await Service.findNearby(
-        { lat: parseFloat(lat), lng: parseFloat(lng) },
-        radius ? parseFloat(radius) * 1000 : 50000
-      );
-    } else if (search) {
-      // Text search
-      services = await Service.find({
-        ...query,
-        $text: { $search: search },
-      }).score({ score: { $meta: 'textScore' } });
-    } else {
-      // Standard query
-      services = await Service.find(query);
-    }
-
-    // Populate minimal data for public view
-    await Service.populate(services, [
-      { path: 'teamId', select: 'name type' },
-      { path: 'churchId', select: 'name' },
-    ]);
-
-    res.json({
-      success: true,
-      count: services.length,
-      data: services,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch services',
-      error: error.message,
-    });
-  }
-});
 
 /**
  * GET /services/:id/images

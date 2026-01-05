@@ -2,6 +2,9 @@
   "name": "acs-backend",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js --ignore logs/",
@@ -33,7 +36,6 @@
     "restore:db": "node scripts/restore-db.js",
     "migrate": "node scripts/migrate.js",
     "migrate:organization-data": "node scripts/migrate-organization-data.js",
-    "migrate:hierarchy": "node scripts/run-hierarchy-migration.js",
     "drop:organizations": "node scripts/drop-organizations-collection.js",
     "clean:org-data": "node scripts/clean-organizational-data.js",
     "clean": "rm -rf node_modules package-lock.json && npm install",
