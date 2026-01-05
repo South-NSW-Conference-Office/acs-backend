@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Environment files (use Cloud Run secrets instead)
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Testing
+coverage
+__tests__
+*.test.js
+*.spec.js
+
+# CI/CD
+.github
+.claude
+
+# Development files
+nodemon.json
+ecosystem.config.js
+
+# OS files
+.DS_Store
+Thumbs.db

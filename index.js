@@ -27,6 +27,7 @@ const profileRoutes = require('./routes/profile');
 const roleLimitsRoutes = require('./routes/admin/role-limits');
 const superAdminRoutes = require('./routes/superAdmin');
 const mediaRoutes = require('./routes/media');
+const contactRoutes = require('./routes/contact');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -246,6 +247,7 @@ const startServer = () => {
     { path: '/api/quota', handler: quotaRoutes, name: 'quota' },
     { path: '/api/profile', handler: profileRoutes, name: 'profile' },
     { path: '/api/media', handler: mediaRoutes, name: 'media' },
+    { path: '/api/contact', handler: contactRoutes, name: 'contact' },
   ];
 
   routes.forEach(({ path, handler, name }) => {

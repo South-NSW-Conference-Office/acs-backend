@@ -298,6 +298,179 @@ Adventist Community Services Australia
     }
   }
 
+  // Send contact form notification to admin
+  async sendContactFormAdminNotification(contactData) {
+    const { name, email, phone, subject, message } = contactData;
+    const submittedDate = new Date().toLocaleDateString('en-AU', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Australia/Sydney',
+    });
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+      to: process.env.EMAIL_FROM,
+      subject: `New Contact Form Submission - ${subject}`,
+      text: `
+NEW CONTACT FORM SUBMISSION
+============================
+
+From: ${name}
+Email: ${email}
+Phone: ${phone}
+Subject: ${subject}
+
+Message:
+---------
+${message}
+
+---
+Submitted via ACS Website Contact Form
+Date: ${submittedDate} AEDT
+      `.trim(),
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      logger.error('Failed to send contact form admin notification:', error);
+      throw new Error('Failed to send contact form notification');
+    }
+  }
+
+  // Send volunteer application notification to admin
+  async sendVolunteerApplicationAdminNotification(applicationData) {
+    const { name, email, phone, availability, interests, experience, motivation } = applicationData;
+    const submittedDate = new Date().toLocaleDateString('en-AU', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Australia/Sydney',
+    });
+
+    // Map interest codes to readable names
+    const interestMap = {
+      foodbank: 'Food Bank Services',
+      clothing: 'Clothing Assistance',
+      counseling: 'Counseling Support',
+      emergency: 'Emergency Relief',
+      admin: 'Administrative Support',
+    };
+
+    // Map availability codes to readable names
+    const availabilityMap = {
+      weekdays: 'Weekdays',
+      weekends: 'Weekends',
+      flexible: 'Flexible',
+    };
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+      to: process.env.EMAIL_FROM,
+      subject: `New Volunteer Application - ${name}`,
+      text: `
+NEW VOLUNTEER APPLICATION
+==========================
+
+Applicant Details:
+------------------
+Name: ${name}
+Email: ${email}
+Phone: ${phone}
+
+Availability: ${availabilityMap[availability] || availability}
+Area of Interest: ${interestMap[interests] || interests}
+
+Experience:
+-----------
+${experience || 'No experience provided'}
+
+Motivation:
+-----------
+${motivation}
+
+---
+Submitted via ACS Website Volunteer Application
+Date: ${submittedDate} AEDT
+      `.trim(),
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      logger.error('Failed to send volunteer application admin notification:', error);
+      throw new Error('Failed to send volunteer application notification');
+    }
+  }
+
+  // Send confirmation email to user after contact form submission
+  async sendContactFormConfirmation(userEmail, userName, formType, subject = null) {
+    const isVolunteer = formType === 'volunteer';
+    const submissionType = isVolunteer ? 'volunteer application' : 'message';
+    const submittedDate = new Date().toLocaleDateString('en-AU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    let subjectLine = isVolunteer
+      ? 'Thank you for your volunteer application - Adventist Community Services'
+      : 'Thank you for contacting us - Adventist Community Services';
+
+    let submissionDetails = isVolunteer
+      ? `- Application Type: Volunteer Application
+- Submitted: ${submittedDate}`
+      : `- Subject: ${subject}
+- Submitted: ${submittedDate}`;
+
+    const mailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
+      to: userEmail,
+      subject: subjectLine,
+      text: `
+Thank you for contacting Adventist Community Services
+
+Dear ${userName},
+
+We have received your ${submissionType} and wanted to let you know
+that our team will review it shortly.
+
+You can expect to hear from us within 2-3 business days.
+If your matter is urgent, please call our office directly.
+
+What you submitted:
+${submissionDetails}
+
+Thank you for reaching out to us.
+
+Warm regards,
+Adventist Community Services Australia
+
+---
+This is an automated confirmation. Please do not reply to this email.
+If you need to send additional information, please submit a new message
+through our website or contact us directly.
+      `.trim(),
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId };
+    } catch (error) {
+      logger.error('Failed to send contact form confirmation:', error);
+      // Don't throw - user confirmation is not critical
+    }
+  }
+
   // Send organization setup invitation email
   async sendOrganizationSetupInvitation(user, organization, invitedBy) {
     const verificationToken = user.emailVerificationToken;
