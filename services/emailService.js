@@ -345,7 +345,15 @@ Date: ${submittedDate} AEDT
 
   // Send volunteer application notification to admin
   async sendVolunteerApplicationAdminNotification(applicationData) {
-    const { name, email, phone, availability, interests, experience, motivation } = applicationData;
+    const {
+      name,
+      email,
+      phone,
+      availability,
+      interests,
+      experience,
+      motivation,
+    } = applicationData;
     const submittedDate = new Date().toLocaleDateString('en-AU', {
       weekday: 'long',
       year: 'numeric',
@@ -407,13 +415,21 @@ Date: ${submittedDate} AEDT
       const info = await this.transporter.sendMail(mailOptions);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      logger.error('Failed to send volunteer application admin notification:', error);
+      logger.error(
+        'Failed to send volunteer application admin notification:',
+        error
+      );
       throw new Error('Failed to send volunteer application notification');
     }
   }
 
   // Send confirmation email to user after contact form submission
-  async sendContactFormConfirmation(userEmail, userName, formType, subject = null) {
+  async sendContactFormConfirmation(
+    userEmail,
+    userName,
+    formType,
+    subject = null
+  ) {
     const isVolunteer = formType === 'volunteer';
     const submissionType = isVolunteer ? 'volunteer application' : 'message';
     const submittedDate = new Date().toLocaleDateString('en-AU', {
@@ -422,11 +438,11 @@ Date: ${submittedDate} AEDT
       year: 'numeric',
     });
 
-    let subjectLine = isVolunteer
+    const subjectLine = isVolunteer
       ? 'Thank you for your volunteer application - Adventist Community Services'
       : 'Thank you for contacting us - Adventist Community Services';
 
-    let submissionDetails = isVolunteer
+    const submissionDetails = isVolunteer
       ? `- Application Type: Volunteer Application
 - Submitted: ${submittedDate}`
       : `- Subject: ${subject}
