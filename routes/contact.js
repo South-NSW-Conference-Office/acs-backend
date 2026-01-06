@@ -18,7 +18,7 @@ router.post(
       .normalizeEmail()
       .withMessage('Valid email is required'),
     body('phone')
-      .matches(/^[\d\s\-\+\(\)]{8,}$/)
+      .matches(/^[\d\s\-+()]{8,}$/)
       .withMessage('Valid phone number is required'),
     body('subject')
       .trim()
@@ -54,7 +54,12 @@ router.post(
 
       // Send confirmation email to user
       try {
-        await emailService.sendContactFormConfirmation(email, name, 'contact', subject);
+        await emailService.sendContactFormConfirmation(
+          email,
+          name,
+          'contact',
+          subject
+        );
         logger.info(`Contact form confirmation sent to: ${email}`);
       } catch (emailError) {
         logger.error('Failed to send user confirmation:', emailError);
@@ -63,7 +68,8 @@ router.post(
 
       return res.status(200).json({
         success: true,
-        message: 'Your message has been sent successfully. We will get back to you soon.',
+        message:
+          'Your message has been sent successfully. We will get back to you soon.',
       });
     } catch (error) {
       logger.error('Contact form submission error:', error);
@@ -88,7 +94,7 @@ router.post(
       .normalizeEmail()
       .withMessage('Valid email is required'),
     body('phone')
-      .matches(/^[\d\s\-\+\(\)]{8,}$/)
+      .matches(/^[\d\s\-+()]{8,}$/)
       .withMessage('Valid phone number is required'),
     body('availability')
       .isIn(['weekdays', 'weekends', 'flexible'])
@@ -113,21 +119,48 @@ router.post(
         });
       }
 
-      const { name, email, phone, availability, interests, experience, motivation } = req.body;
-      const applicationData = { name, email, phone, availability, interests, experience, motivation };
+      const {
+        name,
+        email,
+        phone,
+        availability,
+        interests,
+        experience,
+        motivation,
+      } = req.body;
+      const applicationData = {
+        name,
+        email,
+        phone,
+        availability,
+        interests,
+        experience,
+        motivation,
+      };
 
       // Send admin notification email
       try {
-        await emailService.sendVolunteerApplicationAdminNotification(applicationData);
-        logger.info(`Volunteer application admin notification sent for: ${email}`);
+        await emailService.sendVolunteerApplicationAdminNotification(
+          applicationData
+        );
+        logger.info(
+          `Volunteer application admin notification sent for: ${email}`
+        );
       } catch (emailError) {
-        logger.error('Failed to send volunteer admin notification:', emailError);
+        logger.error(
+          'Failed to send volunteer admin notification:',
+          emailError
+        );
         // Continue - don't block user experience if admin email fails
       }
 
       // Send confirmation email to user
       try {
-        await emailService.sendContactFormConfirmation(email, name, 'volunteer');
+        await emailService.sendContactFormConfirmation(
+          email,
+          name,
+          'volunteer'
+        );
         logger.info(`Volunteer application confirmation sent to: ${email}`);
       } catch (emailError) {
         logger.error('Failed to send volunteer confirmation:', emailError);
@@ -136,13 +169,15 @@ router.post(
 
       return res.status(200).json({
         success: true,
-        message: 'Your volunteer application has been submitted successfully. We will review it and get back to you soon.',
+        message:
+          'Your volunteer application has been submitted successfully. We will review it and get back to you soon.',
       });
     } catch (error) {
       logger.error('Volunteer application submission error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Failed to submit volunteer application. Please try again later.',
+        message:
+          'Failed to submit volunteer application. Please try again later.',
       });
     }
   }
