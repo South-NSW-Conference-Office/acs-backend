@@ -175,6 +175,31 @@ router.get(
           },
         })
         .populate('primaryTeam', 'name')
+        // Populate hierarchical assignments
+        .populate({
+          path: 'unionAssignments.union',
+          select: 'name',
+        })
+        .populate({
+          path: 'unionAssignments.role',
+          select: 'name displayName level',
+        })
+        .populate({
+          path: 'conferenceAssignments.conference',
+          select: 'name',
+        })
+        .populate({
+          path: 'conferenceAssignments.role',
+          select: 'name displayName level',
+        })
+        .populate({
+          path: 'churchAssignments.church',
+          select: 'name',
+        })
+        .populate({
+          path: 'churchAssignments.role',
+          select: 'name displayName level',
+        })
         .select('-password')
         .limit(limit)
         .skip(skip)
@@ -189,15 +214,33 @@ router.get(
           users.map(async (user) => {
             const userJson = user.toJSON();
 
-            // Derive hierarchical assignments from teamAssignments
-            const hierarchicalAssignments =
-              await deriveHierarchicalAssignments(user);
+            // Check if user has stored hierarchical assignments
+            const hasStoredAssignments =
+              (userJson.unionAssignments &&
+                userJson.unionAssignments.length > 0) ||
+              (userJson.conferenceAssignments &&
+                userJson.conferenceAssignments.length > 0) ||
+              (userJson.churchAssignments &&
+                userJson.churchAssignments.length > 0);
+
+            // Use stored assignments if available, otherwise derive from team assignments
+            let finalAssignments;
+            if (hasStoredAssignments) {
+              finalAssignments = {
+                unionAssignments: userJson.unionAssignments || [],
+                conferenceAssignments: userJson.conferenceAssignments || [],
+                churchAssignments: userJson.churchAssignments || [],
+              };
+            } else {
+              // Fall back to deriving from team assignments
+              finalAssignments = await deriveHierarchicalAssignments(user);
+            }
 
             // Add backward compatibility fields for frontend
             return {
               ...userJson,
               id: user._id,
-              ...hierarchicalAssignments,
+              ...finalAssignments,
               organizations: [], // Empty for backward compatibility
             };
           })
@@ -219,6 +262,110 @@ router.get(
     }
   }
 );
+
+// GET /api/users/:userId - Get single user by ID
+router.get('/:userId', authorize('users.read'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if requesting user can access this user's data
+    const canAccess = await authorizationService.canAccessUser(
+      req.user,
+      userId
+    );
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to access this user',
+      });
+    }
+
+    const user = await User.findById(userId)
+      .populate({
+        path: 'teamAssignments.teamId',
+        select: 'name churchId',
+        populate: {
+          path: 'churchId',
+          select: 'name conferenceId',
+          populate: {
+            path: 'conferenceId',
+            select: 'name unionId',
+            populate: {
+              path: 'unionId',
+              select: 'name',
+            },
+          },
+        },
+      })
+      .populate('primaryTeam', 'name')
+      .populate({
+        path: 'unionAssignments.union',
+        select: 'name',
+      })
+      .populate({
+        path: 'unionAssignments.role',
+        select: 'name displayName level',
+      })
+      .populate({
+        path: 'conferenceAssignments.conference',
+        select: 'name',
+      })
+      .populate({
+        path: 'conferenceAssignments.role',
+        select: 'name displayName level',
+      })
+      .populate({
+        path: 'churchAssignments.church',
+        select: 'name',
+      })
+      .populate({
+        path: 'churchAssignments.role',
+        select: 'name displayName level',
+      })
+      .select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const userJson = user.toJSON();
+
+    // Check if user has stored hierarchical assignments
+    const hasStoredAssignments =
+      (userJson.unionAssignments && userJson.unionAssignments.length > 0) ||
+      (userJson.conferenceAssignments &&
+        userJson.conferenceAssignments.length > 0) ||
+      (userJson.churchAssignments && userJson.churchAssignments.length > 0);
+
+    // Use stored assignments if available, otherwise derive from team assignments
+    let finalAssignments;
+    if (hasStoredAssignments) {
+      finalAssignments = {
+        unionAssignments: userJson.unionAssignments || [],
+        conferenceAssignments: userJson.conferenceAssignments || [],
+        churchAssignments: userJson.churchAssignments || [],
+      };
+    } else {
+      finalAssignments = await deriveHierarchicalAssignments(user);
+    }
+
+    res.json({
+      ...userJson,
+      id: user._id,
+      ...finalAssignments,
+      organizations: [],
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      err: error.message,
+    });
+  }
+});
 
 // GET /api/users/:userId/roles - Get user roles
 router.get('/:userId/roles', authorize('users.read'), async (req, res) => {
@@ -275,7 +422,12 @@ router.post(
   '/:userId/roles',
   authorize('users.assign_role'),
   [
+    body('entityId')
+      .optional()
+      .isMongoId()
+      .withMessage('Valid entity ID is required'),
     body('organizationId')
+      .optional()
       .isMongoId()
       .withMessage('Valid organization ID is required'),
     body('roleName').isString().trim().withMessage('Role name is required'),
@@ -291,14 +443,140 @@ router.post(
         });
       }
 
-      // Note: Organization-based role assignment is deprecated in the new team-centric system
-      // Users should be assigned to teams instead
-      return res.status(400).json({
-        success: false,
-        message:
-          'Direct organization role assignment is deprecated. Please assign users to teams instead.',
-        details:
-          'The system has migrated to a team-centric model where users are assigned to teams rather than directly to organizations.',
+      const { userId } = req.params;
+      const { entityId, organizationId, roleName } = req.body;
+      const targetEntityId = entityId || organizationId;
+
+      if (!targetEntityId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Entity ID is required',
+        });
+      }
+
+      // Find the user
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      // Find the role by name
+      const role = await Role.findOne({ name: roleName });
+      if (!role) {
+        return res.status(400).json({
+          success: false,
+          message: `Role "${roleName}" not found`,
+        });
+      }
+
+      // Determine the entity type by checking each collection
+      const Union = require('../models/Union');
+      const Conference = require('../models/Conference');
+      const Church = require('../models/Church');
+
+      let entityType = null;
+      let entity = null;
+
+      // Check if it's a union
+      entity = await Union.findById(targetEntityId);
+      if (entity) {
+        entityType = 'union';
+      }
+
+      // Check if it's a conference
+      if (!entityType) {
+        entity = await Conference.findById(targetEntityId);
+        if (entity) {
+          entityType = 'conference';
+        }
+      }
+
+      // Check if it's a church
+      if (!entityType) {
+        entity = await Church.findById(targetEntityId);
+        if (entity) {
+          entityType = 'church';
+        }
+      }
+
+      if (!entityType) {
+        return res.status(400).json({
+          success: false,
+          message: 'Entity not found in unions, conferences, or churches',
+        });
+      }
+
+      // Create the assignment
+      const assignment = {
+        [entityType]: targetEntityId,
+        role: role._id,
+        assignedAt: new Date(),
+        assignedBy: req.user._id,
+      };
+
+      // Add to the appropriate assignment array
+      const updateField = `${entityType}Assignments`;
+
+      // Check if assignment already exists
+      const existingAssignments = user[updateField] || [];
+      const alreadyExists = existingAssignments.some(
+        (a) => a[entityType]?.toString() === targetEntityId
+      );
+
+      if (alreadyExists) {
+        // Update existing assignment
+        await User.findOneAndUpdate(
+          { _id: userId, [`${updateField}.${entityType}`]: targetEntityId },
+          {
+            $set: {
+              [`${updateField}.$.role`]: role._id,
+              [`${updateField}.$.assignedAt`]: new Date(),
+              [`${updateField}.$.assignedBy`]: req.user._id,
+            },
+          }
+        );
+      } else {
+        // Add new assignment
+        await User.findByIdAndUpdate(userId, {
+          $push: { [updateField]: assignment },
+        });
+      }
+
+      // Fetch updated user with populated assignments
+      const updatedUser = await User.findById(userId)
+        .populate({
+          path: 'unionAssignments.union',
+          select: 'name',
+        })
+        .populate({
+          path: 'unionAssignments.role',
+          select: 'name displayName level',
+        })
+        .populate({
+          path: 'conferenceAssignments.conference',
+          select: 'name',
+        })
+        .populate({
+          path: 'conferenceAssignments.role',
+          select: 'name displayName level',
+        })
+        .populate({
+          path: 'churchAssignments.church',
+          select: 'name',
+        })
+        .populate({
+          path: 'churchAssignments.role',
+          select: 'name displayName level',
+        })
+        .select('-password');
+
+      res.json({
+        success: true,
+        message: 'Role assigned successfully',
+        data: updatedUser,
       });
     } catch (error) {
       // Error assigning role
@@ -429,6 +707,10 @@ router.post(
         organizations,
         organizationId,
         role,
+        // Hierarchical assignments
+        unionAssignments,
+        conferenceAssignments,
+        churchAssignments,
       } = req.body;
 
       // Prepare organizations array if role assignment is provided
@@ -466,6 +748,10 @@ router.post(
         country,
         verified: verified ?? false,
         organizations: organizationsArray,
+        // Include hierarchical assignments
+        unionAssignments: unionAssignments || [],
+        conferenceAssignments: conferenceAssignments || [],
+        churchAssignments: churchAssignments || [],
       };
 
       // Only add password if explicitly provided
@@ -603,6 +889,31 @@ router.put(
           },
         })
         .populate('primaryTeam', 'name')
+        // Populate hierarchical assignments
+        .populate({
+          path: 'unionAssignments.union',
+          select: 'name',
+        })
+        .populate({
+          path: 'unionAssignments.role',
+          select: 'name displayName level',
+        })
+        .populate({
+          path: 'conferenceAssignments.conference',
+          select: 'name',
+        })
+        .populate({
+          path: 'conferenceAssignments.role',
+          select: 'name displayName level',
+        })
+        .populate({
+          path: 'churchAssignments.church',
+          select: 'name',
+        })
+        .populate({
+          path: 'churchAssignments.role',
+          select: 'name displayName level',
+        })
         .select('-password');
 
       if (!user) {
@@ -612,13 +923,34 @@ router.put(
         });
       }
 
+      const userJson = user.toJSON();
+
+      // Check if user has stored hierarchical assignments
+      const hasStoredAssignments =
+        (userJson.unionAssignments && userJson.unionAssignments.length > 0) ||
+        (userJson.conferenceAssignments &&
+          userJson.conferenceAssignments.length > 0) ||
+        (userJson.churchAssignments && userJson.churchAssignments.length > 0);
+
+      // Use stored assignments if available, otherwise derive from team assignments
+      let finalAssignments;
+      if (hasStoredAssignments) {
+        finalAssignments = {
+          unionAssignments: userJson.unionAssignments || [],
+          conferenceAssignments: userJson.conferenceAssignments || [],
+          churchAssignments: userJson.churchAssignments || [],
+        };
+      } else {
+        finalAssignments = await deriveHierarchicalAssignments(user);
+      }
+
       res.json({
         success: true,
         message: 'User updated successfully',
         data: {
-          ...user.toJSON(),
+          ...userJson,
           id: user._id,
-          ...(await deriveHierarchicalAssignments(user)),
+          ...finalAssignments,
           organizations: [], // Empty for backward compatibility
         },
       });

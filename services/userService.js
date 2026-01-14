@@ -177,6 +177,9 @@ class UserService {
         state,
         country,
         teamAssignments = [], // New: teams instead of organizations
+        unionAssignments = [], // Hierarchical assignments
+        conferenceAssignments = [],
+        churchAssignments = [],
         sendInvitation = true,
       } = userData;
 
@@ -210,7 +213,33 @@ class UserService {
         });
       }
 
-      // Create user with team assignments
+      // Process hierarchical assignments
+      const processedUnionAssignments = unionAssignments.map((assignment) => ({
+        union: assignment.union,
+        role: assignment.role,
+        assignedAt: assignment.assignedAt || new Date(),
+        assignedBy: createdBy,
+      }));
+
+      const processedConferenceAssignments = conferenceAssignments.map(
+        (assignment) => ({
+          conference: assignment.conference,
+          role: assignment.role,
+          assignedAt: assignment.assignedAt || new Date(),
+          assignedBy: createdBy,
+        })
+      );
+
+      const processedChurchAssignments = churchAssignments.map(
+        (assignment) => ({
+          church: assignment.church,
+          role: assignment.role,
+          assignedAt: assignment.assignedAt || new Date(),
+          assignedBy: createdBy,
+        })
+      );
+
+      // Create user with team and hierarchical assignments
       const userFields = {
         name,
         email,
@@ -225,6 +254,9 @@ class UserService {
           validatedTeamAssignments.length > 0
             ? validatedTeamAssignments[0].teamId
             : null,
+        unionAssignments: processedUnionAssignments,
+        conferenceAssignments: processedConferenceAssignments,
+        churchAssignments: processedChurchAssignments,
       };
 
       // Only add password if provided (for users who need to set it later)
