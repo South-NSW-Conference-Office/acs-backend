@@ -34,6 +34,79 @@ const teamAssignmentSchema = new mongoose.Schema({
   ], // Team-specific permission overrides
 });
 
+// Hierarchical assignment schemas for direct org-level role assignments
+const unionAssignmentSchema = new mongoose.Schema({
+  union: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Union',
+    required: true,
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    required: true,
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  expiresAt: {
+    type: Date,
+  },
+});
+
+const conferenceAssignmentSchema = new mongoose.Schema({
+  conference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conference',
+    required: true,
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    required: true,
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  expiresAt: {
+    type: Date,
+  },
+});
+
+const churchAssignmentSchema = new mongoose.Schema({
+  church: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Church',
+    required: true,
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role',
+    required: true,
+  },
+  assignedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  expiresAt: {
+    type: Date,
+  },
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -103,6 +176,19 @@ const userSchema = new mongoose.Schema(
     primaryTeam: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Team',
+    },
+    // HIERARCHICAL ASSIGNMENTS - Direct org-level role assignments
+    unionAssignments: {
+      type: [unionAssignmentSchema],
+      default: [],
+    },
+    conferenceAssignments: {
+      type: [conferenceAssignmentSchema],
+      default: [],
+    },
+    churchAssignments: {
+      type: [churchAssignmentSchema],
+      default: [],
     },
     isActive: {
       type: Boolean,
