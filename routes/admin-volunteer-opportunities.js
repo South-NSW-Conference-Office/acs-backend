@@ -55,42 +55,42 @@ router.get(
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
-    const { search, serviceId, status, category } = req.query;
+    const { search, serviceId, status, category, organizationId } = req.query;
     const user = req.user;
 
     // Build query
     const query = {};
 
-    // Organization/Team filtering based on user permissions
-    const isSuperAdmin = user.isSuperAdmin;
+    // Organization filtering based on user permissions
+    // Check if user is super admin by looking at their role assignments
+    const isSuperAdmin =
+      user.organizations &&
+      user.organizations.some(
+        (org) =>
+          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
+      );
 
-    if (!isSuperAdmin) {
-      const userTeams = user.teamAssignments || [];
-      if (userTeams.length > 0) {
-        // Find all services belonging to user's teams
-        const teamIds = userTeams.map((t) => t.teamId._id || t.teamId);
-        const services = await Service.find({
-          teamId: { $in: teamIds },
-          status: { $ne: 'archived' }
-        }).select('_id');
+    if (isSuperAdmin) {
+      // Super admin can see all opportunities
+      if (organizationId) {
+        query.organization = organizationId;
+      }
+    } else {
+      // Other users can only see opportunities from their organizations
+      const userOrgs = user.organizations || [];
 
-        const serviceIds = services.map(s => s._id);
-
-        // If serviceId filter is provided, ensure it's in the allowed list
-        if (serviceId) {
-          if (!serviceIds.some(id => id.toString() === serviceId)) {
-            return res.json([]);
-          }
-          query.service = serviceId;
-        } else {
-          query.service = { $in: serviceIds };
-        }
+      if (userOrgs.length > 0) {
+        // Extract organization IDs from the user.organizations array
+        const orgIds = userOrgs.map((org) => org.organization._id);
+        query.organization = { $in: orgIds };
       } else {
-        // User has no teams, return empty result
+        // User has no organizations, return empty result
         return res.json([]);
       }
-    } else if (serviceId) {
-      // Super admin filtering by serviceId
+    }
+
+    // Service filtering
+    if (serviceId) {
       query.service = serviceId;
     }
 
@@ -116,12 +116,13 @@ router.get(
     const opportunities = await VolunteerRole.find(query)
       .populate({
         path: 'service',
-        select: 'name type teamId',
+        select: 'name type organization',
         populate: {
-          path: 'teamId',
+          path: 'organization',
           select: 'name type',
         },
       })
+      .populate('organization', 'name type')
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 }) // Sort by newest first
       .limit(1000); // Reasonable limit
@@ -137,24 +138,31 @@ router.get(
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
     const user = req.user;
-    const isSuperAdmin = user.isSuperAdmin;
-    const query = { status: 'active' };
+    const query = { deletedAt: null, status: 'active' };
+
+    // Filter by user's organizations
+    // Check if user is super admin by looking at their role assignments
+    const isSuperAdmin =
+      user.organizations &&
+      user.organizations.some(
+        (org) =>
+          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
+      );
 
     if (!isSuperAdmin) {
-      const userTeams = user.teamAssignments || [];
-      if (userTeams.length > 0) {
-        // Extract team IDs from the user.teamAssignments array
-        const teamIds = userTeams.map((t) => t.teamId._id || t.teamId);
-        query.teamId = { $in: teamIds };
+      const userOrgs = user.organizations || [];
+      if (userOrgs.length > 0) {
+        // Extract organization IDs from the user.organizations array
+        const orgIds = userOrgs.map((org) => org.organization._id);
+        query.organization = { $in: orgIds };
       } else {
         return res.json([]);
       }
     }
 
     const services = await Service.find(query)
-      .select('name type teamId churchId')
-      .populate('teamId', 'name type')
-      .populate('churchId', 'name')
+      .select('name type organization')
+      .populate('organization', 'name type')
       .sort({ name: 1 });
 
     res.json(services);
@@ -170,12 +178,13 @@ router.get(
     const opportunity = await VolunteerRole.findById(req.params.id)
       .populate({
         path: 'service',
-        select: 'name type teamId',
+        select: 'name type organization',
         populate: {
-          path: 'teamId',
+          path: 'organization',
           select: 'name type',
         },
       })
+      .populate('organization', 'name type')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -199,20 +208,25 @@ router.post(
     const { serviceId } = req.body;
 
     // Verify service exists and user has access
-    const service = await Service.findOne({ _id: serviceId, status: { $ne: 'archived' } });
+    const service = await Service.findOne({ _id: serviceId, deletedAt: null });
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    // Check permissions
+    // Check if user has permission to manage this service's organization
     const user = req.user;
-    const isSuperAdmin = user.isSuperAdmin;
+    // Check if user is super admin by looking at their role assignments
+    const isSuperAdmin =
+      user.organizations &&
+      user.organizations.some(
+        (org) =>
+          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
+      );
 
     if (!isSuperAdmin) {
-      const userTeams = user.teamAssignments || [];
-      const teamIds = userTeams.map((t) => (t.teamId._id || t.teamId).toString());
-
-      if (!teamIds.includes(service.teamId.toString())) {
+      const userOrgs = user.organizations || [];
+      const orgIds = userOrgs.map((org) => org.organization._id.toString());
+      if (!orgIds.includes(service.organization.toString())) {
         return res
           .status(403)
           .json({ error: 'Insufficient permissions for this service' });
@@ -223,6 +237,7 @@ router.post(
     const opportunity = new VolunteerRole({
       ...opportunityData,
       service: service._id,
+      organization: service.organization,
       createdBy: user._id,
       updatedBy: user._id,
     });
@@ -232,12 +247,13 @@ router.post(
     // Populate the created opportunity for response
     await opportunity.populate({
       path: 'service',
-      select: 'name type teamId',
+      select: 'name type organization',
       populate: {
-        path: 'teamId',
+        path: 'organization',
         select: 'name type',
       },
     });
+    await opportunity.populate('organization', 'name type');
     await opportunity.populate('createdBy', 'name email');
 
     res.status(201).json(opportunity);
@@ -265,13 +281,18 @@ router.put(
 
     // Check permissions
     const user = req.user;
-    const isSuperAdmin = user.isSuperAdmin;
+    // Check if user is super admin by looking at their role assignments
+    const isSuperAdmin =
+      user.organizations &&
+      user.organizations.some(
+        (org) =>
+          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
+      );
 
     if (!isSuperAdmin) {
-      const userTeams = user.teamAssignments || [];
-      const teamIds = userTeams.map((t) => (t.teamId._id || t.teamId).toString());
-
-      if (!opportunity.service || !teamIds.includes(opportunity.service.teamId.toString())) {
+      const userOrgs = user.organizations || [];
+      const orgIds = userOrgs.map((org) => org.organization._id.toString());
+      if (!orgIds.includes(opportunity.organization.toString())) {
         return res
           .status(403)
           .json({ error: 'Insufficient permissions for this opportunity' });
@@ -303,12 +324,13 @@ router.put(
     // Populate the updated opportunity for response
     await opportunity.populate({
       path: 'service',
-      select: 'name type teamId',
+      select: 'name type organization',
       populate: {
-        path: 'teamId',
+        path: 'organization',
         select: 'name type',
       },
     });
+    await opportunity.populate('organization', 'name type');
     await opportunity.populate('updatedBy', 'name email');
 
     res.json(opportunity);
@@ -321,7 +343,7 @@ router.delete(
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
-    const opportunity = await VolunteerRole.findById(req.params.id).populate('service');
+    const opportunity = await VolunteerRole.findById(req.params.id);
 
     if (!opportunity) {
       return res.status(404).json({ error: 'Volunteer opportunity not found' });
@@ -329,13 +351,18 @@ router.delete(
 
     // Check permissions
     const user = req.user;
-    const isSuperAdmin = user.isSuperAdmin;
+    // Check if user is super admin by looking at their role assignments
+    const isSuperAdmin =
+      user.organizations &&
+      user.organizations.some(
+        (org) =>
+          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
+      );
 
     if (!isSuperAdmin) {
-      const userTeams = user.teamAssignments || [];
-      const teamIds = userTeams.map((t) => (t.teamId._id || t.teamId).toString());
-
-      if (!opportunity.service || !teamIds.includes(opportunity.service.teamId.toString())) {
+      const userOrgs = user.organizations || [];
+      const orgIds = userOrgs.map((org) => org.organization._id.toString());
+      if (!orgIds.includes(opportunity.organization.toString())) {
         return res
           .status(403)
           .json({ error: 'Insufficient permissions for this opportunity' });
