@@ -28,6 +28,8 @@ const roleLimitsRoutes = require('./routes/admin/role-limits');
 const superAdminRoutes = require('./routes/superAdmin');
 const mediaRoutes = require('./routes/media');
 const contactRoutes = require('./routes/contact');
+const pageContentRoutes = require('./routes/page-content');
+const adminPageContentRoutes = require('./routes/admin/page-content');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -248,6 +250,16 @@ const startServer = () => {
     { path: '/api/profile', handler: profileRoutes, name: 'profile' },
     { path: '/api/media', handler: mediaRoutes, name: 'media' },
     { path: '/api/contact', handler: contactRoutes, name: 'contact' },
+    {
+      path: '/api/page-content',
+      handler: pageContentRoutes,
+      name: 'page-content',
+    },
+    {
+      path: '/api/admin/page-content',
+      handler: adminPageContentRoutes,
+      name: 'admin-page-content',
+    },
   ];
 
   routes.forEach(({ path, handler, name }) => {
