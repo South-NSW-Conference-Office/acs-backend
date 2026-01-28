@@ -30,6 +30,8 @@ const mediaRoutes = require('./routes/media');
 const contactRoutes = require('./routes/contact');
 const pageContentRoutes = require('./routes/page-content');
 const adminPageContentRoutes = require('./routes/admin/page-content');
+const testimoniesRoutes = require('./routes/testimonies');
+const adminTestimoniesRoutes = require('./routes/admin/testimonies');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -259,6 +261,16 @@ const startServer = () => {
       path: '/api/admin/page-content',
       handler: adminPageContentRoutes,
       name: 'admin-page-content',
+    },
+    {
+      path: '/api/testimonies',
+      handler: testimoniesRoutes,
+      name: 'testimonies',
+    },
+    {
+      path: '/api/admin/testimonies',
+      handler: adminTestimoniesRoutes,
+      name: 'admin-testimonies',
     },
   ];
 

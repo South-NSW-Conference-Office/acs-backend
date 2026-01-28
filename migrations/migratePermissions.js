@@ -42,24 +42,31 @@ const systemCategories = [
     isSystem: true,
   },
   {
+    name: 'testimonies',
+    displayName: 'Testimonies',
+    description: 'Homepage testimonies management',
+    displayOrder: 6,
+    isSystem: true,
+  },
+  {
     name: 'dashboard',
     displayName: 'Dashboard & Analytics',
     description: 'Dashboard and analytics access',
-    displayOrder: 6,
+    displayOrder: 7,
     isSystem: true,
   },
   {
     name: 'media',
     displayName: 'Media & File Management',
     description: 'Media library and file upload management',
-    displayOrder: 7,
+    displayOrder: 8,
     isSystem: true,
   },
   {
     name: 'system',
     displayName: 'System Administration',
     description: 'System-level administrative functions',
-    displayOrder: 8,
+    displayOrder: 9,
     isSystem: true,
   },
 ];
@@ -232,6 +239,14 @@ const systemPermissions = {
       allowedScopes: ['own', 'subordinate', 'all', 'acs'],
     },
   ],
+  testimonies: [
+    {
+      key: 'testimonies.manage',
+      label: 'Manage Testimonies',
+      description: 'Create, edit, approve, and manage homepage testimonies',
+      allowedScopes: [],
+    },
+  ],
   dashboard: [
     {
       key: 'dashboard.view',
@@ -399,6 +414,7 @@ async function migratePermissions() {
     'roles.*',
     'services.*',
     'stories.*',
+    'testimonies.*',
     'media.*'
   );
 
