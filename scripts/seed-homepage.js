@@ -156,7 +156,8 @@ const STATIC_DATA = {
     {
       url: 'https://images.unsplash.com/photo-1722336762551-831c0bcc2b59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21tdW5pdHklMjB2b2x1bnRlZXJzJTIwcGFja2luZyUyMGNsb3RoZXN8ZW58MXx8fHwxNzY2MzcwMTc2fDA&ixlib=rb-4.1.0&q=80&w=1080',
       alt: 'Clothing Assistance',
-      caption: 'Sort and organize clothing donations for those in our community',
+      caption:
+        'Sort and organize clothing donations for those in our community',
     },
     {
       url: 'https://images.unsplash.com/photo-1758599668125-e154250f24bd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2b2x1bnRlZXJzJTIwdGVhbXdvcmslMjBjb21tdW5pdHl8ZW58MXx8fHwxNzY2MzcwMTc3fDA&ixlib=rb-4.1.0&q=80&w=1080',
@@ -527,7 +528,9 @@ async function seedHomepage() {
 
     if (existingPage && !isForced) {
       console.log('Homepage already exists in database.');
-      console.log('Use --force flag to overwrite: npm run seed:homepage -- --force');
+      console.log(
+        'Use --force flag to overwrite: npm run seed:homepage -- --force'
+      );
       await mongoose.connection.close();
       process.exit(0);
     }
