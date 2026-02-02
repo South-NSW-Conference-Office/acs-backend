@@ -1,9 +1,24 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const TeamType = require('../models/TeamType');
 const Team = require('../models/Team');
 const logger = require('../services/loggerService');
+
+/** Middleware: reject invalid ObjectId params early with a clean 400 */
+function validateObjectId(paramName) {
+  return (req, res, next) => {
+    const value = req.params[paramName];
+    if (value && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName} format`,
+      });
+    }
+    next();
+  };
+}
 
 // Get team types for current user
 router.get(
@@ -49,7 +64,6 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch team types',
-        error: error.message,
       });
     }
   }
@@ -142,7 +156,6 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch team types',
-        error: error.message,
       });
     }
   }
@@ -151,6 +164,7 @@ router.get(
 // Get a specific team type
 router.get(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('teams.read'),
   async (req, res) => {
@@ -175,7 +189,6 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch team type',
-        error: error.message,
       });
     }
   }
@@ -227,7 +240,6 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Failed to create team type',
-        error: error.message,
       });
     }
   }
@@ -236,6 +248,7 @@ router.post(
 // Update a team type
 router.put(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('teams.manage'),
   async (req, res) => {
@@ -289,7 +302,6 @@ router.put(
       res.status(500).json({
         success: false,
         message: 'Failed to update team type',
-        error: error.message,
       });
     }
   }
@@ -298,6 +310,7 @@ router.put(
 // Delete a team type
 router.delete(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('teams.manage'),
   async (req, res) => {
@@ -347,7 +360,6 @@ router.delete(
       res.status(500).json({
         success: false,
         message: 'Failed to delete team type',
-        error: error.message,
       });
     }
   }
@@ -371,7 +383,6 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Failed to initialize default team types',
-        error: error.message,
       });
     }
   }

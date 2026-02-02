@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Service = require('../models/Service');
 const ServiceEvent = require('../models/ServiceEvent');
 const VolunteerRole = require('../models/VolunteerRole');
@@ -10,6 +11,20 @@ const {
   canManageService,
   requireServicePermission,
 } = require('../middleware/serviceAuth');
+
+/** Middleware: reject invalid ObjectId params early with a clean 400 */
+function validateObjectId(paramName) {
+  return (req, res, next) => {
+    const value = req.params[paramName];
+    if (value && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName} format`,
+      });
+    }
+    next();
+  };
+}
 
 /**
  * Admin-specific routes for service management
@@ -214,7 +229,7 @@ router.get('/', async (req, res) => {
  * GET /api/admin/services/:id/full
  * Get complete service details including events, roles, and stories
  */
-router.get('/:id/full', async (req, res) => {
+router.get('/:id/full', validateObjectId('id'), async (req, res) => {
   try {
     const service = await Service.findById(req.params.id)
       .populate('teamId', 'name category')
@@ -286,7 +301,6 @@ router.get('/types', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch service types',
-      error: error.message,
     });
   }
 });
@@ -388,6 +402,7 @@ router.post(
  */
 router.put(
   '/:id',
+  validateObjectId('id'),
   requireServicePermission('services.update'),
   async (req, res) => {
     try {
@@ -397,8 +412,28 @@ router.put(
         return res.status(404).json({ error: 'Service not found' });
       }
 
-      // Update service with new data
-      Object.assign(service, req.body);
+      // Update service — whitelist allowed fields
+      const allowedFields = [
+        'name',
+        'type',
+        'descriptionShort',
+        'descriptionLong',
+        'tags',
+        'locations',
+        'contactInfo',
+        'eligibility',
+        'capacity',
+        'scheduling',
+        'status',
+        'settings',
+        'primaryImage',
+        'gallery',
+      ];
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          service[field] = req.body[field];
+        }
+      }
       service.updatedBy = req.user._id;
       await service.save();
 
@@ -429,6 +464,7 @@ router.put(
  */
 router.delete(
   '/:id',
+  validateObjectId('id'),
   requireServicePermission('services.delete'),
   async (req, res) => {
     try {
@@ -479,6 +515,7 @@ router.delete(
  */
 router.put(
   '/:id/banner',
+  validateObjectId('id'),
   requireServicePermission('services.update'),
   async (req, res) => {
     try {
@@ -546,6 +583,7 @@ router.put(
  */
 router.post(
   '/:id/toggle-status',
+  validateObjectId('id'),
   requireServicePermission('services.update'),
   async (req, res) => {
     try {

@@ -1,6 +1,6 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, validationResult, query } = require('express-validator');
-// const mongoose = require('mongoose');
 const Union = require('../models/Union');
 const MediaFile = require('../models/MediaFile');
 const {
@@ -13,7 +13,6 @@ const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 const storageService = require('../services/storageService');
 const {
   upload,
-  // handleUploadError,
   requireFile,
   validateImageDimensions,
 } = require('../middleware/uploadMiddleware');
@@ -22,6 +21,127 @@ const router = express.Router();
 
 // Apply authentication to all routes
 router.use(authenticateToken);
+
+// --- Helper Functions ---
+
+/**
+ * Validate that a string is a valid MongoDB ObjectId.
+ * Returns a 400 response if invalid, or calls next() if valid.
+ */
+function validateObjectId(req, res, next) {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid union ID format',
+    });
+  }
+  next();
+}
+
+/**
+ * Convert a nested object to MongoDB dot-notation for partial updates.
+ * e.g. { headquarters: { city: "Manila" } } → { "headquarters.city": "Manila" }
+ * Only goes one level deep (suitable for our schema's nested objects).
+ */
+function toDotNotation(obj, prefix = '') {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      !(value instanceof Date)
+    ) {
+      Object.assign(result, toDotNotation(value, fullKey));
+    } else {
+      result[fullKey] = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * Whitelist fields from req.body for union creation.
+ * Prevents mass assignment of isActive, metadata, hierarchyPath, etc.
+ */
+function pickAllowedFields(body) {
+  const allowed = ['name', 'territory', 'headquarters', 'contact', 'settings'];
+  const result = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) {
+      result[key] = body[key];
+    }
+  }
+  return result;
+}
+
+/**
+ * Build a safe $set update from req.body for union updates.
+ * Nested objects (headquarters, contact, territory, settings) use dot notation
+ * so partial updates don't wipe sibling fields.
+ * Top-level scalar fields (name) are set directly.
+ */
+function buildUpdatePayload(body) {
+  const nestedFields = ['headquarters', 'contact', 'territory', 'settings'];
+  const allowedTopLevel = ['name'];
+  const update = {};
+
+  for (const key of allowedTopLevel) {
+    if (body[key] !== undefined) {
+      update[key] = body[key];
+    }
+  }
+
+  for (const key of nestedFields) {
+    if (body[key] !== undefined && typeof body[key] === 'object') {
+      Object.assign(update, toDotNotation(body[key], key));
+    }
+  }
+
+  update['metadata.lastUpdated'] = new Date();
+  return { $set: update };
+}
+
+/**
+ * Format error responses consistently.
+ * Handles: duplicate key (E11000), validation errors, and generic errors.
+ */
+function handleUnionError(res, error, context = 'union operation') {
+  // Duplicate key (unique constraint violation)
+  if (
+    error.code === 11000 ||
+    (error.name === 'MongoServerError' && error.code === 11000)
+  ) {
+    return res.status(409).json({
+      success: false,
+      message: 'A union with this name already exists',
+    });
+  }
+
+  // Mongoose validation error — extract clean field messages
+  if (error.name === 'ValidationError') {
+    const fieldErrors = Object.values(error.errors).map((e) => ({
+      field: e.path,
+      message: e.message,
+    }));
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: fieldErrors,
+    });
+  }
+
+  // Generic server error
+  return res.status(500).json({
+    success: false,
+    message: `Failed to ${context}`,
+    error:
+      process.env.NODE_ENV === 'development'
+        ? error.message
+        : 'Internal server error',
+  });
+}
 
 // GET /api/unions - Get all unions
 router.get(
@@ -101,67 +221,72 @@ router.get(
 );
 
 // GET /api/unions/:id - Get specific union
-router.get('/:id', authorizeHierarchical('read', 'union'), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.get(
+  '/:id',
+  validateObjectId,
+  authorizeHierarchical('read', 'union'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    // Verify user has access to this union
-    const hasAccess = await hierarchicalAuthService.canUserManageEntity(
-      req.user,
-      id,
-      'read'
-    );
+      // Verify user has access to this union
+      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+        req.user,
+        id,
+        'read'
+      );
 
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have access to this union',
-      });
-    }
-
-    const union = await Union.findById(id).populate('conferences');
-
-    if (!union) {
-      return res.status(404).json({
-        success: false,
-        message: 'Union not found',
-      });
-    }
-
-    // Enhance union with thumbnail URL if MediaFile is linked
-    const unionObj = union.toObject();
-    if (unionObj.primaryImage?.mediaFileId) {
-      try {
-        const mediaFile = await MediaFile.findById(
-          unionObj.primaryImage.mediaFileId
-        ).select('thumbnail url');
-
-        if (mediaFile) {
-          // Use thumbnail URL if available, otherwise use the main image URL
-          unionObj.primaryImage.thumbnailUrl =
-            mediaFile.thumbnail?.url || mediaFile.url;
-        }
-      } catch (error) {
-        // Failed to fetch media file for union
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have access to this union',
+        });
       }
-    }
 
-    res.json({
-      success: true,
-      message: 'Union retrieved successfully',
-      data: unionObj,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch union',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
-    });
+      const union = await Union.findById(id).populate('conferences');
+
+      if (!union) {
+        return res.status(404).json({
+          success: false,
+          message: 'Union not found',
+        });
+      }
+
+      // Enhance union with thumbnail URL if MediaFile is linked
+      const unionObj = union.toObject();
+      if (unionObj.primaryImage?.mediaFileId) {
+        try {
+          const mediaFile = await MediaFile.findById(
+            unionObj.primaryImage.mediaFileId
+          ).select('thumbnail url');
+
+          if (mediaFile) {
+            // Use thumbnail URL if available, otherwise use the main image URL
+            unionObj.primaryImage.thumbnailUrl =
+              mediaFile.thumbnail?.url || mediaFile.url;
+          }
+        } catch (error) {
+          // Failed to fetch media file for union
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Union retrieved successfully',
+        data: unionObj,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch union',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
+      });
+    }
   }
-});
+);
 
 // POST /api/unions - Create new union (Super Admin only)
 router.post(
@@ -193,30 +318,17 @@ router.post(
         });
       }
 
-      // Check if code already exists
-      if (req.body.code) {
-        const existingUnion = await Union.findOne({
-          code: req.body.code.toUpperCase(),
-        });
-        if (existingUnion) {
-          return res.status(409).json({
-            success: false,
-            message: 'Union code already exists',
-          });
-        }
-      }
+      // Whitelist allowed fields only (prevents mass assignment)
+      const allowedData = pickAllowedFields(req.body);
 
-      // Create the union document first to get an ID
       const union = new Union({
-        ...req.body,
-        ...(req.body.code && { code: req.body.code.toUpperCase() }),
+        ...allowedData,
         createdBy: req.user.id,
       });
 
-      // Set hierarchyPath before validation
+      // Set hierarchyPath before save
       union.hierarchyPath = union._id.toString();
 
-      // Save the union
       await union.save();
 
       res.status(201).json({
@@ -225,12 +337,7 @@ router.post(
         data: union,
       });
     } catch (error) {
-      const statusCode = error.name === 'ValidationError' ? 400 : 500;
-      res.status(statusCode).json({
-        success: false,
-        message: error.message || 'Failed to create union',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      });
+      return handleUnionError(res, error, 'create union');
     }
   }
 );
@@ -238,6 +345,7 @@ router.post(
 // PUT /api/unions/:id - Update union
 router.put(
   '/:id',
+  validateObjectId,
   authorizeHierarchical('update', 'union'),
   auditLog('union.update'),
   [
@@ -278,29 +386,13 @@ router.put(
         });
       }
 
-      // Check if code already exists (if being updated)
-      if (req.body.code) {
-        const existingUnion = await Union.findOne({
-          code: req.body.code.toUpperCase(),
-          _id: { $ne: id },
-        });
-        if (existingUnion) {
-          return res.status(409).json({
-            success: false,
-            message: 'Union code already exists',
-          });
-        }
-        req.body.code = req.body.code.toUpperCase();
-      }
+      // Build dot-notation update to avoid wiping nested fields
+      const updatePayload = buildUpdatePayload(req.body);
 
-      const union = await Union.findByIdAndUpdate(
-        id,
-        {
-          ...req.body,
-          'metadata.lastUpdated': new Date(),
-        },
-        { new: true, runValidators: true }
-      );
+      const union = await Union.findByIdAndUpdate(id, updatePayload, {
+        new: true,
+        runValidators: true,
+      });
 
       if (!union) {
         return res.status(404).json({
@@ -315,12 +407,7 @@ router.put(
         data: union,
       });
     } catch (error) {
-      const statusCode = error.name === 'ValidationError' ? 400 : 500;
-      res.status(statusCode).json({
-        success: false,
-        message: error.message || 'Failed to update union',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      });
+      return handleUnionError(res, error, 'update union');
     }
   }
 );
@@ -328,6 +415,7 @@ router.put(
 // DELETE /api/unions/:id - Soft delete union
 router.delete(
   '/:id',
+  validateObjectId,
   requireSuperAdmin,
   auditLog('union.delete'),
   async (req, res) => {
@@ -335,14 +423,16 @@ router.delete(
       const { id } = req.params;
 
       const union = await Union.findById(id);
-      if (!union) {
+
+      // Treat missing or already-deleted unions as not found
+      if (!union || !union.isActive) {
         return res.status(404).json({
           success: false,
           message: 'Union not found',
         });
       }
 
-      // Check if union has any subordinate entities - BLOCK deletion if any exist
+      // Block deletion if subordinate entities exist
       const Conference = require('../models/Conference');
       const conferenceCount = await Conference.countDocuments({
         unionId: id,
@@ -363,7 +453,6 @@ router.delete(
         });
       }
 
-      // Also check for orphaned churches/teams/services (should not exist if conferences are properly deleted)
       const Church = require('../models/Church');
       const churchCount = await Church.countDocuments({
         hierarchyPath: { $regex: `^${union.hierarchyPath}/` },
@@ -424,7 +513,7 @@ router.delete(
         });
       }
 
-      // Only proceed with deletion if NO subordinate entities exist
+      // Soft delete
       union.isActive = false;
       union.metadata.lastUpdated = new Date();
       union.deletedAt = new Date();
@@ -434,52 +523,10 @@ router.delete(
       res.json({
         success: true,
         message: `Union "${union.name}" has been successfully deleted.`,
-        data: {
-          union: union,
-        },
+        data: { union },
       });
     } catch (error) {
-      // Provide more specific error messages
-      let statusCode = 500;
-      let message = 'Failed to delete union';
-
-      if (error.message.includes('not found')) {
-        statusCode = 404;
-        message = 'Union not found';
-      } else if (
-        error.message.includes('permission') ||
-        error.message.includes('authorized')
-      ) {
-        statusCode = 403;
-        message = 'You do not have permission to delete this union';
-      } else if (
-        error.message.includes('hierarchy') ||
-        error.message.includes('cascade')
-      ) {
-        statusCode = 409;
-        message = error.message; // Show the specific hierarchy error
-      } else if (error.message.includes('validation')) {
-        statusCode = 400;
-        message = error.message; // Show the validation error
-      } else {
-        // For other errors, show the actual error message in development
-        message =
-          process.env.NODE_ENV === 'development'
-            ? error.message
-            : 'An error occurred while deleting the union';
-      }
-
-      res.status(statusCode).json({
-        success: false,
-        message: message,
-        error:
-          process.env.NODE_ENV === 'development'
-            ? {
-                stack: error.stack,
-                details: error.message,
-              }
-            : undefined,
-      });
+      return handleUnionError(res, error, 'delete union');
     }
   }
 );
@@ -487,6 +534,7 @@ router.delete(
 // GET /api/unions/:id/statistics - Get union statistics
 router.get(
   '/:id/statistics',
+  validateObjectId,
   authorizeHierarchical('read', 'union'),
   async (req, res) => {
     try {
@@ -530,6 +578,7 @@ router.get(
 // GET /api/unions/:id/hierarchy - Get full union hierarchy
 router.get(
   '/:id/hierarchy',
+  validateObjectId,
   authorizeHierarchical('read', 'union'),
   async (req, res) => {
     try {
@@ -566,6 +615,7 @@ router.get(
 // PUT /api/unions/:id/banner - Upload/update union banner image
 router.put(
   '/:id/banner',
+  validateObjectId,
   authorizeHierarchical('update', 'union'),
   auditLog('union.banner.update'),
   upload.banner,
@@ -661,6 +711,7 @@ router.put(
  */
 router.put(
   '/:id/banner/media',
+  validateObjectId,
   authorizeHierarchical('update', 'union'),
   auditLog('union.banner.update_from_media'),
   [

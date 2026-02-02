@@ -1,10 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
+const { body, param, validationResult } = require('express-validator');
 const ServiceEvent = require('../models/ServiceEvent');
 const Service = require('../models/Service');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
+
+/** Middleware: reject invalid ObjectId params early with a clean 400 */
+function validateObjectId(paramName) {
+  return (req, res, next) => {
+    const value = req.params[paramName];
+    if (value && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName} format`,
+      });
+    }
+    next();
+  };
+}
 
 // Validation middleware
 const validateEvent = [
@@ -159,6 +174,7 @@ router.get(
 // GET /api/admin/events/:id - Get single event
 router.get(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
@@ -230,9 +246,14 @@ router.post(
         .json({ error: 'End date must be after start date' });
     }
 
-    // Create event
+    // Create event — pick only allowed fields (no mass assignment)
     const event = new ServiceEvent({
-      ...eventData,
+      name: eventData.name,
+      description: eventData.description,
+      start: eventData.start,
+      end: eventData.end,
+      locationText: eventData.locationText,
+      capacity: eventData.capacity,
       service: service._id,
       organization: service.organization,
       createdBy: user._id,
@@ -260,6 +281,7 @@ router.post(
 // PUT /api/admin/events/:id - Update event
 router.put(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('services.manage'),
   validateEvent,
@@ -338,6 +360,7 @@ router.put(
 // DELETE /api/admin/events/:id - Delete event (hard delete)
 router.delete(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {

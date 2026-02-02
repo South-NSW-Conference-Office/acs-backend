@@ -1,11 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const {
   authenticateToken,
   authorizeHierarchical,
   // authorizeTeamAccess,
   // requireSuperAdmin
 } = require('../middleware/hierarchicalAuth');
+
+/** Middleware: reject invalid ObjectId params early with a clean 400 */
+function validateObjectId(paramName) {
+  return (req, res, next) => {
+    const value = req.params[paramName];
+    if (value && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName} format`,
+      });
+    }
+    next();
+  };
+}
 const { authorize, authorizeWithTeam } = require('../middleware/auth');
 const { checkRoleQuota } = require('../middleware/quotaCheck');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
@@ -18,6 +33,7 @@ const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 // Get teams for an organization (church)
 router.get(
   '/church/:churchId',
+  validateObjectId('churchId'),
   authenticateToken,
   authorizeHierarchical('read', 'organization'),
   async (req, res) => {
@@ -400,6 +416,7 @@ router.delete(
 // Get team members
 router.get(
   '/:teamId/members',
+  validateObjectId('teamId'),
   authenticateToken,
   authorizeWithTeam('teams.read'),
   async (req, res) => {
