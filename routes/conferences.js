@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, validationResult, query } = require('express-validator');
 const Conference = require('../models/Conference');
 const Union = require('../models/Union');
@@ -10,6 +11,90 @@ const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 
 const router = express.Router();
+
+// ─── Helper: Validate ObjectId param ──────────────────────────────
+function validateObjectId(req, res, next) {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid conference ID format',
+    });
+  }
+  next();
+}
+
+// ─── Helper: Convert nested object to dot-notation for safe $set ──
+function toDotNotation(obj, prefix = '') {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      !(value instanceof Date)
+    ) {
+      Object.assign(result, toDotNotation(value, path));
+    } else {
+      result[path] = value;
+    }
+  }
+  return result;
+}
+
+// ─── Helper: Whitelist allowed fields ─────────────────────────────
+const ALLOWED_FIELDS = [
+  'name',
+  'territory',
+  'headquarters',
+  'contact',
+  'programs',
+  'budget',
+  'settings',
+];
+
+function pickAllowedFields(body) {
+  const cleaned = {};
+  for (const key of ALLOWED_FIELDS) {
+    if (body[key] !== undefined) cleaned[key] = body[key];
+  }
+  return cleaned;
+}
+
+// ─── Helper: Build safe update payload with dot-notation ──────────
+function buildUpdatePayload(body) {
+  const allowed = pickAllowedFields(body);
+  return toDotNotation(allowed);
+}
+
+// ─── Helper: Centralised error handler ────────────────────────────
+function handleConferenceError(res, error) {
+  // Duplicate key (name + unionId compound unique)
+  if (error.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      message:
+        'A conference with this name already exists in the selected union',
+    });
+  }
+  // Mongoose validation
+  if (error.name === 'ValidationError') {
+    const errors = Object.entries(error.errors).map(([field, err]) => ({
+      field,
+      message: err.message,
+    }));
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors,
+    });
+  }
+  // Generic
+  return res.status(500).json({
+    success: false,
+    message: 'An unexpected error occurred',
+  });
+}
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -89,6 +174,7 @@ router.get(
 // GET /api/conferences/:id - Get specific conference
 router.get(
   '/:id',
+  validateObjectId,
   authorizeHierarchical('read', 'conference'),
   async (req, res) => {
     try {
@@ -125,14 +211,7 @@ router.get(
         data: conference,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch conference',
-        error:
-          process.env.NODE_ENV === 'development'
-            ? error.message
-            : 'Internal server error',
-      });
+      handleConferenceError(res, error);
     }
   }
 );
@@ -174,7 +253,8 @@ router.post(
       }
 
       const conferenceData = {
-        ...req.body,
+        ...pickAllowedFields(req.body),
+        unionId: req.body.unionId,
         createdBy: req.user.id,
       };
 
@@ -187,12 +267,7 @@ router.post(
         data: conference,
       });
     } catch (error) {
-      const statusCode = error.name === 'ValidationError' ? 400 : 500;
-      res.status(statusCode).json({
-        success: false,
-        message: error.message || 'Failed to create conference',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      });
+      handleConferenceError(res, error);
     }
   }
 );
@@ -200,6 +275,7 @@ router.post(
 // PUT /api/conferences/:id - Update conference
 router.put(
   '/:id',
+  validateObjectId,
   authorizeHierarchical('update', 'conference'),
   auditLog('conference.update'),
   [
@@ -249,12 +325,12 @@ router.put(
         });
       }
 
+      const updatePayload = buildUpdatePayload(req.body);
+      updatePayload['metadata.lastUpdated'] = new Date();
+
       const conference = await Conference.findByIdAndUpdate(
         id,
-        {
-          ...req.body,
-          'metadata.lastUpdated': new Date(),
-        },
+        { $set: updatePayload },
         { new: true, runValidators: true }
       ).populate('unionId', 'name');
 
@@ -264,12 +340,7 @@ router.put(
         data: conference,
       });
     } catch (error) {
-      const statusCode = error.name === 'ValidationError' ? 400 : 500;
-      res.status(statusCode).json({
-        success: false,
-        message: error.message || 'Failed to update conference',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      });
+      handleConferenceError(res, error);
     }
   }
 );
@@ -277,6 +348,7 @@ router.put(
 // DELETE /api/conferences/:id - Soft delete conference
 router.delete(
   '/:id',
+  validateObjectId,
   authorizeHierarchical('delete', 'conference'),
   auditLog('conference.delete'),
   async (req, res) => {
@@ -284,7 +356,7 @@ router.delete(
       const { id } = req.params;
 
       const conference = await Conference.findById(id);
-      if (!conference) {
+      if (!conference || !conference.isActive) {
         return res.status(404).json({
           success: false,
           message: 'Conference not found',
@@ -326,18 +398,11 @@ router.delete(
 
       res.json({
         success: true,
-        message: 'Conference deactivated successfully',
-        data: conference,
+        message: `Conference "${conference.name}" has been successfully deleted.`,
+        data: { conference },
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to delete conference',
-        error:
-          process.env.NODE_ENV === 'development'
-            ? error.message
-            : 'Internal server error',
-      });
+      handleConferenceError(res, error);
     }
   }
 );
@@ -345,6 +410,7 @@ router.delete(
 // GET /api/conferences/:id/statistics - Get conference statistics
 router.get(
   '/:id/statistics',
+  validateObjectId,
   authorizeHierarchical('read', 'conference'),
   async (req, res) => {
     try {
@@ -376,14 +442,7 @@ router.get(
         },
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to get conference statistics',
-        error:
-          process.env.NODE_ENV === 'development'
-            ? error.message
-            : 'Internal server error',
-      });
+      handleConferenceError(res, error);
     }
   }
 );
@@ -391,6 +450,7 @@ router.get(
 // GET /api/conferences/:id/hierarchy - Get conference hierarchy
 router.get(
   '/:id/hierarchy',
+  validateObjectId,
   authorizeHierarchical('read', 'conference'),
   async (req, res) => {
     try {
@@ -412,14 +472,7 @@ router.get(
         data: hierarchy,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to get conference hierarchy',
-        error:
-          process.env.NODE_ENV === 'development'
-            ? error.message
-            : 'Internal server error',
-      });
+      handleConferenceError(res, error);
     }
   }
 );
@@ -427,6 +480,7 @@ router.get(
 // PUT /api/conferences/:id/banner - Upload/update conference banner image
 router.put(
   '/:id/banner',
+  validateObjectId,
   authorizeHierarchical('update', 'conference'),
   auditLog('conference.banner.update'),
   async (req, res) => {
@@ -485,6 +539,7 @@ router.put(
 // PUT /api/conferences/:id/banner/media - Set conference banner from existing media file
 router.put(
   '/:id/banner/media',
+  validateObjectId,
   authorizeHierarchical('update', 'conference'),
   auditLog('conference.banner.update_from_media'),
   [

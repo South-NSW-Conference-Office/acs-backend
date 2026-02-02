@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Service = require('../models/Service');
 // const Team = require('../models/Team');
 const {
@@ -10,6 +11,51 @@ const {
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+
+/** Middleware: reject invalid ObjectId params early with a clean 400 */
+function validateObjectId(paramName) {
+  return (req, res, next) => {
+    const value = req.params[paramName];
+    if (value && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName} format`,
+      });
+    }
+    next();
+  };
+}
+
+/** Convert nested objects to dot-notation for safe MongoDB $set */
+function toDotNotation(obj, prefix = '') {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      !(value instanceof Date) &&
+      !mongoose.Types.ObjectId.isValid(value)
+    ) {
+      Object.assign(result, toDotNotation(value, fullKey));
+    } else {
+      result[fullKey] = value;
+    }
+  }
+  return result;
+}
+
+/** Pick only allowed fields from an object */
+function pickAllowedFields(obj, allowedFields) {
+  const result = {};
+  for (const field of allowedFields) {
+    if (obj[field] !== undefined) {
+      result[field] = obj[field];
+    }
+  }
+  return result;
+}
 
 // ============================================
 // HIERARCHICAL SERVICE ROUTES
@@ -44,7 +90,6 @@ router.get('/accessible', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch accessible services',
-      error: error.message,
     });
   }
 });
@@ -55,6 +100,7 @@ router.get('/accessible', authenticateToken, async (req, res) => {
  */
 router.get(
   '/team/:teamId',
+  validateObjectId('teamId'),
   authenticateToken,
   authorizeHierarchical('read', 'team'),
   async (req, res) => {
@@ -87,6 +133,7 @@ router.get(
  */
 router.get(
   '/church/:churchId',
+  validateObjectId('churchId'),
   authenticateToken,
   authorizeHierarchical('read', 'organization'),
   async (req, res) => {
@@ -122,7 +169,7 @@ router.get(
  * GET /services/public/:id
  * Get single service by ID (public view)
  */
-router.get('/public/:id', async (req, res) => {
+router.get('/public/:id', validateObjectId('id'), async (req, res) => {
   try {
     const service = await Service.findById(req.params.id)
       .populate('teamId', 'name type')
@@ -151,7 +198,6 @@ router.get('/public/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch service',
-      error: error.message,
     });
   }
 });
@@ -203,7 +249,6 @@ router.get('/public', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch services',
-      error: error.message,
     });
   }
 });
@@ -214,6 +259,7 @@ router.get('/public', async (req, res) => {
  */
 router.get(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorizeServiceAccess('read'),
   async (req, res) => {
@@ -329,24 +375,42 @@ router.post(
  */
 router.put(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorizeServiceAccess('update'),
   auditLog('service.update'),
   async (req, res) => {
     try {
       const service = req.serviceContext; // Set by authorizeServiceAccess middleware
-      const updates = req.body;
 
-      // Prevent changing teamId (services are bound to teams)
-      delete updates.teamId;
-      delete updates.churchId;
-      delete updates.hierarchyPath;
+      // Whitelist allowed update fields
+      const allowedFields = [
+        'name',
+        'type',
+        'descriptionShort',
+        'descriptionLong',
+        'tags',
+        'locations',
+        'contactInfo',
+        'eligibility',
+        'capacity',
+        'scheduling',
+        'status',
+        'settings',
+      ];
+      const filtered = pickAllowedFields(req.body, allowedFields);
 
-      // Update service
-      Object.assign(service, updates);
-      service.updatedBy = req.user._id;
+      // Use dot-notation for nested objects to avoid wiping siblings
+      const dotUpdates = toDotNotation(filtered);
+      dotUpdates.updatedBy = req.user._id;
 
-      await service.save();
+      await Service.findByIdAndUpdate(service._id, { $set: dotUpdates });
+      const updated = await Service.findById(service._id)
+        .populate('teamId', 'name type')
+        .populate('churchId', 'name');
+
+      // Replace service reference for response
+      Object.assign(service, updated.toObject());
 
       res.json({
         success: true,
@@ -368,6 +432,7 @@ router.put(
  */
 router.delete(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorizeServiceAccess('delete'),
   auditLog('service.delete'),
@@ -400,6 +465,7 @@ router.delete(
  */
 router.post(
   '/:id/restore',
+  validateObjectId('id'),
   authenticateToken,
   authorizeServiceAccess('update'),
   auditLog('service.restore'),
@@ -430,7 +496,7 @@ router.post(
  * GET /services/:id/images
  * Get all service images (public endpoint - no auth required)
  */
-router.get('/:id/images', async (req, res) => {
+router.get('/:id/images', validateObjectId('id'), async (req, res) => {
   try {
     const service = await Service.findById(req.params.id).select(
       'primaryImage gallery'

@@ -111,11 +111,32 @@ class TeamService {
       }
     }
 
-    // Update team
-    Object.assign(team, updateFields);
-    await team.save();
+    // Convert nested objects to dot-notation to avoid wiping siblings
+    const dotFields = {};
+    for (const [key, value] of Object.entries(updateFields)) {
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        !(value instanceof Date) &&
+        !require('mongoose').Types.ObjectId.isValid(value)
+      ) {
+        // Flatten nested object to dot-notation
+        for (const [subKey, subVal] of Object.entries(value)) {
+          dotFields[`${key}.${subKey}`] = subVal;
+        }
+      } else {
+        dotFields[key] = value;
+      }
+    }
 
-    return team;
+    // Update team using $set with dot-notation
+    await Team.findByIdAndUpdate(teamId, { $set: dotFields });
+    const updated = await Team.findById(teamId)
+      .populate('churchId', 'name hierarchyLevel')
+      .populate('leaderId', 'name email avatar')
+      .populate('createdBy', 'name email');
+    return updated;
   }
 
   /**

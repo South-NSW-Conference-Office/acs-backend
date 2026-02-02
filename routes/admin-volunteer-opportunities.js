@@ -1,10 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const VolunteerRole = require('../models/VolunteerRole');
 const Service = require('../models/Service');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
+
+/** Middleware: reject invalid ObjectId params early with a clean 400 */
+function validateObjectId(paramName) {
+  return (req, res, next) => {
+    const value = req.params[paramName];
+    if (value && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${paramName} format`,
+      });
+    }
+    next();
+  };
+}
 
 // Validation middleware
 const validateOpportunity = [
@@ -172,6 +187,7 @@ router.get(
 // GET /api/admin/volunteer-opportunities/:id - Get single volunteer opportunity
 router.get(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
@@ -233,9 +249,23 @@ router.post(
       }
     }
 
-    // Create volunteer opportunity
+    // Create volunteer opportunity — pick allowed fields (no mass assignment)
     const opportunity = new VolunteerRole({
-      ...opportunityData,
+      title: opportunityData.title,
+      description: opportunityData.description,
+      category: opportunityData.category,
+      requirements: opportunityData.requirements,
+      training: opportunityData.training,
+      timeCommitment: opportunityData.timeCommitment,
+      location: opportunityData.location,
+      benefits: opportunityData.benefits,
+      numberOfPositions: opportunityData.numberOfPositions,
+      status: opportunityData.status,
+      visibility: opportunityData.visibility,
+      applicationProcess: opportunityData.applicationProcess,
+      startDate: opportunityData.startDate,
+      endDate: opportunityData.endDate,
+      tags: opportunityData.tags,
       service: service._id,
       organization: service.organization,
       createdBy: user._id,
@@ -263,6 +293,7 @@ router.post(
 // PUT /api/admin/volunteer-opportunities/:id - Update volunteer opportunity
 router.put(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('services.manage'),
   validateOpportunity,
@@ -340,6 +371,7 @@ router.put(
 // DELETE /api/admin/volunteer-opportunities/:id - Delete volunteer opportunity (hard delete)
 router.delete(
   '/:id',
+  validateObjectId('id'),
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
