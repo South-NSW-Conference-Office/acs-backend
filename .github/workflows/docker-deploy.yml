@@ -3,15 +3,6 @@ name: Build and Deploy Docker (Production)
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'routes/**'
-      - 'models/**'
-      - 'services/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile'
-      - '.github/workflows/docker-deploy.yml'
 
 env:
   REGISTRY: ghcr.io

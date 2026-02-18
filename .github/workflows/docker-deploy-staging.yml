@@ -3,15 +3,6 @@ name: Build and Deploy Docker (Staging)
 on:
   push:
     branches: [staging]
-    paths:
-      - 'src/**'
-      - 'routes/**'
-      - 'models/**'
-      - 'services/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'Dockerfile'
-      - '.github/workflows/docker-deploy-staging.yml'
 
 env:
   REGISTRY: ghcr.io
