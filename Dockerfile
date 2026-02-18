@@ -1,45 +1,22 @@
-# Use Node.js LTS with Alpine for smaller image size
-FROM node:20-alpine
+FROM node:20-bullseye-slim
 
-# Install dependencies required for sharp and other native modules
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    vips-dev
-
-# Set working directory
 WORKDIR /app
 
-# Copy package files first for better caching
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-# Copy application code
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
+RUN mkdir -p logs && chown -R node:node /app
 
-# Set environment to production
 ENV NODE_ENV=production
+ENV PORT=5000
+EXPOSE 5000
 
-# Cloud Run uses PORT environment variable
-ENV PORT=8080
-EXPOSE 8080
+USER node
 
-# Run as non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 -G nodejs && \
-    chown -R nodejs:nodejs /app
-
-USER nodejs
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+    CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 5000) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
-# Start the application
 CMD ["node", "index.js"]
