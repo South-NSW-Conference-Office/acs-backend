@@ -56,10 +56,10 @@ jobs:
       - name: Deploy to Genesis VPS (Staging)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_STAGING_HOST || secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_STAGING_USERNAME || secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_STAGING_SSH_KEY || secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_STAGING_PORT || secrets.VPS_PORT }}
+          host: ${{ vars.VPS_STAGING_HOST || vars.VPS_HOST }}
+          username: ${{ vars.VPS_STAGING_USERNAME || vars.VPS_USERNAME }}
+          key: ${{ vars.VPS_STAGING_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ vars.VPS_STAGING_PORT || vars.VPS_PORT }}
           script: |
             cd /opt/adventist-community-services-staging
             docker compose pull
