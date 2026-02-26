@@ -36,6 +36,11 @@ const adminTestimoniesRoutes = require('./routes/admin/testimonies');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy when behind reverse proxy (nginx, docker, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
 app.use(helmet());
 // CORS configuration
