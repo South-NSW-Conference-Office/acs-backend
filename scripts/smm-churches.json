@@ -1,0 +1,4055 @@
+[
+  {
+    "sector": "SMM Alabel",
+    "name": "1 Acasia - Alabel",
+    "type": "Church",
+    "members": 2,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Alegria - Alabel",
+    "type": "Church",
+    "members": 439,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bagacay - Alabel",
+    "type": "Church",
+    "members": 159,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "DOMOLOK",
+    "type": "Company",
+    "members": 30,
+    "city": "Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Linao",
+    "type": "Church",
+    "members": 81,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Manga",
+    "type": "Company",
+    "members": 74,
+    "city": "Upi-Maguindanao"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pagang",
+    "type": "Church",
+    "members": 278,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SAAAI",
+    "type": "Church",
+    "members": 20,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Spring",
+    "type": "Church",
+    "members": 398,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tokawal",
+    "type": "Church",
+    "members": 215,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper Alabel",
+    "type": "Church",
+    "members": 299,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "upper bagacay",
+    "type": "Company",
+    "members": 33,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Koronadal I 64 Almotag - Koronadal",
+    "type": "Company",
+    "members": 2027,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Caloocan",
+    "type": "Church",
+    "members": 287,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Carpenter Hill",
+    "type": "Church",
+    "members": 211,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Concepcion",
+    "type": "Church",
+    "members": 73,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Elpo/Sta. Barbara",
+    "type": "Company",
+    "members": 217,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ilang-ilang/ Saravia/ BO. 8",
+    "type": "Company",
+    "members": 271,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Koronadal Central",
+    "type": "Church",
+    "members": 742,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Marbel Central",
+    "type": "Church",
+    "members": 1151,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Nursery, Koronadal",
+    "type": "Company",
+    "members": 112,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Palavilla",
+    "type": "Company",
+    "members": 120,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "PROVINCIAL JAIL, KORONADAL",
+    "type": "Company",
+    "members": 83,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Salkan",
+    "type": "Church",
+    "members": 191,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sta. Cruz",
+    "type": "Church",
+    "members": 172,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tagumpay",
+    "type": "Church",
+    "members": 318,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TANANSANG",
+    "type": "Company",
+    "members": 593,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Jonjorie Blando Narca SMM Lake Sebu 1 266 Asam Ungi - Lake Sebu",
+    "type": "Company",
+    "members": 4605,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bahung",
+    "type": "Company",
+    "members": 9,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Batutunggal",
+    "type": "Company",
+    "members": 97,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Blogsanay",
+    "type": "Company",
+    "members": 3,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "BLONGTAKUL",
+    "type": "Company",
+    "members": 17,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Botonglong",
+    "type": "Company",
+    "members": 174,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "CROSSING Bukag",
+    "type": "Company",
+    "members": 198,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "DATAL ALA",
+    "type": "Company",
+    "members": 20,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "IBA, LAMLAHAK",
+    "type": "Company",
+    "members": 94,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "KLINGBLOWON",
+    "type": "Company",
+    "members": 161,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Klubi",
+    "type": "Church",
+    "members": 1148,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lahit",
+    "type": "Company",
+    "members": 325,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAM AFUS, LAKE SEBU",
+    "type": "Company",
+    "members": 102,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lam Alo",
+    "type": "Company",
+    "members": 590,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lam Muti, Lake Sebu",
+    "type": "Company",
+    "members": 231,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lambadak",
+    "type": "Company",
+    "members": 224,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMBANIG",
+    "type": "Company",
+    "members": 122,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamdalag",
+    "type": "Company",
+    "members": 426,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamkwa",
+    "type": "Church",
+    "members": 37,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 1,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamlasak",
+    "type": "Company",
+    "members": 98,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMPITOK, LAKE SEBU",
+    "type": "Company",
+    "members": 73,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMSUFO",
+    "type": "Company",
+    "members": 29,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lembeten",
+    "type": "Company",
+    "members": 124,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lembong",
+    "type": "Company",
+    "members": 163,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LEMFUGON",
+    "type": "Company",
+    "members": 322,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lemgawel",
+    "type": "Church",
+    "members": 26,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lemkling",
+    "type": "Company",
+    "members": 192,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lower Elnao",
+    "type": "Company",
+    "members": 646,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Luhib",
+    "type": "Company",
+    "members": 208,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Luyong",
+    "type": "Company",
+    "members": 209,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "MARANG, LAKE SEBU",
+    "type": "Company",
+    "members": 19,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "MATULAS, LS",
+    "type": "Company",
+    "members": 62,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "NAUT",
+    "type": "Company",
+    "members": 8,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Selben",
+    "type": "Company",
+    "members": 75,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Selohon",
+    "type": "Company",
+    "members": 57,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sepaka",
+    "type": "Company",
+    "members": 133,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Siete",
+    "type": "Church",
+    "members": 105,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sitio Talaytay",
+    "type": "Company",
+    "members": 53,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SITIO TUKULAW",
+    "type": "Company",
+    "members": 99,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TABETE, LS",
+    "type": "Company",
+    "members": 57,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tablo - Lake Sebu",
+    "type": "Company",
+    "members": 34,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tadluga",
+    "type": "Company",
+    "members": 35,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Taguho",
+    "type": "Company",
+    "members": 46,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TAKUNIL",
+    "type": "Company",
+    "members": 54,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "T'BONG, LS",
+    "type": "Company",
+    "members": 124,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Temegading",
+    "type": "Company",
+    "members": 169,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tenebang",
+    "type": "Company",
+    "members": 199,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tubak-Lake Sebu",
+    "type": "Company",
+    "members": 117,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper Elnao",
+    "type": "Company",
+    "members": 240,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper Makulan",
+    "type": "Company",
+    "members": 75,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Metro Gensan East II 69 Almatak - General Santos City",
+    "type": "Company",
+    "members": 8095,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bethel",
+    "type": "Company",
+    "members": 31,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Buayan",
+    "type": "Church",
+    "members": 506,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Labu",
+    "type": "Church",
+    "members": 855,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ligaya",
+    "type": "Church",
+    "members": 119,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Millionaires",
+    "type": "Company",
+    "members": 158,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "NEW GARDEN GROOVE PRK.4",
+    "type": "Church",
+    "members": 53,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pag-asa Balite Lagao",
+    "type": "Church",
+    "members": 1008,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Taliwara",
+    "type": "Company",
+    "members": 210,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TINAGACAN",
+    "type": "Church",
+    "members": 171,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TOLAMBONG",
+    "type": "Company",
+    "members": 2,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper Labay",
+    "type": "Company",
+    "members": 195,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Glen Lorence Diama SMM Alabel 1 1.840 Alabel Central",
+    "type": "Church",
+    "members": 3377,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bagong Lipunan - Alabel",
+    "type": "Church",
+    "members": 172,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Baluntay - Alabel",
+    "type": "Company",
+    "members": 16,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 2,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Blacon",
+    "type": "Company",
+    "members": 126,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "IPOL",
+    "type": "Company",
+    "members": 17,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kawas",
+    "type": "Church",
+    "members": 357,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kihan",
+    "type": "Church",
+    "members": 250,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ladol Sda",
+    "type": "Church",
+    "members": 451,
+    "city": "Church Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Nop",
+    "type": "Church",
+    "members": 499,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pag-asa",
+    "type": "Church",
+    "members": 210,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "PLENGGANG, ALEGRIA",
+    "type": "Company",
+    "members": 40,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "PONGOLIEL, ALEGRIA",
+    "type": "Company",
+    "members": 13,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SALIAN",
+    "type": "Company",
+    "members": 21,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Jeremias Jr. Gono SMM Bagumbayan 2 294 Bai Saripinang SDA",
+    "type": "Church",
+    "members": 4012,
+    "city": "Church Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Baras 2 - Bagumbayan",
+    "type": "Church",
+    "members": 179,
+    "city": "Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Busok",
+    "type": "Church",
+    "members": 202,
+    "city": "Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dawing, Sto. Niño",
+    "type": "Church",
+    "members": 20,
+    "city": "Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kataan",
+    "type": "Church",
+    "members": 87,
+    "city": "Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kinayao",
+    "type": "Church",
+    "members": 184,
+    "city": "Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Marbol",
+    "type": "Church",
+    "members": 313,
+    "city": "Bagumbayan-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Balut Island 31 Kasimpo",
+    "type": "Company",
+    "members": 1279,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LANAO",
+    "type": "Company",
+    "members": 57,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Mabila",
+    "type": "Church",
+    "members": 256,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Maveas",
+    "type": "Company",
+    "members": 296,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pagen",
+    "type": "Church",
+    "members": 31,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pakiwalso",
+    "type": "Company",
+    "members": 71,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TAGEN",
+    "type": "Company",
+    "members": 40,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Elicio Bornales SMM Banga 1 139 Atbali - Banga",
+    "type": "Company",
+    "members": 782,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Banga Central",
+    "type": "Church",
+    "members": 1452,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "BUYOS",
+    "type": "Company",
+    "members": 12,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Cinco",
+    "type": "Church",
+    "members": 62,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Direlon/Bungyod",
+    "type": "Company",
+    "members": 214,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ebenezer",
+    "type": "Company",
+    "members": 516,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "ELBANTONG",
+    "type": "Company",
+    "members": 76,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "ETUMPALAK",
+    "type": "Company",
+    "members": 401,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lam-asam",
+    "type": "Church",
+    "members": 883,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMBALAS",
+    "type": "Company",
+    "members": 97,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMBINGI",
+    "type": "Company",
+    "members": 78,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMBUKAY",
+    "type": "Company",
+    "members": 84,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamkut",
+    "type": "Company",
+    "members": 66,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAMPARI",
+    "type": "Company",
+    "members": 35,
+    "city": "Bangar-La Union"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lampuco",
+    "type": "Church",
+    "members": 444,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamtabongbong",
+    "type": "Company",
+    "members": 901,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LANDAN",
+    "type": "Company",
+    "members": 155,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LITTLE BAGUIO, BANGA",
+    "type": "Company",
+    "members": 116,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Liwanay",
+    "type": "Church",
+    "members": 213,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Rang-ay (Bo.4)",
+    "type": "Church",
+    "members": 408,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Riverside, Banga (Bo. 7) (San Jose)",
+    "type": "Church",
+    "members": 76,
+    "city": "Banga-South"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 3,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upong",
+    "type": "Company",
+    "members": 361,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Wilson Kenneth Campos SMM Banga 2 534 Alon - Banga",
+    "type": "Company",
+    "members": 6789,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bo. 6 (san Vicente)",
+    "type": "Church",
+    "members": 217,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Eden Banga",
+    "type": "Company",
+    "members": 63,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kusan B-8",
+    "type": "Church",
+    "members": 185,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamcot",
+    "type": "Company",
+    "members": 460,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Malaya (Bo.9)",
+    "type": "Church",
+    "members": 634,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Punong Grande (Bo.2)",
+    "type": "Church",
+    "members": 73,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Rizal (Bo.3)",
+    "type": "Church",
+    "members": 170,
+    "city": "Banga-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Joel B. Nacubuan SMM Calumpang Central 3.009 Calumpang",
+    "type": "Church",
+    "members": 2336,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "San Jose",
+    "type": "Company",
+    "members": 338,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ian Dave Bañas SMM Compound 45 Alabel Municipal Jail",
+    "type": "Company",
+    "members": 3347,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Baluntay Jail (LB Tabo)",
+    "type": "Company",
+    "members": 113,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "City Jail, Lanton",
+    "type": "Company",
+    "members": 203,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Compound",
+    "type": "Church",
+    "members": 977,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dennis Alipoon SMM Glan 135 Aglumay - Glan",
+    "type": "Company",
+    "members": 1338,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Baliton - Glan",
+    "type": "Company",
+    "members": 177,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Calpidong",
+    "type": "Church",
+    "members": 167,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Campao",
+    "type": "Company",
+    "members": 95,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Datal Bukay",
+    "type": "Company",
+    "members": 228,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "D'lama",
+    "type": "Company",
+    "members": 52,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Glan Central",
+    "type": "Church",
+    "members": 1043,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Gufaya",
+    "type": "Church",
+    "members": 96,
+    "city": "Malapatan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LAGO, TANGO",
+    "type": "Company",
+    "members": 86,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "MALAMBAHONG",
+    "type": "Company",
+    "members": 19,
+    "city": "Sarangani-Davao Occidental"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Panangalon",
+    "type": "Company",
+    "members": 110,
+    "city": "Malapatan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sapu",
+    "type": "Church",
+    "members": 356,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sapu- Cabug",
+    "type": "Company",
+    "members": 71,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tango",
+    "type": "Company",
+    "members": 589,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM GSC SDA Central 37 Balunto",
+    "type": "Company",
+    "members": 3224,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "GSC SDA Central",
+    "type": "Church",
+    "members": 7771,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "OLARTE, LABANGAL",
+    "type": "Company",
+    "members": 57,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Edilberto Boter SMM Kalamansig 190 Alaska-Sabanal - Lebak",
+    "type": "Company",
+    "members": 7865,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Banigan Center",
+    "type": "Company",
+    "members": 258,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kalamansig",
+    "type": "Church",
+    "members": 343,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Landing",
+    "type": "Church",
+    "members": 96,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Leman",
+    "type": "Company",
+    "members": 33,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "MAGON",
+    "type": "Company",
+    "members": 141,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sangay",
+    "type": "Church",
+    "members": 290,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sipiin",
+    "type": "Company",
+    "members": 40,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sitio Bitogen",
+    "type": "Company",
+    "members": 90,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sta. Clara",
+    "type": "Church",
+    "members": 314,
+    "city": "Kalamansig-Sultan"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 4,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TINANDOK, KALAMANSIG",
+    "type": "Company",
+    "members": 82,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tumbaga/ Tinago",
+    "type": "Company",
+    "members": 105,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Keytodac/Lebak 2 809 Keytodac",
+    "type": "Church",
+    "members": 1982,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Salumping",
+    "type": "Company",
+    "members": 103,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Villamonte",
+    "type": "Company",
+    "members": 47,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Emmer G. Casas SMM Kiamba 116 Banati",
+    "type": "Company",
+    "members": 959,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Datal Uga",
+    "type": "Company",
+    "members": 43,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Gawan",
+    "type": "Company",
+    "members": 4,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "GREENVALLEY KIAMBA",
+    "type": "Company",
+    "members": 248,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Itis",
+    "type": "Company",
+    "members": 136,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kayupo SDA",
+    "type": "Church",
+    "members": 22,
+    "city": "Company Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kiamba",
+    "type": "Church",
+    "members": 1233,
+    "city": "Church Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lahakawa",
+    "type": "Company",
+    "members": 97,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Linek",
+    "type": "Church",
+    "members": 172,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Maitum",
+    "type": "Church",
+    "members": 706,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Palo 4",
+    "type": "Company",
+    "members": 51,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tablao SDA",
+    "type": "Church",
+    "members": 17,
+    "city": "Company Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TABUTONG, KIAMBA",
+    "type": "Company",
+    "members": 164,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tambilil",
+    "type": "Church",
+    "members": 343,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tulad",
+    "type": "Company",
+    "members": 370,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Koronadal II 242 Bantugan/ Namnama",
+    "type": "Church",
+    "members": 3722,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Cacub",
+    "type": "Church",
+    "members": 402,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Damcite",
+    "type": "Company",
+    "members": 346,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "DATAL LANAO",
+    "type": "Company",
+    "members": 36,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Esperanza",
+    "type": "Church",
+    "members": 645,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "JB Paciente",
+    "type": "Company",
+    "members": 97,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Marbel 4",
+    "type": "Company",
+    "members": 60,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Marbel 5",
+    "type": "Company",
+    "members": 200,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Marbel 7/ Topland",
+    "type": "Company",
+    "members": 739,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Punta Barrio",
+    "type": "Company",
+    "members": 143,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Roxas",
+    "type": "Company",
+    "members": 59,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Seok Mabini",
+    "type": "Company",
+    "members": 247,
+    "city": "Koronadal City-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Allan P. Galagnara SMM Lake Sebu 2 337 Bliboy",
+    "type": "Company",
+    "members": 3216,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Boto Cemel",
+    "type": "Company",
+    "members": 124,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Datal kadi",
+    "type": "Company",
+    "members": 349,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Datal Ligaw",
+    "type": "Company",
+    "members": 887,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Elumet",
+    "type": "Company",
+    "members": 375,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kadi",
+    "type": "Company",
+    "members": 639,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kolon Bong",
+    "type": "Company",
+    "members": 193,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lake Sebu Central",
+    "type": "Church",
+    "members": 1418,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Nef",
+    "type": "Company",
+    "members": 214,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Riverside",
+    "type": "Company",
+    "members": 661,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TABLISONG",
+    "type": "Company",
+    "members": 107,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Talisay",
+    "type": "Church",
+    "members": 261,
+    "city": "Lake Sebu-South"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 5,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tasiman",
+    "type": "Company",
+    "members": 519,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "TOLO, LAKE SEBU",
+    "type": "Company",
+    "members": 263,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Levi S. Rizaldo SMM Lebak 54 Agsam - Kalamansig",
+    "type": "Church",
+    "members": 6347,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Apos - Lebak",
+    "type": "Church",
+    "members": 181,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bukal-bukal",
+    "type": "Church",
+    "members": 45,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "BULKAW",
+    "type": "Company",
+    "members": 10,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bululawan",
+    "type": "Company",
+    "members": 105,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Calamongog",
+    "type": "Company",
+    "members": 30,
+    "city": "Sultan Kudarat-Maguindanao"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lebak",
+    "type": "Church",
+    "members": 513,
+    "city": "Kalamansig-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Poloy-poloy",
+    "type": "Church",
+    "members": 129,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tibpuan",
+    "type": "Company",
+    "members": 111,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tinonggos",
+    "type": "Church",
+    "members": 85,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tubak",
+    "type": "Company",
+    "members": 190,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tubog Toplan",
+    "type": "Company",
+    "members": 31,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Louden Mark C. Pueblas SMM Maasim 86 Amsipit - Maasim",
+    "type": "Company",
+    "members": 1484,
+    "city": "Maasim-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kablacan",
+    "type": "Company",
+    "members": 99,
+    "city": "Maasim-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LUMASAL",
+    "type": "Company",
+    "members": 6,
+    "city": "Maasim-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lumuyon",
+    "type": "Company",
+    "members": 107,
+    "city": "Maasim-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Maasim",
+    "type": "Church",
+    "members": 513,
+    "city": "Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Jonifer Jr. Lulu SMM Malandag 412 Alkikan - Malungon",
+    "type": "Church",
+    "members": 811,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Bo. Blaan",
+    "type": "Church",
+    "members": 141,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Datal Batong",
+    "type": "Church",
+    "members": 444,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Datal Tampal",
+    "type": "Church",
+    "members": 65,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kibala",
+    "type": "Church",
+    "members": 80,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kiblat",
+    "type": "Church",
+    "members": 211,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Magulo/Benigno Aquino",
+    "type": "Church",
+    "members": 281,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Malabod",
+    "type": "Church",
+    "members": 389,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Malandag Ch.",
+    "type": "Church",
+    "members": 808,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Miasong",
+    "type": "Church",
+    "members": 405,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pulatana",
+    "type": "Church",
+    "members": 390,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SMM Malapatan 90 Buan Village",
+    "type": "Company",
+    "members": 3626,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kinam - Malapatan",
+    "type": "Company",
+    "members": 338,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lamkulay",
+    "type": "Company",
+    "members": 173,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lun Baybay",
+    "type": "Company",
+    "members": 106,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lun Masla",
+    "type": "Company",
+    "members": 580,
+    "city": "Alabel-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Malapatan",
+    "type": "Church",
+    "members": 641,
+    "city": "Malapatan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Mutia Charlie SMM Malungon 120 Ambang - Malungon",
+    "type": "Company",
+    "members": 1928,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ampon Central - Malungon",
+    "type": "Church",
+    "members": 297,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Balayong",
+    "type": "Church",
+    "members": 282,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dalamuan",
+    "type": "Company",
+    "members": 90,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Duay Abo",
+    "type": "Church",
+    "members": 242,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "GUMILO",
+    "type": "Company",
+    "members": 47,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "JECUPE, NAGPAN",
+    "type": "Company",
+    "members": 28,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 6,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "KAWAYAN",
+    "type": "Company",
+    "members": 5,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kuhan",
+    "type": "Church",
+    "members": 203,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Langcuas",
+    "type": "Company",
+    "members": 266,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lutay",
+    "type": "Church",
+    "members": 359,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Malalag Tubig",
+    "type": "Church",
+    "members": 76,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Malungon Central",
+    "type": "Church",
+    "members": 716,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "MAMACAO",
+    "type": "Company",
+    "members": 35,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Maygalang",
+    "type": "Church",
+    "members": 77,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pikong",
+    "type": "Company",
+    "members": 76,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "San Isidro",
+    "type": "Church",
+    "members": 9,
+    "city": "Church Malungon-South Cotabato"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "San Roque/ New Earth",
+    "type": "Church",
+    "members": 154,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Tamban",
+    "type": "Church",
+    "members": 319,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper Lumabat",
+    "type": "Church",
+    "members": 183,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper Mainit",
+    "type": "Company",
+    "members": 98,
+    "city": "Malungon-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Aldwin Dexter Rabadon SMM Margus 378 Balangonan/ Kitayo",
+    "type": "Church",
+    "members": 3682,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Banweng- Margus",
+    "type": "Company",
+    "members": 87,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Batotoling",
+    "type": "Church",
+    "members": 209,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Butulan",
+    "type": "Church",
+    "members": 307,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dungon",
+    "type": "Company",
+    "members": 55,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kibatang",
+    "type": "Church",
+    "members": 446,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "LOWER KALATUNGAN",
+    "type": "Company",
+    "members": 114,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Margus",
+    "type": "Company",
+    "members": 274,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Molmol SDA church",
+    "type": "Company",
+    "members": 193,
+    "city": "Davao City-Zamboanga Sibugay"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Pangyan",
+    "type": "Church",
+    "members": 385,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Punsad",
+    "type": "Church",
+    "members": 265,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Wa-ay",
+    "type": "Church",
+    "members": 31,
+    "city": "Glan-Sarangani"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Carlito Erguisa SMM Metro Gensan East I 49 Balakayo/ Heights View",
+    "type": "Company",
+    "members": 2744,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Conel",
+    "type": "Church",
+    "members": 573,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dacville",
+    "type": "Church",
+    "members": 237,
+    "city": "Mabuhay-General"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Habitat",
+    "type": "Church",
+    "members": 237,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Klinan 5",
+    "type": "Church",
+    "members": 336,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Nursery - General Santos",
+    "type": "Church",
+    "members": 595,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Olympog",
+    "type": "Church",
+    "members": 265,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "RSVM - General Santos City",
+    "type": "Church",
+    "members": 310,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "San Vicente",
+    "type": "Church",
+    "members": 431,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SPRING VIEW",
+    "type": "Church",
+    "members": 34,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Arnold Batbatan SMM Metro Gensan West I 408 39.2 FVR - General Santos City",
+    "type": "Church",
+    "members": 3067,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Amazing Grace - General Santos City",
+    "type": "Church",
+    "members": 211,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dream Paradise",
+    "type": "Church",
+    "members": 210,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Fatima",
+    "type": "Church",
+    "members": 838,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Felomina Sda",
+    "type": "Church",
+    "members": 278,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Green Pasture Site (GPS)",
+    "type": "Church",
+    "members": 59,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Green Valley/ Labus",
+    "type": "Church",
+    "members": 897,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Maligaya, GSC",
+    "type": "Company",
+    "members": 104,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Mt. Sinai/ Bawing",
+    "type": "Church",
+    "members": 346,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 7,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "New Zion/ Banualan",
+    "type": "Company",
+    "members": 310,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "SHUTTLE/ New Jerusalem",
+    "type": "Company",
+    "members": 231,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Triadelphia Seventh-day Adventist",
+    "type": "Church",
+    "members": 262,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Upper London SDA",
+    "type": "Church",
+    "members": 23,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Loey Jann C. Arranguez SMM Metro Gensan West II 96 Beulah Land / Quilantang",
+    "type": "Church",
+    "members": 4177,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "BLESSED LAND",
+    "type": "Company",
+    "members": 38,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "City Jail (GSC west 2)",
+    "type": "Company",
+    "members": 415,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Countryside/ Placida",
+    "type": "Church",
+    "members": 158,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Dreamland - General Santos City",
+    "type": "Church",
+    "members": 721,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Emmanuel",
+    "type": "Company",
+    "members": 80,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Good Samaritan",
+    "type": "Company",
+    "members": 378,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lote",
+    "type": "Church",
+    "members": 1051,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "New Bucana",
+    "type": "Church",
+    "members": 884,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Promised Land - General Santos City",
+    "type": "Company",
+    "members": 80,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Ulylab SDA",
+    "type": "Church",
+    "members": 36,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kevin Ramirez Villanueva SMM Metro Gensan West III 718 Bulaong",
+    "type": "Church",
+    "members": 3937,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Cornerstone/Sto. Niño",
+    "type": "Church",
+    "members": 379,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Country Garden Sda",
+    "type": "Church",
+    "members": 607,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Kulasi/ New Canaan",
+    "type": "Church",
+    "members": 361,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Lanton/ Orion",
+    "type": "Company",
+    "members": 362,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "MOTOKLING",
+    "type": "Company",
+    "members": 68,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "New Galilee",
+    "type": "Church",
+    "members": 182,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Newland",
+    "type": "Church",
+    "members": 449,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "PAO-PAO CHURCH",
+    "type": "Church",
+    "members": 805,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Sinawal",
+    "type": "Company",
+    "members": 16,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Alabel",
+    "name": "Nildo Mamac SMM Mission District 143 Southern Mindanao Mission",
+    "type": "Church",
+    "members": 3947,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM MVA",
+    "name": "Mva",
+    "type": "Church",
+    "members": 935,
+    "city": "Tupi-South"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Aquino - Norala",
+    "type": "Company",
+    "members": 34,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Bangkal",
+    "type": "Company",
+    "members": 297,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Elcuda",
+    "type": "Company",
+    "members": 674,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Kolambog",
+    "type": "Church",
+    "members": 181,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "LAMBUSONG, NORALA",
+    "type": "Company",
+    "members": 323,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Lamfugon",
+    "type": "Company",
+    "members": 769,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "New Panay (Bo. 9)",
+    "type": "Church",
+    "members": 170,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Norala Central",
+    "type": "Church",
+    "members": 812,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "San Miguel",
+    "type": "Church",
+    "members": 461,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Simsiman",
+    "type": "Church",
+    "members": 0,
+    "city": "Norala-South Cotabato"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Ronnie Garay SMM Palimbang 931 Badiangon - Palimbang",
+    "type": "Church",
+    "members": 3721,
+    "city": "Palimbang-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Kidufong - Palimbang",
+    "type": "Company",
+    "members": 25,
+    "city": "Palimbang-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Milbuk",
+    "type": "Church",
+    "members": 176,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Tibuhol",
+    "type": "Church",
+    "members": 21,
+    "city": "Kiamba-Sarangani"
+  },
+  {
+    "sector": "SMM Norala",
+    "name": "Page 8 of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 1153,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "0 Grace Land",
+    "type": "Company",
+    "members": 1,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Lumakil",
+    "type": "Church",
+    "members": 124,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Magsaysay Sda",
+    "type": "Church",
+    "members": 34,
+    "city": "Church Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "MATIN-AO, POLOMOLOK",
+    "type": "Church",
+    "members": 345,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "MIZPAH",
+    "type": "Church",
+    "members": 151,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Pagalungan",
+    "type": "Company",
+    "members": 18,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Polomolok Central",
+    "type": "Church",
+    "members": 1040,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Polomolok East",
+    "type": "Church",
+    "members": 814,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Silway 8",
+    "type": "Church",
+    "members": 358,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "SULIT/ Goshen",
+    "type": "Company",
+    "members": 34,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "UPPER MATIN-AO, POLOMOLOK",
+    "type": "Company",
+    "members": 98,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Villa Rey/ Zion",
+    "type": "Church",
+    "members": 56,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Edsel Rendon Arcon SMM Polomolok 2 375 Alnamang - Polomolok",
+    "type": "Company",
+    "members": 3072,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Balisong - Polomolok",
+    "type": "Church",
+    "members": 185,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Cassava",
+    "type": "Church",
+    "members": 143,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "CROSSING PALKAN",
+    "type": "Church",
+    "members": 295,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "KAWIT",
+    "type": "Church",
+    "members": 92,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Lamcaliaf",
+    "type": "Church",
+    "members": 122,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "landan, Polomolok",
+    "type": "Church",
+    "members": 828,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Lemblisong",
+    "type": "Church",
+    "members": 450,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Maligo",
+    "type": "Church",
+    "members": 197,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "MT. MATUTUM/ TRIBAL/ Kinilis",
+    "type": "Company",
+    "members": 212,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Palkan",
+    "type": "Company",
+    "members": 397,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Polo",
+    "type": "Company",
+    "members": 236,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "RIVERSIDE PALKAN",
+    "type": "Company",
+    "members": 93,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Chelmer Cacal SMM Polomolok 3 448 Dolecan",
+    "type": "Church",
+    "members": 3625,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Dolefil",
+    "type": "Church",
+    "members": 695,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Gethsemane",
+    "type": "Church",
+    "members": 333,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Glamang SDA",
+    "type": "Church",
+    "members": 281,
+    "city": "Church Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "LAPU, PSC",
+    "type": "Company",
+    "members": 78,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Mt. Olive",
+    "type": "Church",
+    "members": 220,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "New Garden Grove/ Mt. Sinai",
+    "type": "Church",
+    "members": 281,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Paradise (Paraiso)",
+    "type": "Church",
+    "members": 184,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Upper Klinan",
+    "type": "Church",
+    "members": 364,
+    "city": "Polomolok-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Eugine Rey Macahito SMM Sto. Niño 154 Ambalgan - Sto. Niño",
+    "type": "Church",
+    "members": 2884,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Baras 1",
+    "type": "Church",
+    "members": 294,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "KANDANG, BAI SARIPINANG",
+    "type": "Company",
+    "members": 31,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Kuhan, Sto. Niño",
+    "type": "Company",
+    "members": 1225,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "MALUNES, SURALLAH",
+    "type": "Company",
+    "members": 208,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Manuel Roxas",
+    "type": "Church",
+    "members": 175,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "San Isidro",
+    "type": "Church",
+    "members": 101,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Sto. Niño Central",
+    "type": "Church",
+    "members": 533,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "TIMPOK",
+    "type": "Company",
+    "members": 209,
+    "city": "Bai Saripinag-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Visionaire SDA",
+    "type": "Church",
+    "members": 16,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Polomolok",
+    "name": "Page 9 of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 2946,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Asparagus - Surallah",
+    "type": "Church",
+    "members": 309,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Bagong Lipunan Sur - Surallah",
+    "type": "Church",
+    "members": 301,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Buenavista",
+    "type": "Church",
+    "members": 267,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Camotes",
+    "type": "Church",
+    "members": 53,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "CANAHAY",
+    "type": "Company",
+    "members": 96,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "DATAL SAMLON",
+    "type": "Company",
+    "members": 392,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "HANO-ON",
+    "type": "Company",
+    "members": 10,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "KENRAM",
+    "type": "Company",
+    "members": 57,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lampugon - Surallah",
+    "type": "Company",
+    "members": 392,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lower Moloy",
+    "type": "Church",
+    "members": 146,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Mabini",
+    "type": "Church",
+    "members": 407,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "MAHI CHURCH",
+    "type": "Company",
+    "members": 680,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Maligaya, Surallah",
+    "type": "Church",
+    "members": 95,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Memorial Academy, Surallah",
+    "type": "Company",
+    "members": 8,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Surallah Central",
+    "type": "Church",
+    "members": 487,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Talahik",
+    "type": "Company",
+    "members": 373,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "TAPIKONG",
+    "type": "Company",
+    "members": 12,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tapok",
+    "type": "Company",
+    "members": 120,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tibiao",
+    "type": "Company",
+    "members": 63,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tubongan",
+    "type": "Company",
+    "members": 13,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Upper Mini",
+    "type": "Company",
+    "members": 181,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Upper Moloy",
+    "type": "Church",
+    "members": 389,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Wallace",
+    "type": "Company",
+    "members": 289,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Delmer Cordellon Barrientos SMM Surallah 2 152 Centrala",
+    "type": "Church",
+    "members": 5140,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambontong",
+    "type": "Church",
+    "members": 227,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamian",
+    "type": "Church",
+    "members": 267,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Manomboy",
+    "type": "Company",
+    "members": 118,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Morville",
+    "type": "Church",
+    "members": 135,
+    "city": "Company Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tubi-Allah",
+    "type": "Church",
+    "members": 398,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "SMM T`Boli 1 104 Alaw - T'boli",
+    "type": "Company",
+    "members": 1297,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Backngeb - T'Boli",
+    "type": "Company",
+    "members": 90,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Basag-T'boli",
+    "type": "Company",
+    "members": 77,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Bila Tudok - T'Boli",
+    "type": "Company",
+    "members": 46,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Canteen",
+    "type": "Company",
+    "members": 187,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Dangkong",
+    "type": "Company",
+    "members": 123,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Datal Dlanag",
+    "type": "Company",
+    "members": 378,
+    "city": "Tboli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Demamis",
+    "type": "Church",
+    "members": 1154,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Desding",
+    "type": "Company",
+    "members": 88,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "El-Law SDA T'boli",
+    "type": "Company",
+    "members": 323,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "El-Niño",
+    "type": "Company",
+    "members": 54,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "ELTIGNE",
+    "type": "Company",
+    "members": 38,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Hot Spring",
+    "type": "Company",
+    "members": 307,
+    "city": "Tboli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kefak",
+    "type": "Company",
+    "members": 5,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambalot",
+    "type": "Company",
+    "members": 5,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambed",
+    "type": "Company",
+    "members": 158,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LAM-BLITE",
+    "type": "Company",
+    "members": 20,
+    "city": "T'Boli-South"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 10,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LAMFENGE",
+    "type": "Company",
+    "members": 16,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamhaku",
+    "type": "Church",
+    "members": 379,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LASAK (T'boli)",
+    "type": "Company",
+    "members": 76,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lemkinisong",
+    "type": "Company",
+    "members": 36,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lemloyon",
+    "type": "Company",
+    "members": 68,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LOGAN III",
+    "type": "Company",
+    "members": 15,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lower Desekit",
+    "type": "Company",
+    "members": 175,
+    "city": "Tboli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Macolon",
+    "type": "Company",
+    "members": 13,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Motosom",
+    "type": "Company",
+    "members": 200,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "New Dumangas",
+    "type": "Company",
+    "members": 128,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Riverside Laconon",
+    "type": "Company",
+    "members": 209,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "SALABANOG",
+    "type": "Company",
+    "members": 29,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "T'BOLI (HOME DIVISION)",
+    "type": "Company",
+    "members": 248,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Upper Desekit",
+    "type": "Company",
+    "members": 124,
+    "city": "Tboli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Novien Alegado SMM T`Boli 2 22 AFUS - T'BOLI",
+    "type": "Company",
+    "members": 4873,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Basak",
+    "type": "Company",
+    "members": 184,
+    "city": "Lebak-Sultan Kudarat"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kematu",
+    "type": "Company",
+    "members": 209,
+    "city": "Tboli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lam-apos",
+    "type": "Company",
+    "members": 117,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambato",
+    "type": "Church",
+    "members": 177,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambuling",
+    "type": "Company",
+    "members": 540,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambusong",
+    "type": "Church",
+    "members": 314,
+    "city": "Surallah-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamla-at",
+    "type": "Company",
+    "members": 202,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamsalome",
+    "type": "Company",
+    "members": 339,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LAMSINE",
+    "type": "Company",
+    "members": 60,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lemsnolon",
+    "type": "Church",
+    "members": 200,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Safang",
+    "type": "Company",
+    "members": 46,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Sinolon",
+    "type": "Company",
+    "members": 118,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Talufo",
+    "type": "Church",
+    "members": 560,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "T'boli Central",
+    "type": "Church",
+    "members": 831,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "SMM Tampakan 226 Bongkalon/ Mt. Carmel",
+    "type": "Church",
+    "members": 3919,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Bongmal",
+    "type": "Company",
+    "members": 403,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Bukang Liwayway",
+    "type": "Church",
+    "members": 59,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Buto",
+    "type": "Company",
+    "members": 173,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Campo 5",
+    "type": "Company",
+    "members": 249,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Crossing Langit",
+    "type": "Company",
+    "members": 80,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Danlag",
+    "type": "Church",
+    "members": 259,
+    "city": "Company Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Datalbiao",
+    "type": "Company",
+    "members": 93,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Hillside",
+    "type": "Church",
+    "members": 318,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kipalbig",
+    "type": "Church",
+    "members": 177,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kolondatal",
+    "type": "Company",
+    "members": 302,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lagdek/ Overview",
+    "type": "Company",
+    "members": 313,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lambayong-Tampacan",
+    "type": "Church",
+    "members": 102,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Liberty",
+    "type": "Church",
+    "members": 241,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Matagol",
+    "type": "Church",
+    "members": 278,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Palo 19",
+    "type": "Church",
+    "members": 101,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "River Side Tampakan",
+    "type": "Company",
+    "members": 18,
+    "city": "Tampakan-South"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 11,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Santa Cruz",
+    "type": "Church",
+    "members": 135,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Snip",
+    "type": "Church",
+    "members": 321,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Sta. Cruz (tampakan)",
+    "type": "Company",
+    "members": 175,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Sulop/ Pula Bato",
+    "type": "Church",
+    "members": 625,
+    "city": "Sulop-Davao del Sur"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tampakan",
+    "type": "Church",
+    "members": 1052,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Taplan",
+    "type": "Church",
+    "members": 71,
+    "city": "Tampakan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kennedy Dinopol Solinap SMM Tantangan 137 Bukay-Pait",
+    "type": "Company",
+    "members": 5771,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "COLONSILOL",
+    "type": "Company",
+    "members": 193,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Dumadalig",
+    "type": "Company",
+    "members": 200,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "EL-ULIT",
+    "type": "Company",
+    "members": 616,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Libas",
+    "type": "Church",
+    "members": 950,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Maibo",
+    "type": "Church",
+    "members": 130,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Malbog",
+    "type": "Church",
+    "members": 504,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Matimos",
+    "type": "Company",
+    "members": 286,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "New Cuyapo",
+    "type": "Church",
+    "members": 138,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "New Iloilo",
+    "type": "Church",
+    "members": 473,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "PAGLAUM, TANTANGAN",
+    "type": "Company",
+    "members": 516,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tacub Tantangan",
+    "type": "Company",
+    "members": 399,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tantangan Central",
+    "type": "Church",
+    "members": 547,
+    "city": "Tantangan-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Simeon Jr. Caresosa SMM Tasaday/Blit 287 Antual - Lake Sebu",
+    "type": "Church",
+    "members": 5089,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Blit",
+    "type": "Company",
+    "members": 791,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Buhong",
+    "type": "Company",
+    "members": 36,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Japan Home Diversion",
+    "type": "Company",
+    "members": 70,
+    "city": "Santo Niiño-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "KABATANG",
+    "type": "Company",
+    "members": 51,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kansal",
+    "type": "Company",
+    "members": 350,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LAMBILA",
+    "type": "Company",
+    "members": 88,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LAMOYON",
+    "type": "Company",
+    "members": 58,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamsoging",
+    "type": "Company",
+    "members": 139,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LEMSOGING",
+    "type": "Company",
+    "members": 23,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Ned",
+    "type": "Company",
+    "members": 335,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Panahak",
+    "type": "Company",
+    "members": 40,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "PANAHAK, LAKE SEBU",
+    "type": "Company",
+    "members": 33,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Salban",
+    "type": "Company",
+    "members": 381,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Slong, Lake Sebu",
+    "type": "Company",
+    "members": 287,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tasufao",
+    "type": "Church",
+    "members": 115,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tasufaw",
+    "type": "Company",
+    "members": 116,
+    "city": "Lake Sebu-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Nower Gomez SMM Tupi 1 154 Acfaon - Tupi - SMM",
+    "type": "Company",
+    "members": 3200,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Cebuano",
+    "type": "Church",
+    "members": 465,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Crossing SDA",
+    "type": "Church",
+    "members": 183,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kalcam",
+    "type": "Company",
+    "members": 170,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamplawan",
+    "type": "Company",
+    "members": 170,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lote Cebuano",
+    "type": "Church",
+    "members": 303,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lunen",
+    "type": "Company",
+    "members": 326,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "MAMBUSONG, TUPI",
+    "type": "Company",
+    "members": 75,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tubeng",
+    "type": "Company",
+    "members": 913,
+    "city": "Tupi-South"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "of 13 Janine Genodipa 2/6/2026 11:23:48AM Members Period: 02-2026 Grouping",
+    "type": "Church",
+    "members": 12,
+    "city": "Unknown"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tupi Central",
+    "type": "Church",
+    "members": 1528,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "SMM Tupi 3 1.250 Acmonan Central - Tupi",
+    "type": "Church",
+    "members": 4287,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Acmonan Upper - Tupi",
+    "type": "Church",
+    "members": 744,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Albagan - Tupi",
+    "type": "Company",
+    "members": 39,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Amloc - Tupi",
+    "type": "Company",
+    "members": 47,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Atbol - Tupi",
+    "type": "Church",
+    "members": 319,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Cabizares",
+    "type": "Company",
+    "members": 20,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Dataltah",
+    "type": "Church",
+    "members": 797,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kapok",
+    "type": "Church",
+    "members": 266,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "KITUBO, TUPI",
+    "type": "Company",
+    "members": 13,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamlatang",
+    "type": "Company",
+    "members": 580,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lamlutay",
+    "type": "Company",
+    "members": 26,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Leing",
+    "type": "Church",
+    "members": 448,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Linan",
+    "type": "Church",
+    "members": 444,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Lote - Linan",
+    "type": "Church",
+    "members": 27,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Motukalon",
+    "type": "Church",
+    "members": 179,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "New Paradise, Tupi",
+    "type": "Company",
+    "members": 170,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Saboy",
+    "type": "Church",
+    "members": 221,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "SECOND BARRIO",
+    "type": "Company",
+    "members": 37,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tinago - Tupi",
+    "type": "Church",
+    "members": 242,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tubo",
+    "type": "Company",
+    "members": 11,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tupi 2 248 Aflek - Tupi",
+    "type": "Church",
+    "members": 5880,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Datalngese",
+    "type": "Company",
+    "members": 40,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Glandang Lower",
+    "type": "Church",
+    "members": 242,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Glandang Upper",
+    "type": "Church",
+    "members": 487,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Kablon",
+    "type": "Church",
+    "members": 548,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LAMBANGAN",
+    "type": "Company",
+    "members": 119,
+    "city": "T'Boli-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "LATIL",
+    "type": "Company",
+    "members": 64,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Polonuling",
+    "type": "Church",
+    "members": 323,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Shiloh",
+    "type": "Church",
+    "members": 262,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Simbo Lower",
+    "type": "Company",
+    "members": 421,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Simbo Upper",
+    "type": "Church",
+    "members": 344,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Talcon",
+    "type": "Company",
+    "members": 170,
+    "city": "Tupi-South Cotabato"
+  },
+  {
+    "sector": "SMM Surallah",
+    "name": "Tukay Kalon",
+    "type": "Church",
+    "members": 275,
+    "city": "Tupi-South Cotabato"
+  }
+]
