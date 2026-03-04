@@ -3,6 +3,12 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
+
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required');
+  process.exit(1);
+}
+
 const logger = require('./services/loggerService');
 const { applyRateLimiters } = require('./middleware/rateLimiter');
 
@@ -51,7 +57,8 @@ app.use(
         `[CORS] Processing request from origin: ${origin || 'no-origin'}`
       );
 
-      // Allow requests with no origin (mobile apps, curl, etc.)
+      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      // In production, this could be restricted if all clients send Origin headers
       if (!origin) {
         logger.info('[CORS] Allowing request with no origin');
         return callback(null, true);
@@ -74,19 +81,19 @@ app.use(
       const localNetworkRegex = /^http:\/\/192\.168\.\d+\.\d+:\d+$/;
 
       const isAllowedOrigin = allowedOrigins.includes(origin);
-      const isLocalhost = localhostRegex.test(origin);
-      const isLocalhostIP = localhostIPRegex.test(origin);
-      const isLocalNetwork = localNetworkRegex.test(origin);
+      const isLocalDev =
+        process.env.NODE_ENV !== 'production' &&
+        (localhostRegex.test(origin) ||
+          localhostIPRegex.test(origin) ||
+          localNetworkRegex.test(origin));
 
       logger.info(`[CORS] Origin check results:`, {
         origin,
         isAllowedOrigin,
-        isLocalhost,
-        isLocalhostIP,
-        isLocalNetwork,
+        isLocalDev,
       });
 
-      if (isAllowedOrigin || isLocalhost || isLocalhostIP || isLocalNetwork) {
+      if (isAllowedOrigin || isLocalDev) {
         logger.info(`[CORS] ✓ Origin allowed: ${origin}`);
         callback(null, true);
       } else {
@@ -295,17 +302,28 @@ const startServer = () => {
   // Health check endpoint
   app.get('/health', (req, res) => {
     logger.debug('[HEALTH] Health check requested');
-    const healthData = {
-      status: 'OK',
+    res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+  });
+
+  // 404 handler with logging (must come before the error handler)
+  app.use('*', (req, res) => {
+    logger.warn(`[404] Route not found: ${req.method} ${req.path}`, {
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      headers: req.headers,
+      userAgent: req.get('User-Agent'),
+      origin: req.get('Origin'),
+      ip: req.ip,
+    });
+
+    res.status(404).json({
+      success: false,
+      message: 'Route not found',
+      path: req.path,
+      method: req.method,
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      environment: process.env.NODE_ENV || 'development',
-      mongodb:
-        mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    };
-    logger.debug('[HEALTH] Health check response:', healthData);
-    res.status(200).json(healthData);
+    });
   });
 
   // Error handling middleware with detailed logging
@@ -341,27 +359,6 @@ const startServer = () => {
       timestamp: new Date().toISOString(),
       path: req.path,
       method: req.method,
-    });
-  });
-
-  // 404 handler with logging
-  app.use('*', (req, res) => {
-    logger.warn(`[404] Route not found: ${req.method} ${req.path}`, {
-      method: req.method,
-      path: req.path,
-      query: req.query,
-      headers: req.headers,
-      userAgent: req.get('User-Agent'),
-      origin: req.get('Origin'),
-      ip: req.ip,
-    });
-
-    res.status(404).json({
-      success: false,
-      message: 'Route not found',
-      path: req.path,
-      method: req.method,
-      timestamp: new Date().toISOString(),
     });
   });
 

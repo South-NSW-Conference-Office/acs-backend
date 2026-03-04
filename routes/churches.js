@@ -18,6 +18,10 @@ const {
 
 const router = express.Router();
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ── Helper functions ─────────────────────────────────────────────────────────
 
 const mongoose = require('mongoose');
@@ -139,8 +143,8 @@ router.get(
       const query = {};
 
       if (conferenceId) query.conferenceId = conferenceId;
-      if (city) query['location.address.city'] = new RegExp(city, 'i');
-      if (state) query['location.address.state'] = new RegExp(state, 'i');
+      if (city) query['location.address.city'] = new RegExp(escapeRegex(city), 'i');
+      if (state) query['location.address.state'] = new RegExp(escapeRegex(state), 'i');
       if (!includeInactive || includeInactive !== 'true') {
         query.isActive = true;
       }
@@ -155,7 +159,7 @@ router.get(
 
       if (userLevel > 1 && userPath) {
         // Users below conference level can only see churches in their subtree
-        query.hierarchyPath = { $regex: `^${userPath}` };
+        query.hierarchyPath = { $regex: `^${escapeRegex(userPath)}` };
       }
 
       const churches = await Church.find(query)

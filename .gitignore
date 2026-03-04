@@ -28,8 +28,7 @@ __tests__/
 *.test.ts
 *.spec.js
 *.spec.ts
-scripts/test*.js
-scripts/test*.ts
+scripts/
 
 # Uploads
 uploads/

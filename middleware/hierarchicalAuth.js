@@ -19,7 +19,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     // Check if token is blacklisted
     const isBlacklisted = await tokenService.isBlacklisted(token);
@@ -128,16 +128,7 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
         if (!canAccess) {
           return res.status(403).json({
             success: false,
-            message: `Insufficient hierarchical permissions for ${requiredAction} on ${targetEntityType}`,
-            userLevel: await hierarchicalAuthService.getUserHighestLevel(user),
-            targetLevel: hierarchicalAuthService.parseHierarchyLevel(
-              targetEntity.hierarchyPath
-            ),
-            debug: {
-              userPath:
-                await hierarchicalAuthService.getUserHierarchyPath(user),
-              targetPath: targetEntity.hierarchyPath,
-            },
+            message: 'Insufficient permissions',
           });
         }
       } else if (requiredAction === 'create') {
@@ -150,9 +141,7 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
         if (userLevel >= requiredLevel) {
           return res.status(403).json({
             success: false,
-            message: `Insufficient permissions to create ${targetEntityType}`,
-            userLevel,
-            requiredLevel,
+            message: 'Insufficient permissions',
           });
         }
       }
@@ -197,7 +186,6 @@ const requireSuperAdmin = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'Super admin access required',
-        userLevel,
       });
     }
 

@@ -1,6 +1,10 @@
 const authorizationService = require('../services/authorizationService');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Secure Query Builder
  * Provides reusable methods for building secure database queries
@@ -67,7 +71,7 @@ class SecureQueryBuilder {
     // Filter organizations in user's subtree using hierarchy path
     return {
       ...baseQuery,
-      hierarchyPath: { $regex: `^${userPath}` },
+      hierarchyPath: { $regex: `^${escapeRegex(userPath)}` },
       isActive: true,
     };
   }
@@ -144,7 +148,7 @@ class SecureQueryBuilder {
   buildSearchConditions(searchTerm, fields = []) {
     if (!searchTerm || fields.length === 0) return {};
 
-    const regex = new RegExp(searchTerm, 'i');
+    const regex = new RegExp(escapeRegex(searchTerm), 'i');
     const conditions = fields.map((field) => ({ [field]: regex }));
 
     return conditions.length === 1 ? conditions[0] : { $or: conditions };

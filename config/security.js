@@ -64,7 +64,12 @@ const securityConfig = {
       includeSubDomains: true,
       preload: true,
     },
-    contentSecurityPolicy: false, // Configure based on your needs
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
     frameguard: { action: 'deny' },
   },
 };

@@ -257,7 +257,7 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -362,7 +362,7 @@ router.get('/:userId', authorize('users.read'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      err: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
     });
   }
 });
@@ -412,7 +412,7 @@ router.get('/:userId/roles', authorize('users.read'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      err: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
     });
   }
 });
@@ -583,7 +583,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -608,7 +608,7 @@ router.delete(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -773,7 +773,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -862,6 +862,9 @@ router.put(
       delete updates.organizations;
       delete updates._id;
       delete updates.id;
+      delete updates.isSuperAdmin;
+      delete updates.role;
+      delete updates.permissions;
 
       // Add update metadata
       updates.updatedAt = new Date();
@@ -959,7 +962,7 @@ router.put(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -1056,7 +1059,7 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -1132,7 +1135,7 @@ router.delete('/:userId', authorize('users.delete'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      err: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
     });
   }
 });
@@ -1251,7 +1254,7 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -1307,7 +1310,7 @@ router.get('/:userId/teams', authorize('users.read'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      err: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
     });
   }
 });
@@ -1380,7 +1383,7 @@ router.put(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }

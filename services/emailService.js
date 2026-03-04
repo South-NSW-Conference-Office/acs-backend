@@ -14,7 +14,7 @@ class EmailService {
       },
       requireTLS: true,
       tls: {
-        rejectUnauthorized: false,
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
       },
     });
   }
@@ -298,6 +298,12 @@ Adventist Community Services Australia
     }
   }
 
+  // Sanitize strings used in email headers to prevent header injection
+  sanitizeEmailHeader(value) {
+    if (typeof value !== 'string') return '';
+    return value.replace(/[\r\n]/g, '');
+  }
+
   // Send contact form notification to admin
   async sendContactFormAdminNotification(contactData) {
     const { name, email, phone, subject, message } = contactData;
@@ -314,7 +320,7 @@ Adventist Community Services Australia
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
       to: process.env.EMAIL_FROM,
-      subject: `New Contact Form Submission - ${subject}`,
+      subject: `New Contact Form Submission - ${this.sanitizeEmailHeader(subject)}`,
       text: `
 NEW CONTACT FORM SUBMISSION
 ============================
@@ -383,7 +389,7 @@ Date: ${submittedDate} AEDT
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
       to: process.env.EMAIL_FROM,
-      subject: `New Volunteer Application - ${name}`,
+      subject: `New Volunteer Application - ${this.sanitizeEmailHeader(name)}`,
       text: `
 NEW VOLUNTEER APPLICATION
 ==========================

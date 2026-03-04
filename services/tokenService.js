@@ -1,18 +1,27 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const BlacklistedToken = require('../models/BlacklistedToken');
 
 /**
  * Token Service
  * Handles JWT token generation, validation, and blacklisting
  * Follows Single Responsibility Principle
+ *
+ * Blacklisted tokens are persisted to MongoDB (survives restarts, works across
+ * PM2 cluster instances) and cached in an in-memory Map for fast lookups.
  */
 class TokenService {
   constructor() {
-    // In-memory store for blacklisted tokens
-    // In production, use Redis or similar persistent cache
+    // Warn if JWT_REFRESH_SECRET is not set
+    if (!process.env.JWT_REFRESH_SECRET) {
+      console.warn('WARNING: JWT_REFRESH_SECRET not set. Using JWT_SECRET as fallback. Set JWT_REFRESH_SECRET in production.');
+    }
+
+    // In-memory cache for blacklisted tokens (fast path)
+    // Backed by MongoDB for persistence and cross-instance consistency
     this.blacklistedTokens = new Map();
 
-    // Clean up expired tokens every hour
+    // Clean up expired tokens from the in-memory cache every hour
     setInterval(() => this.cleanupExpiredTokens(), 3600000);
   }
 
@@ -72,7 +81,8 @@ class TokenService {
     try {
       const decoded = jwt.verify(
         refreshToken,
-        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+        { algorithms: ['HS256'] }
       );
 
       if (decoded.type !== 'refresh') {
@@ -109,19 +119,21 @@ class TokenService {
   }
 
   /**
-   * Blacklist a token
+   * Blacklist a token (persists to both in-memory cache and MongoDB)
    * @param {String} token - Token to blacklist
+   * @param {String} [reason='logout'] - Reason for blacklisting
    * @returns {Promise<void>}
    */
-  async blacklistToken(token) {
+  async blacklistToken(token, reason = 'logout') {
     try {
       const decoded = jwt.decode(token);
       if (!decoded || !decoded.exp) return;
 
       const expiry = decoded.exp * 1000; // Convert to milliseconds
       const tokenId = decoded.tokenId;
+      const expiresAt = new Date(expiry);
 
-      // Store token ID with expiry time
+      // Store in in-memory cache (fast path)
       if (tokenId) {
         this.blacklistedTokens.set(tokenId, expiry);
       }
@@ -129,6 +141,21 @@ class TokenService {
       // Also store the full token hash for backward compatibility
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       this.blacklistedTokens.set(tokenHash, expiry);
+
+      // Persist to MongoDB (survives restarts, works across cluster instances)
+      try {
+        await BlacklistedToken.create({
+          token: tokenHash,
+          userId: decoded.userId || null,
+          expiresAt,
+          reason,
+        });
+      } catch (dbError) {
+        // Ignore duplicate key errors (token already blacklisted)
+        if (dbError.code !== 11000) {
+          console.error('Failed to persist blacklisted token to MongoDB:', dbError.message);
+        }
+      }
     } catch (error) {
       // Error blacklisting token
     }
@@ -136,6 +163,7 @@ class TokenService {
 
   /**
    * Check if a token is blacklisted
+   * Checks in-memory cache first (fast path), then falls back to MongoDB
    * @param {String} token - Token to check
    * @returns {Promise<Boolean>} - True if blacklisted
    */
@@ -144,14 +172,34 @@ class TokenService {
       const decoded = jwt.decode(token);
       if (!decoded) return false;
 
-      // Check by token ID
+      // Fast path: check in-memory cache by token ID
       if (decoded.tokenId && this.blacklistedTokens.has(decoded.tokenId)) {
         return true;
       }
 
-      // Check by token hash
+      // Fast path: check in-memory cache by token hash
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      return this.blacklistedTokens.has(tokenHash);
+      if (this.blacklistedTokens.has(tokenHash)) {
+        return true;
+      }
+
+      // Slow path: fall back to MongoDB query (handles cross-instance and post-restart cases)
+      try {
+        const found = await BlacklistedToken.findOne({ token: tokenHash }).lean();
+        if (found) {
+          // Populate the in-memory cache so subsequent checks are fast
+          this.blacklistedTokens.set(tokenHash, found.expiresAt.getTime());
+          if (decoded.tokenId) {
+            this.blacklistedTokens.set(decoded.tokenId, found.expiresAt.getTime());
+          }
+          return true;
+        }
+      } catch (dbError) {
+        // If MongoDB is unavailable, rely on the in-memory cache result (already checked above)
+        console.error('Failed to query BlacklistedToken from MongoDB:', dbError.message);
+      }
+
+      return false;
     } catch (error) {
       // Error checking blacklist
       return false;
@@ -164,16 +212,15 @@ class TokenService {
    * @returns {Promise<void>}
    */
   async revokeAllUserTokens() {
-    // In a production system, this would require storing user-token mappings
-    // For now, this is a placeholder for the interface
-    // Revoking all tokens for user
-    // Implementation would involve:
-    // 1. Query all active tokens for the user
-    // 2. Add each token to the blacklist
+    // TODO: For a complete implementation, add a `tokensRevokedAt` timestamp field
+    // on the User model. During token verification, compare the token's `iat` (issued at)
+    // against `user.tokensRevokedAt`. If `iat < tokensRevokedAt`, reject the token.
+    // This avoids needing to enumerate and individually blacklist every token for a user.
   }
 
   /**
-   * Clean up expired tokens from blacklist
+   * Clean up expired tokens from the in-memory cache.
+   * MongoDB cleanup is handled automatically by the TTL index on `expiresAt`.
    */
   cleanupExpiredTokens() {
     const now = Date.now();
@@ -192,7 +239,7 @@ class TokenService {
    */
   verifyToken(token, secret = process.env.JWT_SECRET) {
     try {
-      return jwt.verify(token, secret);
+      return jwt.verify(token, secret, { algorithms: ['HS256'] });
     } catch (error) {
       return null;
     }

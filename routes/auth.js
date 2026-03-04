@@ -2,9 +2,10 @@ const express = require('express');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { authenticateToken, checkPermission } = require('../middleware/auth');
+const { authenticateToken, authorize, checkPermission } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const tokenService = require('../services/tokenService');
+const { validatePassword } = require('../config/security');
 
 const router = express.Router();
 
@@ -131,6 +132,16 @@ router.post(
           success: false,
           message:
             'Password has already been set for this account. Please use the login page.',
+        });
+      }
+
+      // Validate password strength
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password does not meet requirements',
+          errors: passwordValidation.errors,
         });
       }
 
@@ -338,6 +349,14 @@ router.post(
         });
       }
 
+      // Check if account is locked
+      if (user.lockUntil && user.lockUntil > Date.now()) {
+        return res.status(423).json({
+          success: false,
+          message: 'Account temporarily locked. Try again later.',
+        });
+      }
+
       // Check if user has set up their password
       if (!user.password) {
         return res.status(400).json({
@@ -351,12 +370,24 @@ router.post(
       // Check password
       const isValidPassword = await user.comparePassword(password);
       if (!isValidPassword) {
+        // Increment failed login attempts
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+        if (user.failedLoginAttempts >= 5) {
+          user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+        }
+        await user.save();
+
         return res.status(401).json({
           success: false,
           message: 'Invalid credentials',
           err: 'Incorrect password',
         });
       }
+
+      // Reset failed login attempts on successful login
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
 
       // Generate JWT token using token service
       const token = tokenService.generateSingleToken(user);
@@ -432,7 +463,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -447,8 +478,8 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
     let permissions = [];
     let role = null;
 
-    // Check if user is a super admin (by isSuperAdmin flag or specific email/property)
-    if (user.isSuperAdmin === true || user.email === 'superadmin@acs.org') {
+    // Check if user is a super admin (by isSuperAdmin flag)
+    if (user.isSuperAdmin === true) {
       // Super admins get wildcard permissions regardless of organization assignments
       permissions = ['*'];
       role = {
@@ -512,14 +543,16 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      err: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
     });
   }
 });
 
-// POST /api/auth/register - Register new user (for development)
+// POST /api/auth/register - Register new user
 router.post(
   '/register',
+  authenticateToken,
+  authorize('users.create'),
   [
     body('name')
       .trim()
@@ -545,6 +578,16 @@ router.post(
       }
 
       const { name, email, password } = req.body;
+
+      // Validate password strength
+      const registerPasswordValidation = validatePassword(password);
+      if (!registerPasswordValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password does not meet requirements',
+          errors: registerPasswordValidation.errors,
+        });
+      }
 
       // Check if user already exists
       const existingUser = await User.findOne({ email });
@@ -581,7 +624,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -651,7 +694,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -678,6 +721,16 @@ router.post(
       }
 
       const { token, password } = req.body;
+
+      // Validate password strength
+      const resetPasswordValidation = validatePassword(password);
+      if (!resetPasswordValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password does not meet requirements',
+          errors: resetPasswordValidation.errors,
+        });
+      }
 
       // Hash the provided token to compare with stored hash
       const resetTokenHash = crypto
@@ -714,7 +767,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -776,7 +829,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }
@@ -876,7 +929,7 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Hierarchical authentication verification failed',
-      err: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
     });
   }
 });
@@ -917,7 +970,7 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        err: error.message,
+        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
       });
     }
   }

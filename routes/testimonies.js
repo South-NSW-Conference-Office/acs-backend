@@ -13,16 +13,17 @@ const Testimony = require('../models/Testimony');
  */
 router.get('/', async (req, res) => {
   try {
-    const { limit = 20, page = 1 } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [testimonies, total] = await Promise.all([
       Testimony.find({ status: 'approved' })
         .select('name location review image approvedAt')
         .sort('-approvedAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Testimony.countDocuments({ status: 'approved' }),
     ]);
 
@@ -30,10 +31,10 @@ router.get('/', async (req, res) => {
       success: true,
       testimonies,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        pages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
@@ -50,9 +51,9 @@ router.get('/', async (req, res) => {
  */
 router.get('/featured', async (req, res) => {
   try {
-    const { limit = 8 } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 8, 1), 100);
 
-    const testimonies = await Testimony.findFeatured(parseInt(limit)).select(
+    const testimonies = await Testimony.findFeatured(limit).select(
       'name location review image'
     );
 

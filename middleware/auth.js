@@ -16,7 +16,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     // Check if token is blacklisted
     const isBlacklisted = await tokenService.isBlacklisted(token);
@@ -161,8 +161,6 @@ const authorize = (requiredPermission = {}) => {
         return res.status(403).json({
           success: false,
           message: 'Insufficient permissions',
-          required: requiredPermission,
-          userPermissions: userPermissions.permissions,
         });
       }
 
@@ -321,8 +319,7 @@ const authorizeWithTeam = (requiredPermission = {}) => {
         if (!hasPermission) {
           return res.status(403).json({
             success: false,
-            message: 'Insufficient team permissions',
-            required: requiredPermission,
+            message: 'Insufficient permissions',
           });
         }
 
