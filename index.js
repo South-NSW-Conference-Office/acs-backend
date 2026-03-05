@@ -38,6 +38,7 @@ const pageContentRoutes = require('./routes/page-content');
 const adminPageContentRoutes = require('./routes/admin/page-content');
 const testimoniesRoutes = require('./routes/testimonies');
 const adminTestimoniesRoutes = require('./routes/admin/testimonies');
+const publicFellowshipRoutes = require('./routes/public-fellowship');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -283,6 +284,11 @@ const startServer = () => {
       path: '/api/admin/testimonies',
       handler: adminTestimoniesRoutes,
       name: 'admin-testimonies',
+    },
+    {
+      path: '/api/public/fellowship',
+      handler: publicFellowshipRoutes,
+      name: 'public-fellowship',
     },
   ];
 
