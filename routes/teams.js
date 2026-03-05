@@ -60,6 +60,40 @@ router.get(
   }
 );
 
+// Public: list active teams (no auth required)
+router.get('/public', async (req, res) => {
+  try {
+    const teams = await Team.find({ isActive: true })
+      .populate('churchId', 'name')
+      .populate('leaderId', 'name')
+      .select('name description category churchId leaderId members services coverImage profileImage createdAt')
+      .sort('-createdAt')
+      .limit(50);
+
+    res.json({ success: true, data: teams });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Public: get single team by ID (no auth required)
+router.get('/public/:id', validateObjectId('id'), async (req, res) => {
+  try {
+    const team = await Team.findById(req.params.id)
+      .populate('churchId', 'name address')
+      .populate('leaderId', 'name email')
+      .populate('members.userId', 'name email');
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Team not found' });
+    }
+
+    res.json({ success: true, data: team });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get all teams accessible to user (hierarchical)
 router.get('/all', authenticateToken, async (req, res) => {
   try {
