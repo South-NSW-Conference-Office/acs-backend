@@ -139,7 +139,55 @@ function invalidateChurchCache() {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
-// Apply authentication to all routes
+// =============================================================================
+// PUBLIC routes — NO auth required (must be above router.use(authenticateToken))
+// =============================================================================
+
+/**
+ * GET /api/churches/public
+ * Public church listing — no token needed.
+ * Returns active churches with fields sufficient for ChurchCard rendering.
+ * Supports ?search=, ?state=, ?conferenceId= query params.
+ */
+router.get('/public', async (req, res) => {
+  try {
+    const { search, state, conferenceId } = req.query;
+
+    const filter = { isActive: true };
+    if (conferenceId) filter.conferenceId = conferenceId;
+    if (state)
+      filter['location.address.state'] = new RegExp(
+        `^${escapeRegex(state)}$`,
+        'i'
+      );
+    if (search) {
+      const re = new RegExp(escapeRegex(search), 'i');
+      filter.$or = [
+        { name: re },
+        { 'location.address.city': re },
+        { 'location.address.state': re },
+      ];
+    }
+
+    const churches = await Church.find(filter)
+      .select(
+        'name code location contact leadership primaryImage outreach conferenceId isActive metadata'
+      )
+      .populate('conferenceId', 'name code')
+      .sort({ name: 1 })
+      .lean();
+
+    const data = churches.map(formatChurchListItem);
+
+    res.json({ success: true, data, total: data.length });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: 'Failed to load churches' });
+  }
+});
+
+// Apply authentication to all routes below this line
 router.use(authenticateToken);
 
 // GET /api/churches - Get paginated churches
