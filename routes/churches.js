@@ -144,6 +144,32 @@ function invalidateChurchCache() {
 // =============================================================================
 
 /**
+ * GET /api/churches/public/:id
+ * Public single church detail — no token needed.
+ * Returns full formatted church data required by ChurchDetails page.
+ */
+router.get('/public/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid Church ID format' });
+    }
+    const church = await Church.findOne({ _id: req.params.id, isActive: true })
+      .populate('conferenceId', 'name code')
+      .lean();
+    if (!church) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Church not found' });
+    }
+    res.json({ success: true, data: formatChurchResponse(church) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to load church' });
+  }
+});
+
+/**
  * GET /api/churches/public
  * Public church listing — no token needed.
  * Returns active churches with fields sufficient for ChurchCard rendering.
