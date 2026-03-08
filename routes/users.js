@@ -257,7 +257,9 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -583,7 +585,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -608,7 +612,9 @@ router.delete(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -773,7 +779,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -962,7 +970,9 @@ router.put(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -1059,7 +1069,9 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -1254,7 +1266,9 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -1383,7 +1397,9 @@ router.put(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }

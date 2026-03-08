@@ -2,7 +2,11 @@ const express = require('express');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { authenticateToken, authorize, checkPermission } = require('../middleware/auth');
+const {
+  authenticateToken,
+  authorize,
+  checkPermission,
+} = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const tokenService = require('../services/tokenService');
 const { validatePassword } = require('../config/security');
@@ -463,7 +467,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -624,7 +630,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -694,7 +702,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -767,7 +777,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -829,7 +841,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }
@@ -970,7 +984,9 @@ router.post(
       res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' ? { err: error.message } : {}),
+        ...(process.env.NODE_ENV === 'development'
+          ? { err: error.message }
+          : {}),
       });
     }
   }

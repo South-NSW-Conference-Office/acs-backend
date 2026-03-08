@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const { body, param, validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const ServiceEvent = require('../models/ServiceEvent');
 const Service = require('../models/Service');
 const { authenticateToken, authorize } = require('../middleware/auth');

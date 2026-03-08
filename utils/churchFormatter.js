@@ -20,13 +20,13 @@
 // Outreach label map — backend owns the enum; frontend just renders the string
 // ---------------------------------------------------------------------------
 const OUTREACH_LABELS = {
-  food_assistance:       'Food Assistance',
-  clothing:              'Clothing',
-  health_services:       'Health Services',
-  education:             'Education',
-  disaster_relief:       'Disaster Relief',
+  food_assistance: 'Food Assistance',
+  clothing: 'Clothing',
+  health_services: 'Health Services',
+  education: 'Education',
+  disaster_relief: 'Disaster Relief',
   community_development: 'Community Development',
-  family_services:       'Family Services',
+  family_services: 'Family Services',
 };
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ function extractPrimaryPastor(leadership) {
   if (!leadership?.associatePastors?.length) return null;
   const p = leadership.associatePastors[0];
   return {
-    name:  p.name  || null,
+    name: p.name || null,
     title: p.title || null,
     phone: normalizePhone(p.phone),
     email: p.email || null,
@@ -103,7 +103,7 @@ function resolveConference(conferenceId) {
   if (!conferenceId) return null;
   if (typeof conferenceId === 'object') {
     return {
-      _id:  conferenceId._id  ? String(conferenceId._id) : null,
+      _id: conferenceId._id ? String(conferenceId._id) : null,
       name: conferenceId.name || null,
       code: conferenceId.code || null,
     };
@@ -128,41 +128,38 @@ function mapOutreachFocus(primaryFocus) {
 // Computed here so the frontend never has to inspect nested arrays/booleans.
 // ---------------------------------------------------------------------------
 function computePresenceFlags(church) {
-  const services   = church.services   || {};
+  const services = church.services || {};
   const facilities = church.facilities || {};
   const leadership = church.leadership || {};
-  const outreach   = church.outreach   || {};
+  const outreach = church.outreach || {};
 
   const specialServices = services.special || [];
-  const classrooms      = facilities.classrooms || [];
-  const pastors         = leadership.associatePastors || [];
-  const outreachFocus   = outreach.primaryFocus || [];
+  const classrooms = facilities.classrooms || [];
+  const pastors = leadership.associatePastors || [];
+  const outreachFocus = outreach.primaryFocus || [];
 
   return {
     hasServiceTimes: Boolean(
       services.sabbathSchool ||
-      services.worship ||
-      services.prayerMeeting ||
-      services.vespers ||
-      specialServices.length > 0
+        services.worship ||
+        services.prayerMeeting ||
+        services.vespers ||
+        specialServices.length > 0
     ),
     hasFacilities: Boolean(
       facilities.sanctuary ||
-      classrooms.length > 0 ||
-      facilities.kitchen?.available ||
-      facilities.parking
+        classrooms.length > 0 ||
+        facilities.kitchen?.available ||
+        facilities.parking
     ),
     hasLeadership: Boolean(
       pastors.length > 0 ||
-      leadership.firstElder ||
-      leadership.acsCoordinator ||
-      leadership.clerk ||
-      leadership.treasurer
+        leadership.firstElder ||
+        leadership.acsCoordinator ||
+        leadership.clerk ||
+        leadership.treasurer
     ),
-    hasOutreach: Boolean(
-      outreachFocus.length > 0 ||
-      outreach.serviceArea
-    ),
+    hasOutreach: Boolean(outreachFocus.length > 0 || outreach.serviceArea),
   };
 }
 
@@ -183,23 +180,26 @@ function normalizeChurchInput(body) {
   // Normalize contact fields
   if (out.contact) {
     out.contact = { ...out.contact };
-    if (out.contact.phone   !== undefined) out.contact.phone   = normalizePhone(out.contact.phone);
-    if (out.contact.website !== undefined) out.contact.website = normalizeWebsite(out.contact.website);
+    if (out.contact.phone !== undefined)
+      out.contact.phone = normalizePhone(out.contact.phone);
+    if (out.contact.website !== undefined)
+      out.contact.website = normalizeWebsite(out.contact.website);
   }
 
   // Normalize nested leader phone numbers
   if (out.leadership) {
     out.leadership = { ...out.leadership };
 
-    const normalizeLeader = (leader) => leader
-      ? { ...leader, phone: normalizePhone(leader.phone) }
-      : leader;
+    const normalizeLeader = (leader) =>
+      leader ? { ...leader, phone: normalizePhone(leader.phone) } : leader;
 
     if (Array.isArray(out.leadership.associatePastors)) {
-      out.leadership.associatePastors = out.leadership.associatePastors.map(normalizeLeader);
+      out.leadership.associatePastors =
+        out.leadership.associatePastors.map(normalizeLeader);
     }
     ['firstElder', 'acsCoordinator', 'clerk', 'treasurer'].forEach((role) => {
-      if (out.leadership[role]) out.leadership[role] = normalizeLeader(out.leadership[role]);
+      if (out.leadership[role])
+        out.leadership[role] = normalizeLeader(out.leadership[role]);
     });
   }
 
@@ -216,33 +216,36 @@ function normalizeChurchInput(body) {
  */
 function formatChurchResponse(church) {
   // Support both Mongoose documents and lean objects
-  const raw = typeof church.toObject === 'function' ? church.toObject() : church;
+  const raw =
+    typeof church.toObject === 'function' ? church.toObject() : church;
 
-  const address    = raw.location?.address || null;
-  const contact    = raw.contact || {};
+  const address = raw.location?.address || null;
+  const contact = raw.contact || {};
   const leadership = raw.leadership || {};
-  const outreach   = raw.outreach || {};
-  const services   = raw.services || {};
-  const metadata   = raw.metadata || {};
+  const outreach = raw.outreach || {};
+  const services = raw.services || {};
+  const metadata = raw.metadata || {};
 
   const conference = resolveConference(raw.conferenceId);
 
   // Normalize contact at read-time too (defensive — data may pre-date normalisation)
-  const phone   = normalizePhone(contact.phone);
+  const phone = normalizePhone(contact.phone);
   const website = normalizeWebsite(contact.website);
 
   // Special services — ensure it's always an array
-  const specialServices = Array.isArray(services.special) ? services.special : [];
+  const specialServices = Array.isArray(services.special)
+    ? services.special
+    : [];
 
   // Outreach with labels
   const outreachFocus = mapOutreachFocus(outreach.primaryFocus);
 
   return {
     // ── Core identity ──────────────────────────────────────────────────────
-    _id:           String(raw._id),
-    name:          raw.name          || null,
-    code:          raw.code          || null,
-    isActive:      raw.isActive      ?? true,
+    _id: String(raw._id),
+    name: raw.name || null,
+    code: raw.code || null,
+    isActive: raw.isActive ?? true,
     organizedDate: raw.organizedDate || null,
     hierarchyPath: raw.hierarchyPath || null,
     hierarchyLevel: raw.hierarchyLevel ?? 2,
@@ -254,16 +257,16 @@ function formatChurchResponse(church) {
     location: {
       address: address
         ? {
-            street:     address.street     || null,
-            city:       address.city       || null,
-            state:      address.state      || null,
+            street: address.street || null,
+            city: address.city || null,
+            state: address.state || null,
             postalCode: address.postalCode || null,
-            country:    address.country    || null,
+            country: address.country || null,
           }
         : null,
       coordinates: raw.location?.coordinates
         ? {
-            latitude:  raw.location.coordinates.latitude,
+            latitude: raw.location.coordinates.latitude,
             longitude: raw.location.coordinates.longitude,
           }
         : null,
@@ -271,15 +274,15 @@ function formatChurchResponse(church) {
 
     // ── Computed location strings (frontend must not derive these) ─────────
     formattedAddress: buildFormattedAddress(address) || 'Address not available',
-    locationShort:    buildLocationShort(address)    || 'Location not available',
+    locationShort: buildLocationShort(address) || 'Location not available',
 
     // ── Contact (normalised, with UI-safe defaults) ────────────────────────
     contact: {
-      phone:   phone   || null,
-      email:   contact.email   || null,
+      phone: phone || null,
+      email: contact.email || null,
       website: website || null,
       // UI-safe fallbacks — frontend renders these directly
-      phoneDisplay:   phone   || 'Contact for details',
+      phoneDisplay: phone || 'Contact for details',
       websiteDisplay: website || null,
     },
 
@@ -292,40 +295,57 @@ function formatChurchResponse(church) {
 
     // ── Leadership ─────────────────────────────────────────────────────────
     leadership: {
-      primaryPastor:     extractPrimaryPastor(leadership),
-      associatePastors:  (leadership.associatePastors || []).map((p, i) => ({
+      primaryPastor: extractPrimaryPastor(leadership),
+      associatePastors: (leadership.associatePastors || []).map((p, i) => ({
         ...p,
         phone: normalizePhone(p.phone),
         isPrimary: i === 0,
       })),
-      firstElder:    leadership.firstElder    ? { ...leadership.firstElder,    phone: normalizePhone(leadership.firstElder.phone) }    : null,
-      acsCoordinator:leadership.acsCoordinator? { ...leadership.acsCoordinator, phone: normalizePhone(leadership.acsCoordinator.phone) } : null,
-      clerk:         leadership.clerk         ? { ...leadership.clerk,          phone: normalizePhone(leadership.clerk.phone) }          : null,
-      treasurer:     leadership.treasurer     ? { ...leadership.treasurer,      phone: normalizePhone(leadership.treasurer.phone) }      : null,
+      firstElder: leadership.firstElder
+        ? {
+            ...leadership.firstElder,
+            phone: normalizePhone(leadership.firstElder.phone),
+          }
+        : null,
+      acsCoordinator: leadership.acsCoordinator
+        ? {
+            ...leadership.acsCoordinator,
+            phone: normalizePhone(leadership.acsCoordinator.phone),
+          }
+        : null,
+      clerk: leadership.clerk
+        ? { ...leadership.clerk, phone: normalizePhone(leadership.clerk.phone) }
+        : null,
+      treasurer: leadership.treasurer
+        ? {
+            ...leadership.treasurer,
+            phone: normalizePhone(leadership.treasurer.phone),
+          }
+        : null,
     },
 
     // ── Services ───────────────────────────────────────────────────────────
     services: {
       sabbathSchool: services.sabbathSchool || null,
-      worship:       services.worship       || null,
+      worship: services.worship || null,
       prayerMeeting: services.prayerMeeting || null,
-      vespers:       services.vespers       || null,
-      special:       specialServices,
+      vespers: services.vespers || null,
+      special: specialServices,
     },
 
     // ── Facilities ─────────────────────────────────────────────────────────
     facilities: {
-      sanctuary:  raw.facilities?.sanctuary  || null,
+      sanctuary: raw.facilities?.sanctuary || null,
       classrooms: raw.facilities?.classrooms || [],
-      kitchen:    raw.facilities?.kitchen    || null,
-      parking:    raw.facilities?.parking    || null,
-      other:      raw.facilities?.other      || [],
+      kitchen: raw.facilities?.kitchen || null,
+      parking: raw.facilities?.parking || null,
+      other: raw.facilities?.other || [],
     },
 
     // ── Outreach (with human-readable labels from backend) ─────────────────
     outreach: {
       primaryFocus: outreachFocus,
-      serviceArea:  outreach.serviceArea || null,
+      serviceArea: outreach.serviceArea || null,
       partnerships: outreach.partnerships || [],
     },
 
@@ -338,7 +358,7 @@ function formatChurchResponse(church) {
 
     // ── Stats (always numbers, never null) ─────────────────────────────────
     stats: {
-      teamCount:    metadata.teamCount    || 0,
+      teamCount: metadata.teamCount || 0,
       serviceCount: metadata.serviceCount || 0,
     },
 
@@ -358,37 +378,42 @@ function formatChurchResponse(church) {
  * Only includes fields the list table needs — keeps the payload small.
  */
 function formatChurchListItem(church) {
-  const raw = typeof church.toObject === 'function' ? church.toObject() : church;
-  const address  = raw.location?.address || null;
-  const contact  = raw.contact || {};
+  const raw =
+    typeof church.toObject === 'function' ? church.toObject() : church;
+  const address = raw.location?.address || null;
+  const contact = raw.contact || {};
 
   return {
-    _id:          String(raw._id),
-    name:         raw.name  || null,
-    code:         raw.code  || null,
-    isActive:     raw.isActive ?? true,
-    conference:   resolveConference(raw.conferenceId),
+    _id: String(raw._id),
+    name: raw.name || null,
+    code: raw.code || null,
+    isActive: raw.isActive ?? true,
+    conference: resolveConference(raw.conferenceId),
     locationShort: buildLocationShort(address) || null,
     location: {
       address: address
         ? {
-            street:     address.street     || null,
-            city:       address.city       || null,
-            state:      address.state      || null,
+            street: address.street || null,
+            city: address.city || null,
+            state: address.state || null,
             postalCode: address.postalCode || null,
           }
         : null,
     },
     contact: {
-      phone:   normalizePhone(contact.phone)   || null,
-      email:   contact.email                   || null,
+      phone: normalizePhone(contact.phone) || null,
+      email: contact.email || null,
       website: normalizeWebsite(contact.website) || null,
     },
     stats: {
-      teamCount:    raw.metadata?.teamCount    || 0,
+      teamCount: raw.metadata?.teamCount || 0,
       serviceCount: raw.metadata?.serviceCount || 0,
     },
   };
 }
 
-module.exports = { formatChurchResponse, formatChurchListItem, normalizeChurchInput };
+module.exports = {
+  formatChurchResponse,
+  formatChurchListItem,
+  normalizeChurchInput,
+};

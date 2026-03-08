@@ -16,7 +16,9 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ['HS256'],
+    });
 
     // Check if token is blacklisted
     const isBlacklisted = await tokenService.isBlacklisted(token);

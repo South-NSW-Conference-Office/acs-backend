@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const BlacklistedToken = require('../models/BlacklistedToken');
@@ -14,7 +15,9 @@ class TokenService {
   constructor() {
     // Warn if JWT_REFRESH_SECRET is not set
     if (!process.env.JWT_REFRESH_SECRET) {
-      console.warn('WARNING: JWT_REFRESH_SECRET not set. Using JWT_SECRET as fallback. Set JWT_REFRESH_SECRET in production.');
+      console.warn(
+        'WARNING: JWT_REFRESH_SECRET not set. Using JWT_SECRET as fallback. Set JWT_REFRESH_SECRET in production.'
+      );
     }
 
     // In-memory cache for blacklisted tokens (fast path)
@@ -153,7 +156,10 @@ class TokenService {
       } catch (dbError) {
         // Ignore duplicate key errors (token already blacklisted)
         if (dbError.code !== 11000) {
-          console.error('Failed to persist blacklisted token to MongoDB:', dbError.message);
+          console.error(
+            'Failed to persist blacklisted token to MongoDB:',
+            dbError.message
+          );
         }
       }
     } catch (error) {
@@ -185,18 +191,26 @@ class TokenService {
 
       // Slow path: fall back to MongoDB query (handles cross-instance and post-restart cases)
       try {
-        const found = await BlacklistedToken.findOne({ token: tokenHash }).lean();
+        const found = await BlacklistedToken.findOne({
+          token: tokenHash,
+        }).lean();
         if (found) {
           // Populate the in-memory cache so subsequent checks are fast
           this.blacklistedTokens.set(tokenHash, found.expiresAt.getTime());
           if (decoded.tokenId) {
-            this.blacklistedTokens.set(decoded.tokenId, found.expiresAt.getTime());
+            this.blacklistedTokens.set(
+              decoded.tokenId,
+              found.expiresAt.getTime()
+            );
           }
           return true;
         }
       } catch (dbError) {
         // If MongoDB is unavailable, rely on the in-memory cache result (already checked above)
-        console.error('Failed to query BlacklistedToken from MongoDB:', dbError.message);
+        console.error(
+          'Failed to query BlacklistedToken from MongoDB:',
+          dbError.message
+        );
       }
 
       return false;

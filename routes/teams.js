@@ -66,7 +66,9 @@ router.get('/public', async (req, res) => {
     const teams = await Team.find({ isActive: true })
       .populate('churchId', 'name')
       .populate('leaderId', 'name')
-      .select('name description category churchId leaderId members services coverImage profileImage createdAt')
+      .select(
+        'name description category churchId leaderId members services coverImage profileImage createdAt'
+      )
       .sort('-createdAt')
       .limit(50);
 
@@ -85,7 +87,9 @@ router.get('/public/:id', validateObjectId('id'), async (req, res) => {
       .populate('members.userId', 'name email');
 
     if (!team) {
-      return res.status(404).json({ success: false, message: 'Team not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Team not found' });
     }
 
     res.json({ success: true, data: team });

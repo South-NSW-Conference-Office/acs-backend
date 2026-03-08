@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Role = require('../models/Role');

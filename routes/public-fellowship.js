@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const express = require('express');
 const Church = require('../models/Church');
 const Conference = require('../models/Conference');
@@ -26,12 +27,14 @@ router.get('/', async (req, res) => {
     }
 
     const churches = await Church.find(churchQuery)
-      .select('name code location contact facilities services outreach conferenceId metadata')
+      .select(
+        'name code location contact facilities services outreach conferenceId metadata'
+      )
       .populate('conferenceId', 'name code')
       .sort('name');
 
     // Transform for public consumption — no sensitive data
-    const publicChurches = churches.map(church => ({
+    const publicChurches = churches.map((church) => ({
       id: church._id,
       name: church.name,
       code: church.code,
@@ -43,9 +46,13 @@ router.get('/', async (req, res) => {
       hasKitchen: church.facilities?.kitchen?.available || false,
       // Infer meals from kitchen availability + special services
       hasMeals: church.facilities?.kitchen?.available || false,
-      mealDay: church.services?.special?.find(s => 
-        s.name?.toLowerCase().includes('meal') || s.name?.toLowerCase().includes('lunch')
-      )?.schedule || (church.facilities?.kitchen?.available ? 'Saturday lunch' : null),
+      mealDay:
+        church.services?.special?.find(
+          (s) =>
+            s.name?.toLowerCase().includes('meal') ||
+            s.name?.toLowerCase().includes('lunch')
+        )?.schedule ||
+        (church.facilities?.kitchen?.available ? 'Saturday lunch' : null),
       worshipTime: church.services?.worship?.time || null,
       sabbathSchoolTime: church.services?.sabbathSchool?.time || null,
       outreachFocus: church.outreach?.primaryFocus || [],
@@ -56,18 +63,22 @@ router.get('/', async (req, res) => {
 
     res.json({
       success: true,
-      conferences: conferences.map(c => ({
+      conferences: conferences.map((c) => ({
         id: c._id,
         name: c.name,
         code: c.code,
-        churchCount: publicChurches.filter(ch => String(ch.conferenceId) === String(c._id)).length,
+        churchCount: publicChurches.filter(
+          (ch) => String(ch.conferenceId) === String(c._id)
+        ).length,
       })),
       churches: publicChurches,
       total: publicChurches.length,
     });
   } catch (error) {
     console.error('Fellowship public endpoint error:', error);
-    res.status(500).json({ success: false, message: 'Failed to load fellowship data' });
+    res
+      .status(500)
+      .json({ success: false, message: 'Failed to load fellowship data' });
   }
 });
 

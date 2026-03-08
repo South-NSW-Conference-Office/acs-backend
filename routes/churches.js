@@ -6,7 +6,6 @@ const MediaFile = require('../models/MediaFile');
 const {
   authenticateToken,
   authorizeHierarchical,
-  invalidateUserCache,
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
@@ -85,12 +84,6 @@ function pickAllowedFields(body) {
   return picked;
 }
 
-/** Combine pick + dot-notation for a safe $set payload */
-function buildUpdatePayload(body) {
-  const safe = pickAllowedFields(body);
-  return toDotNotation(safe);
-}
-
 /** Centralised error handler for Church routes */
 function handleChurchError(error, res) {
   if (error.code === 11000) {
@@ -154,35 +147,60 @@ router.get(
   '/',
   authorizeHierarchical('read', 'church'),
   [
-    query('conferenceId').optional().isMongoId().withMessage('Valid conference ID required'),
+    query('conferenceId')
+      .optional()
+      .isMongoId()
+      .withMessage('Valid conference ID required'),
     query('city').optional().isString().withMessage('City must be a string'),
     query('state').optional().isString().withMessage('State must be a string'),
-    query('search').optional().isString().withMessage('Search must be a string'),
-    query('includeInactive').optional().isBoolean().withMessage('includeInactive must be a boolean'),
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1–100'),
+    query('search')
+      .optional()
+      .isString()
+      .withMessage('Search must be a string'),
+    query('includeInactive')
+      .optional()
+      .isBoolean()
+      .withMessage('includeInactive must be a boolean'),
+    query('page')
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage('Page must be a positive integer'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage('Limit must be 1–100'),
   ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array(),
+        });
       }
 
       const { conferenceId, city, state, search, includeInactive } = req.query;
-      const page  = Math.max(1, parseInt(req.query.page  || '1',  10));
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '25', 10)));
-      const skip  = (page - 1) * limit;
+      const page = Math.max(1, parseInt(req.query.page || '1', 10));
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt(req.query.limit || '25', 10))
+      );
+      const skip = (page - 1) * limit;
 
       // Build filter — use hierarchy context already resolved by middleware
       const userLevel = req.userHierarchyLevel;
-      const userPath  = req.userHierarchyPath;
+      const userPath = req.userHierarchyPath;
 
       const filter = {};
-      if (!includeInactive || includeInactive !== 'true') filter.isActive = true;
+      if (!includeInactive || includeInactive !== 'true')
+        filter.isActive = true;
       if (conferenceId) filter.conferenceId = conferenceId;
-      if (city)  filter['location.address.city']  = new RegExp(escapeRegex(city),  'i');
-      if (state) filter['location.address.state'] = new RegExp(escapeRegex(state), 'i');
+      if (city)
+        filter['location.address.city'] = new RegExp(escapeRegex(city), 'i');
+      if (state)
+        filter['location.address.state'] = new RegExp(escapeRegex(state), 'i');
       if (search) {
         const re = new RegExp(escapeRegex(search), 'i');
         filter.$or = [
@@ -231,7 +249,10 @@ router.get(
       res.status(500).json({
         success: false,
         message: 'Failed to fetch churches',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal server error',
       });
     }
   }
@@ -338,7 +359,11 @@ router.get(
       // Enforce hierarchy: non-admins can only see churches in their subtree
       const userPath = req.userHierarchyPath;
       const userLevel = req.userHierarchyLevel;
-      if (userLevel > 1 && userPath && !church.hierarchyPath?.startsWith(userPath)) {
+      if (
+        userLevel > 1 &&
+        userPath &&
+        !church.hierarchyPath?.startsWith(userPath)
+      ) {
         return res.status(403).json({
           success: false,
           message: 'You do not have access to this church',
@@ -603,7 +628,9 @@ router.put(
         id,
         { $set: normalisedDot },
         { new: true, runValidators: true }
-      ).populate('conferenceId', 'name code').lean();
+      )
+        .populate('conferenceId', 'name code')
+        .lean();
 
       invalidateChurchCache();
       res.json({
