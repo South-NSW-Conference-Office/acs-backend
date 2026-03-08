@@ -3,13 +3,51 @@ const User = require('../models/User');
 const tokenService = require('../services/tokenService');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 
+// =============================================================================
+// User cache — avoids 4-level deep Atlas populate on every request.
+// Keyed by userId, entries expire after 60s or on explicit invalidation.
+// =============================================================================
+const _userCache = new Map();
+const USER_CACHE_TTL = 60_000; // 60 seconds
+
+function getCachedUser(userId) {
+  const entry = _userCache.get(String(userId));
+  if (!entry) return null;
+  if (Date.now() - entry.ts > USER_CACHE_TTL) {
+    _userCache.delete(String(userId));
+    return null;
+  }
+  return entry.user;
+}
+
+function setCachedUser(userId, user) {
+  _userCache.set(String(userId), { user, ts: Date.now() });
+}
+
+function invalidateUserCache(userId) {
+  _userCache.delete(String(userId));
+}
+
+// Prune stale entries every 5 minutes to avoid memory growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of _userCache) {
+    if (now - entry.ts > USER_CACHE_TTL) _userCache.delete(key);
+  }
+}, 5 * 60_000);
+
 /**
- * Enhanced authentication token middleware with hierarchical support
+ * authenticateToken
+ *
+ * Improvements over original:
+ * - User is cached in memory (60s TTL) so the 4-level Atlas populate only
+ *   runs once per user per minute instead of on every single request.
+ * - blacklistedToken check already uses in-memory cache (fast path).
  */
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
@@ -21,7 +59,7 @@ const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
-    // Check if token is blacklisted
+    // Blacklist check — already has in-memory fast path in tokenService
     const isBlacklisted = await tokenService.isBlacklisted(token);
     if (isBlacklisted) {
       return res.status(401).json({
@@ -31,16 +69,21 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.userId).populate({
-      path: 'teamAssignments.teamId',
-      populate: {
-        path: 'churchId',
+    // User lookup — serve from cache when possible
+    let user = getCachedUser(decoded.userId);
+    if (!user) {
+      user = await User.findById(decoded.userId).populate({
+        path: 'teamAssignments.teamId',
         populate: {
-          path: 'conferenceId',
-          populate: { path: 'unionId' },
+          path: 'churchId',
+          populate: {
+            path: 'conferenceId',
+            populate: { path: 'unionId' },
+          },
         },
-      },
-    });
+      });
+      if (user) setCachedUser(decoded.userId, user);
+    }
 
     if (!user || !user.isActive) {
       return res.status(401).json({
@@ -62,7 +105,6 @@ const authenticateToken = async (req, res, next) => {
         err: 'Token verification failed',
       });
     }
-
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
@@ -70,7 +112,6 @@ const authenticateToken = async (req, res, next) => {
         err: 'Token has expired',
       });
     }
-
     return res.status(500).json({
       success: false,
       message: 'Authentication error',
@@ -80,8 +121,13 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
- * Hierarchical authorization middleware
- * Enforces strict hierarchy: Super Admin → Conference → Church → Team → Service
+ * authorizeHierarchical
+ *
+ * Improvements over original:
+ * - getUserHighestLevel + getUserHierarchyPath resolved in parallel (Promise.all)
+ *   instead of sequentially.
+ * - Results stored on req so route handlers can read req.userHierarchyLevel /
+ *   req.userHierarchyPath directly without redundant re-computation.
  */
 const authorizeHierarchical = (requiredAction, targetEntityType) => {
   return async (req, res, next) => {
@@ -95,7 +141,18 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
         });
       }
 
-      // 1. Determine target entity
+      // 1. Resolve hierarchy context in parallel (single async barrier)
+      const [userLevel, userPath] = await Promise.all([
+        hierarchicalAuthService.getUserHighestLevel(user),
+        hierarchicalAuthService.getUserHierarchyPath(user),
+      ]);
+
+      // Store on req so route handlers never need to call these again
+      req.userHierarchyLevel = userLevel;
+      req.userHierarchyPath = userPath;
+      req.hierarchicalAccess = true;
+
+      // 2. Determine target entity (only for routes with :id param)
       const entityId =
         req.params.id ||
         req.params.teamId ||
@@ -117,7 +174,9 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
         }
       }
 
-      // 2. Check hierarchical access
+      req.targetEntity = targetEntity;
+
+      // 3. Check hierarchical access
       if (targetEntity && targetEntity.hierarchyPath) {
         const canAccess = await hierarchicalAuthService.canUserManageEntity(
           user,
@@ -132,9 +191,6 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
           });
         }
       } else if (requiredAction === 'create') {
-        // For creation, check if user can create this type of entity
-        const userLevel =
-          await hierarchicalAuthService.getUserHighestLevel(user);
         const requiredLevel =
           hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
 
@@ -146,17 +202,8 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
         }
       }
 
-      // 3. Store hierarchy context for route handlers
-      req.targetEntity = targetEntity;
-      req.hierarchicalAccess = true;
-      req.userHierarchyLevel =
-        await hierarchicalAuthService.getUserHighestLevel(user);
-      req.userHierarchyPath =
-        await hierarchicalAuthService.getUserHierarchyPath(user);
-
       next();
     } catch (error) {
-      // Log hierarchical authorization error silently
       return res.status(500).json({
         success: false,
         message: 'Hierarchical authorization error',
@@ -167,7 +214,8 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
 };
 
 /**
- * Middleware to ensure only super admins can access system-level operations
+ * requireSuperAdmin — uses req.userHierarchyLevel set by authorizeHierarchical
+ * when available, otherwise resolves it once.
  */
 const requireSuperAdmin = async (req, res, next) => {
   try {
@@ -178,9 +226,10 @@ const requireSuperAdmin = async (req, res, next) => {
       });
     }
 
-    const userLevel = await hierarchicalAuthService.getUserHighestLevel(
-      req.user
-    );
+    const userLevel =
+      req.userHierarchyLevel !== undefined
+        ? req.userHierarchyLevel
+        : await hierarchicalAuthService.getUserHighestLevel(req.user);
 
     if (userLevel !== 0) {
       return res.status(403).json({
@@ -200,7 +249,7 @@ const requireSuperAdmin = async (req, res, next) => {
 };
 
 /**
- * Middleware to validate that user can access organization context
+ * validateOrganizationContext
  */
 const validateOrganizationContext = async (req, res, next) => {
   try {
@@ -208,7 +257,7 @@ const validateOrganizationContext = async (req, res, next) => {
       req.headers['x-organization-id'] || req.params.organizationId;
 
     if (!organizationId) {
-      return next(); // No organization context is valid for some operations
+      return next();
     }
 
     if (!req.user) {
@@ -255,7 +304,7 @@ const validateOrganizationContext = async (req, res, next) => {
 };
 
 /**
- * Middleware for team-specific authorization
+ * authorizeTeamAccess
  */
 const authorizeTeamAccess = (requiredAction = 'read') => {
   return async (req, res, next) => {
@@ -312,7 +361,7 @@ const authorizeTeamAccess = (requiredAction = 'read') => {
 };
 
 /**
- * Middleware for service-specific authorization
+ * authorizeServiceAccess
  */
 const authorizeServiceAccess = (requiredAction = 'read') => {
   return async (req, res, next) => {
@@ -378,4 +427,5 @@ module.exports = {
   validateOrganizationContext,
   authorizeTeamAccess,
   authorizeServiceAccess,
+  invalidateUserCache,
 };

@@ -6,6 +6,7 @@ const MediaFile = require('../models/MediaFile');
 const {
   authenticateToken,
   authorizeHierarchical,
+  invalidateUserCache,
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
@@ -15,6 +16,12 @@ const {
   requireFile,
   validateImageDimensions,
 } = require('../middleware/uploadMiddleware');
+
+const {
+  formatChurchResponse,
+  formatChurchListItem,
+  normalizeChurchInput,
+} = require('../utils/churchFormatter');
 
 const router = express.Router();
 
@@ -107,80 +114,124 @@ function handleChurchError(error, res) {
   });
 }
 
+// =============================================================================
+// Churches list cache
+// Keyed by a cache key derived from query params + user hierarchy path.
+// Invalidated whenever a church is created, updated, or deleted.
+// =============================================================================
+const _churchListCache = new Map();
+const CHURCH_CACHE_TTL = 60_000; // 60 seconds
+
+function buildCacheKey(query, page, limit) {
+  return JSON.stringify({ ...query, page, limit });
+}
+
+function getChurchCache(key) {
+  const entry = _churchListCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CHURCH_CACHE_TTL) {
+    _churchListCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setChurchCache(key, data) {
+  _churchListCache.set(key, { data, ts: Date.now() });
+}
+
+function invalidateChurchCache() {
+  _churchListCache.clear();
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // Apply authentication to all routes
 router.use(authenticateToken);
 
-// GET /api/churches - Get all churches
+// GET /api/churches - Get paginated churches
 router.get(
   '/',
   authorizeHierarchical('read', 'church'),
   [
-    query('conferenceId')
-      .optional()
-      .isMongoId()
-      .withMessage('Valid conference ID required'),
+    query('conferenceId').optional().isMongoId().withMessage('Valid conference ID required'),
     query('city').optional().isString().withMessage('City must be a string'),
     query('state').optional().isString().withMessage('State must be a string'),
-    query('includeInactive')
-      .optional()
-      .isBoolean()
-      .withMessage('includeInactive must be a boolean'),
+    query('search').optional().isString().withMessage('Search must be a string'),
+    query('includeInactive').optional().isBoolean().withMessage('includeInactive must be a boolean'),
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1–100'),
   ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array(),
-        });
+        return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
       }
 
-      const { conferenceId, city, state, includeInactive } = req.query;
-      const query = {};
+      const { conferenceId, city, state, search, includeInactive } = req.query;
+      const page  = Math.max(1, parseInt(req.query.page  || '1',  10));
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '25', 10)));
+      const skip  = (page - 1) * limit;
 
-      if (conferenceId) query.conferenceId = conferenceId;
-      if (city) query['location.address.city'] = new RegExp(escapeRegex(city), 'i');
-      if (state) query['location.address.state'] = new RegExp(escapeRegex(state), 'i');
-      if (!includeInactive || includeInactive !== 'true') {
-        query.isActive = true;
+      // Build filter — use hierarchy context already resolved by middleware
+      const userLevel = req.userHierarchyLevel;
+      const userPath  = req.userHierarchyPath;
+
+      const filter = {};
+      if (!includeInactive || includeInactive !== 'true') filter.isActive = true;
+      if (conferenceId) filter.conferenceId = conferenceId;
+      if (city)  filter['location.address.city']  = new RegExp(escapeRegex(city),  'i');
+      if (state) filter['location.address.state'] = new RegExp(escapeRegex(state), 'i');
+      if (search) {
+        const re = new RegExp(escapeRegex(search), 'i');
+        filter.$or = [
+          { name: re },
+          { 'location.address.city': re },
+          { 'location.address.state': re },
+        ];
       }
-
-      // Filter based on user's hierarchy access
-      const userLevel = await hierarchicalAuthService.getUserHighestLevel(
-        req.user
-      );
-      const userPath = await hierarchicalAuthService.getUserHierarchyPath(
-        req.user
-      );
-
       if (userLevel > 1 && userPath) {
-        // Users below conference level can only see churches in their subtree
-        query.hierarchyPath = { $regex: `^${escapeRegex(userPath)}` };
+        filter.hierarchyPath = { $regex: `^${escapeRegex(userPath)}` };
       }
 
-      const churches = await Church.find(query)
-        .populate('conferenceId', 'name code')
-        .select('name code location contact isActive conferenceId')
-        .sort('name');
+      // Serve from cache when available
+      const cacheKey = buildCacheKey(filter, page, limit);
+      const cached = getChurchCache(cacheKey);
+      if (cached) {
+        res.set('Cache-Control', 'private, max-age=60');
+        return res.json(cached);
+      }
 
-      res.json({
+      // Run count + page query in parallel
+      const [total, churches] = await Promise.all([
+        Church.countDocuments(filter),
+        Church.find(filter)
+          .populate('conferenceId', 'name code')
+          .select('name code location contact isActive conferenceId metadata')
+          .sort({ name: 1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+      ]);
+
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      const payload = {
         success: true,
         message: 'Churches retrieved successfully',
-        data: churches,
-        count: churches.length,
-      });
+        data: churches.map(formatChurchListItem),
+        pagination: { page, limit, total, totalPages },
+      };
+
+      setChurchCache(cacheKey, payload);
+      res.set('Cache-Control', 'private, max-age=60');
+      res.json(payload);
     } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch churches',
-        error:
-          process.env.NODE_ENV === 'development'
-            ? error.message
-            : 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
       });
     }
   }
@@ -273,23 +324,9 @@ router.get(
     try {
       const { id } = req.params;
 
-      // Verify user has access to this church
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
-        req.user,
-        id,
-        'read'
-      );
-
-      if (!hasAccess) {
-        return res.status(403).json({
-          success: false,
-          message: 'You do not have access to this church',
-        });
-      }
-
       const church = await Church.findById(id)
         .populate('conferenceId', 'name code unionId')
-        .populate('teams');
+        .lean();
 
       if (!church) {
         return res.status(404).json({
@@ -298,10 +335,20 @@ router.get(
         });
       }
 
+      // Enforce hierarchy: non-admins can only see churches in their subtree
+      const userPath = req.userHierarchyPath;
+      const userLevel = req.userHierarchyLevel;
+      if (userLevel > 1 && userPath && !church.hierarchyPath?.startsWith(userPath)) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have access to this church',
+        });
+      }
+
       res.json({
         success: true,
         message: 'Church retrieved successfully',
-        data: church,
+        data: formatChurchResponse(church),
       });
     } catch (error) {
       res.status(500).json({
@@ -432,7 +479,7 @@ router.post(
       const tempHierarchyPath = `${conference.hierarchyPath}/temp-${Date.now()}`;
 
       const churchData = {
-        ...req.body,
+        ...normalizeChurchInput(req.body),
         code: churchCode,
         hierarchyPath: tempHierarchyPath,
         hierarchyLevel: 2,
@@ -445,6 +492,7 @@ router.post(
       church.hierarchyPath = `${conference.hierarchyPath}/${church._id}`;
       await church.save();
       await church.populate('conferenceId', 'name code');
+      invalidateChurchCache();
 
       res.status(201).json({
         success: true,
@@ -545,20 +593,23 @@ router.put(
         req.body.code = req.body.code.toUpperCase();
       }
 
-      // Build safe update payload (whitelist + dot-notation)
-      const dotUpdate = buildUpdatePayload(req.body);
-      dotUpdate['metadata.lastUpdated'] = new Date();
+      // Build safe update payload: whitelist → normalise → dot-notation
+      const safeFields = pickAllowedFields(req.body);
+      const normalised = normalizeChurchInput(safeFields);
+      const normalisedDot = toDotNotation(normalised);
+      normalisedDot['metadata.lastUpdated'] = new Date();
 
       const church = await Church.findByIdAndUpdate(
         id,
-        { $set: dotUpdate },
+        { $set: normalisedDot },
         { new: true, runValidators: true }
-      ).populate('conferenceId', 'name code');
+      ).populate('conferenceId', 'name code').lean();
 
+      invalidateChurchCache();
       res.json({
         success: true,
         message: 'Church updated successfully',
-        data: church,
+        data: formatChurchResponse(church),
       });
     } catch (error) {
       handleChurchError(error, res);
@@ -617,6 +668,7 @@ router.delete(
       church.metadata.lastUpdated = new Date();
       await church.save();
 
+      invalidateChurchCache();
       res.json({
         success: true,
         message: 'Church deactivated successfully',
