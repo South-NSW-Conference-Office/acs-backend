@@ -83,8 +83,7 @@ router.get('/public/:id', validateObjectId('id'), async (req, res) => {
   try {
     const team = await Team.findById(req.params.id)
       .populate('churchId', 'name address')
-      .populate('leaderId', 'name email')
-      .populate('members.userId', 'name email');
+      .populate('leaderId', 'name email');
 
     if (!team) {
       return res
