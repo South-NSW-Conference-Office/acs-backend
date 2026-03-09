@@ -159,6 +159,11 @@ const churchSchema = new mongoose.Schema(
         time: String,
         description: String,
       },
+      communityMeal: {
+        day: String,        // "Saturday", "1st & 3rd Saturday", etc.
+        time: String,       // "12:30 PM"
+        description: String,
+      },
       special: [
         {
           name: String,
