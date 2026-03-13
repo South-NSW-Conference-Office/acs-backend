@@ -60,7 +60,8 @@ router.get('/', async (req, res) => {
       teamCount: church.metadata?.teamCount || 0,
       serviceCount: church.metadata?.serviceCount || 0,
       address: church.location?.address?.street || `${church.location?.address?.city || ''} ${church.location?.address?.state || ''} ${church.location?.address?.postalCode || ''}`.trim() || null,
-      coordinates: church.location?.coordinates || null,
+      lat: church.location?.lat || null,
+      lng: church.location?.lng || null,
       website: church.website || church.contact?.website || null,
     }));
 
