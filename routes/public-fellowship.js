@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
 
     const churches = await Church.find(churchQuery)
       .select(
-        'name code location contact facilities services outreach conferenceId metadata hasMeals mealDay'
+        'name code location contact facilities services outreach conferenceId metadata hasMeals mealDay website'
       )
       .populate('conferenceId', 'name code')
       .sort('name');
@@ -59,7 +59,9 @@ router.get('/', async (req, res) => {
       outreachFocus: church.outreach?.primaryFocus || [],
       teamCount: church.metadata?.teamCount || 0,
       serviceCount: church.metadata?.serviceCount || 0,
+      address: church.location?.address?.street || `${church.location?.address?.city || ''} ${church.location?.address?.state || ''} ${church.location?.address?.postalCode || ''}`.trim() || null,
       coordinates: church.location?.coordinates || null,
+      website: church.website || church.contact?.website || null,
     }));
 
     res.json({
