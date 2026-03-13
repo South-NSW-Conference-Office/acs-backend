@@ -8,6 +8,12 @@ const conferenceSchema = new mongoose.Schema(
       trim: true,
     },
 
+    code: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
     // Parent relationship
     unionId: {
       type: mongoose.Schema.Types.ObjectId,

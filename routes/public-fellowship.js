@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
 
     const churches = await Church.find(churchQuery)
       .select(
-        'name code location contact facilities services outreach conferenceId metadata'
+        'name code location contact facilities services outreach conferenceId metadata hasMeals mealDay'
       )
       .populate('conferenceId', 'name code')
       .sort('name');
@@ -44,15 +44,16 @@ router.get('/', async (req, res) => {
       conferenceCode: church.conferenceId?.code || '',
       conferenceId: church.conferenceId?._id || null,
       hasKitchen: church.facilities?.kitchen?.available || false,
-      // Infer meals from kitchen availability + special services
-      hasMeals: church.facilities?.kitchen?.available || false,
+      // Infer meals from kitchen availability OR explicit hasMeals field
+      hasMeals: church.hasMeals === true || church.facilities?.kitchen?.available === true || false,
       mealDay:
+        church.mealDay ||
         church.services?.special?.find(
           (s) =>
             s.name?.toLowerCase().includes('meal') ||
             s.name?.toLowerCase().includes('lunch')
         )?.schedule ||
-        (church.facilities?.kitchen?.available ? 'Saturday lunch' : null),
+        ((church.hasMeals === true || church.facilities?.kitchen?.available) ? 'Saturday lunch' : null),
       worshipTime: church.services?.worship?.time || null,
       sabbathSchoolTime: church.services?.sabbathSchool?.time || null,
       outreachFocus: church.outreach?.primaryFocus || [],
