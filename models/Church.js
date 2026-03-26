@@ -239,6 +239,11 @@ const churchSchema = new mongoose.Schema(
       },
     },
 
+    // Fellowship meals
+    hasMeals: { type: Boolean, default: false },
+    mealDay: { type: String, default: null },  // e.g. 'Saturday lunch 12:30 PM'
+    mealNotes: { type: String, default: null }, // additional notes
+
     // Status and metadata
     isActive: {
       type: Boolean,
