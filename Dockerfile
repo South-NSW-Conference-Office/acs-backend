@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm ci --omit=dev
+RUN npm install -g npm@11 && npm ci --omit=dev
 
 COPY . .
 
