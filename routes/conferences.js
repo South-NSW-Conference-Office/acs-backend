@@ -6,6 +6,7 @@ const Union = require('../models/Union');
 const {
   authenticateToken,
   authorizeHierarchical,
+  requireSuperAdmin,
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
@@ -632,6 +633,64 @@ router.put(
             ? error.message
             : 'Internal server error',
       });
+    }
+  }
+);
+
+// DELETE /api/conferences/:id/permanent - Hard delete conference (cascade)
+router.delete(
+  '/:id/permanent',
+  validateObjectId,
+  requireSuperAdmin,
+  auditLog('conference.hard_delete'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const conference = await Conference.findById(id);
+
+      if (!conference) {
+        return res.status(404).json({ success: false, message: 'Conference not found' });
+      }
+
+      const Church = require('../models/Church');
+      const Team = require('../models/Team');
+      const Service = require('../models/Service');
+      const storageService = require('../services/storageService');
+
+      const hierarchyRegex = { $regex: `^${conference.hierarchyPath}/` };
+
+      const deleted = {
+        churches: await Church.countDocuments({ hierarchyPath: hierarchyRegex }),
+        teams: await Team.countDocuments({ hierarchyPath: hierarchyRegex }),
+        services: await Service.countDocuments({ hierarchyPath: hierarchyRegex }),
+      };
+
+      await Service.deleteMany({ hierarchyPath: hierarchyRegex });
+      await Team.deleteMany({ hierarchyPath: hierarchyRegex });
+      await Church.deleteMany({ hierarchyPath: hierarchyRegex });
+
+      if (conference.primaryImage?.key) {
+        try { await storageService.deleteImage(conference.primaryImage.key); }
+        catch (err) { console.error(`Failed to delete banner for conference ${id}:`, err); }
+      }
+
+      const conferenceName = conference.name;
+      await Conference.findByIdAndDelete(id);
+
+      const parts = [];
+      if (deleted.churches) parts.push(`${deleted.churches} church(es)`);
+      if (deleted.teams) parts.push(`${deleted.teams} team(s)`);
+      if (deleted.services) parts.push(`${deleted.services} service(s)`);
+      const cascade = parts.length ? ` Also removed ${parts.join(', ')}.` : '';
+
+      res.json({
+        success: true,
+        message: `Conference "${conferenceName}" has been permanently deleted.${cascade}`,
+        data: { deleted },
+      });
+    } catch (error) {
+      console.error('Error permanently deleting conference:', error);
+      res.status(500).json({ success: false, message: 'Failed to permanently delete conference' });
     }
   }
 );

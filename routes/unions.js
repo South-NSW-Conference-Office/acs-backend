@@ -531,6 +531,77 @@ router.delete(
   }
 );
 
+// DELETE /api/unions/:id/permanent - Hard delete union (permanently removes from database)
+// Cascades: deletes all subordinate conferences, churches, teams, and services
+router.delete(
+  '/:id/permanent',
+  validateObjectId,
+  requireSuperAdmin,
+  auditLog('union.hard_delete'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const union = await Union.findById(id);
+
+      if (!union) {
+        return res.status(404).json({
+          success: false,
+          message: 'Union not found',
+        });
+      }
+
+      const Conference = require('../models/Conference');
+      const Church = require('../models/Church');
+      const Team = require('../models/Team');
+      const Service = require('../models/Service');
+
+      const hierarchyRegex = { $regex: `^${union.hierarchyPath}/` };
+
+      // Count subordinates for the response
+      const deleted = {
+        conferences: await Conference.countDocuments({ unionId: id }),
+        churches: await Church.countDocuments({ hierarchyPath: hierarchyRegex }),
+        teams: await Team.countDocuments({ hierarchyPath: hierarchyRegex }),
+        services: await Service.countDocuments({ hierarchyPath: hierarchyRegex }),
+      };
+
+      // Cascade delete all subordinates (deepest first)
+      await Service.deleteMany({ hierarchyPath: hierarchyRegex });
+      await Team.deleteMany({ hierarchyPath: hierarchyRegex });
+      await Church.deleteMany({ hierarchyPath: hierarchyRegex });
+      await Conference.deleteMany({ unionId: id });
+
+      // Delete banner image from storage if it exists
+      if (union.primaryImage?.key) {
+        try {
+          await storageService.deleteImage(union.primaryImage.key);
+        } catch (err) {
+          console.error(`Failed to delete banner image for union ${id}:`, err);
+        }
+      }
+
+      const unionName = union.name;
+      await Union.findByIdAndDelete(id);
+
+      const parts = [];
+      if (deleted.conferences) parts.push(`${deleted.conferences} conference(s)`);
+      if (deleted.churches) parts.push(`${deleted.churches} church(es)`);
+      if (deleted.teams) parts.push(`${deleted.teams} team(s)`);
+      if (deleted.services) parts.push(`${deleted.services} service(s)`);
+      const cascade = parts.length ? ` Also removed ${parts.join(', ')}.` : '';
+
+      res.json({
+        success: true,
+        message: `Union "${unionName}" has been permanently deleted.${cascade}`,
+        data: { deleted },
+      });
+    } catch (error) {
+      return handleUnionError(res, error, 'permanently delete union');
+    }
+  }
+);
+
 // GET /api/unions/:id/statistics - Get union statistics
 router.get(
   '/:id/statistics',

@@ -28,13 +28,15 @@ function invalidateUserCache(userId) {
   _userCache.delete(String(userId));
 }
 
-// Prune stale entries every 5 minutes to avoid memory growth
+// Prune stale entries every 5 minutes to avoid memory growth.
+// .unref() so this timer doesn't keep the Node event loop alive on its own
+// (important for test runners and graceful shutdown).
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of _userCache) {
     if (now - entry.ts > USER_CACHE_TTL) _userCache.delete(key);
   }
-}, 5 * 60_000);
+}, 5 * 60_000).unref();
 
 /**
  * authenticateToken

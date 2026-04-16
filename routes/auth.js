@@ -410,8 +410,8 @@ router.post(
           displayName: 'Super Administrator',
           level: 'system',
         };
-      } else if (user.organizations.length > 0) {
-        // Get the first organization assignment since we no longer have primaryOrganization
+      } else if (Array.isArray(user.organizations) && user.organizations.length > 0) {
+        // Legacy organizations field (not on current User schema — guarded to avoid TypeError)
         const primaryOrgAssignment = user.organizations[0];
 
         if (primaryOrgAssignment && primaryOrgAssignment.role) {

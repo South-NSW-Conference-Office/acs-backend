@@ -103,35 +103,41 @@ const auditLogMiddleware = (options = {}) => {
     const originalSend = res.send;
     const originalJson = res.json;
 
-    // Capture response and log
-    const captureResponse = async function (body) {
-      res.send = originalSend;
-      res.json = originalJson;
-
+    // Shared audit logger — captures the response body without replacing
+    // the outgoing response path (preserves the original Content-Type).
+    const writeAudit = async (bodyForAudit) => {
       const responseTime = Date.now() - startTime;
       const shouldLog = shouldLogRequest(req, actionsToLog);
-
-      if (shouldLog) {
-        try {
-          await logAuditEntry({
-            req,
-            res,
-            responseTime,
-            sensitiveFields,
-            body,
-          });
-        } catch (error) {
-          // Silently handle audit log errors to avoid disrupting the request flow
-        }
+      if (!shouldLog) return;
+      try {
+        await logAuditEntry({
+          req,
+          res,
+          responseTime,
+          sensitiveFields,
+          body: bodyForAudit,
+        });
+      } catch (error) {
+        // Silently handle audit log errors to avoid disrupting the request flow
       }
+    };
 
-      // Call original method
+    // Wrap res.send — preserves original send behavior (and Content-Type).
+    res.send = function (body) {
+      res.send = originalSend;
+      res.json = originalJson;
+      writeAudit(typeof body === 'string' ? body : JSON.stringify(body));
       return originalSend.call(this, body);
     };
 
-    res.send = captureResponse;
+    // Wrap res.json — IMPORTANT: delegate to originalJson so Express sets
+    // Content-Type: application/json (calling originalSend with a JSON string
+    // would incorrectly set Content-Type: text/html).
     res.json = function (body) {
-      return captureResponse.call(this, JSON.stringify(body));
+      res.send = originalSend;
+      res.json = originalJson;
+      writeAudit(JSON.stringify(body));
+      return originalJson.call(this, body);
     };
 
     next();

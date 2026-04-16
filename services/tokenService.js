@@ -24,8 +24,9 @@ class TokenService {
     // Backed by MongoDB for persistence and cross-instance consistency
     this.blacklistedTokens = new Map();
 
-    // Clean up expired tokens from the in-memory cache every hour
-    setInterval(() => this.cleanupExpiredTokens(), 3600000);
+    // Clean up expired tokens from the in-memory cache every hour.
+    // .unref() so the interval doesn't keep Node alive by itself.
+    setInterval(() => this.cleanupExpiredTokens(), 3600000).unref();
   }
 
   /**

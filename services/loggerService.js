@@ -51,14 +51,15 @@ class LoggerService {
   }
 
   initLogRotation() {
-    // Rotate logs daily - delay initialization to avoid blocking startup
+    // Rotate logs daily - delay initialization to avoid blocking startup.
+    // .unref() so the interval doesn't keep Node alive by itself (tests/shutdown).
     process.nextTick(() => {
       setInterval(
         () => {
           this.rotateLogFile();
         },
         24 * 60 * 60 * 1000
-      ); // 24 hours
+      ).unref(); // 24 hours
     });
   }
 
