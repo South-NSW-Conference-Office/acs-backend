@@ -155,69 +155,115 @@ class EmailService {
     const expirationHours = Math.round(
       (expirationTime - Date.now()) / (1000 * 60 * 60)
     );
+    const expirationLabel = expirationTime.toLocaleDateString('en-AU', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Australia/Sydney',
+    });
 
-    // Check if user needs to set up password
     const needsPasswordSetup = !user.passwordSet;
     const actionText = needsPasswordSetup
       ? 'verify your email address and set up your password'
       : 'verify your email address';
+    const headline = needsPasswordSetup
+      ? 'Set up your account'
+      : 'Verify your email address';
+    const buttonLabel = needsPasswordSetup ? 'Set up my account' : 'Verify my email';
+
+    const fromName = process.env.EMAIL_FROM_NAME || 'Adventist Community Services';
+    const fromAddress = process.env.EMAIL_FROM || 'noreply@acs.org.au';
 
     const mailOptions = {
-      from:
-        process.env.EMAIL_FROM ||
-        '"Adventist Community Services Australia" <noreply@acs.org.au>',
+      from: `"${fromName}" <${fromAddress}>`,
       to: user.email,
-      subject: 'Email Verification - Adventist Community Services Australia',
-      text: `
-WELCOME TO ADVENTIST COMMUNITY SERVICES AUSTRALIA
+      replyTo: fromAddress,
+      subject: 'Verify your email — Adventist Community Services',
+      headers: {
+        'X-Entity-Ref-ID': `verify-${verificationToken.slice(0, 12)}`,
+      },
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${headline}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#333;">
+  <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;">${headline} — this link expires in ${expirationHours} hours.</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background:#F5821F;padding:24px 32px;text-align:center;color:#ffffff;">
+              <h1 style="margin:0;font-size:22px;font-weight:600;">Adventist Community Services</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h2 style="margin:0 0 16px 0;font-size:20px;color:#1a2332;">${headline}</h2>
+              <p style="margin:0 0 16px 0;line-height:1.6;">Hello ${user.name},</p>
+              <p style="margin:0 0 24px 0;line-height:1.6;">You have been added to the Adventist Community Services system. To finish setting up your account, please ${actionText}.</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+                <tr>
+                  <td style="background:#F5821F;border-radius:8px;">
+                    <a href="${verificationUrl}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;">${buttonLabel}</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 8px 0;font-size:13px;color:#666;">Or copy and paste this link into your browser:</p>
+              <p style="margin:0 0 24px 0;font-size:13px;word-break:break-all;"><a href="${verificationUrl}" style="color:#1a2332;">${verificationUrl}</a></p>
+              ${needsPasswordSetup ? `<p style="margin:0 0 16px 0;line-height:1.6;font-size:14px;">You will be asked to create a password during setup. Choose one with at least 8 characters including upper and lowercase letters, a number, and a special character.</p>` : ''}
+              <p style="margin:0 0 24px 0;line-height:1.6;font-size:14px;"><strong>This link expires in ${expirationHours} hours</strong> (${expirationLabel} AEDT). If it expires, contact your administrator to resend.</p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+              <p style="margin:0 0 4px 0;font-size:13px;color:#666;"><strong>Account details</strong></p>
+              <p style="margin:0 0 4px 0;font-size:13px;color:#666;">Email: ${user.email}</p>
+              <p style="margin:0 0 4px 0;font-size:13px;color:#666;">Organization: ${user.organizationName || 'To be assigned'}</p>
+              <p style="margin:0 0 16px 0;font-size:13px;color:#666;">Role: ${user.roleName || 'To be assigned'}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#999;">If you did not expect this email, please contact your system administrator.</p>
+              <p style="margin:8px 0 0 0;font-size:12px;color:#999;">&copy; ${new Date().getFullYear()} Adventist Community Services. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+      text: `Adventist Community Services — ${headline}
 
 Hello ${user.name},
 
-You have been added to the Adventist Community Services Australia system. To complete your registration and access your account, please ${actionText}.
+You have been added to the Adventist Community Services system. To finish setting up your account, please ${actionText}.
 
-${needsPasswordSetup ? 'VERIFICATION AND PASSWORD SETUP REQUIRED' : 'VERIFICATION REQUIRED'}
-Click the link below to ${actionText}:
+Open this link in your browser:
 ${verificationUrl}
 
-${
-  needsPasswordSetup
-    ? `
-IMPORTANT: During verification, you will be asked to set up your password to complete your account setup. Please choose a secure password that is at least 6 characters long.
-`
-    : ''
-}
-IMPORTANT DEADLINE
-This verification link will expire in ${expirationHours} hours (${expirationTime.toLocaleDateString(
-        'en-AU',
-        {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Australia/Sydney',
-        }
-      )} AEDT).
+${needsPasswordSetup ? 'You will be asked to create a password during setup. Choose one with at least 8 characters including upper and lowercase letters, a number, and a special character.\n\n' : ''}This link expires in ${expirationHours} hours (${expirationLabel} AEDT). If it expires, contact your administrator to resend.
 
-If you do not ${actionText} within this timeframe, you will need to contact your administrator to resend the verification email.
+Account details:
+  Email: ${user.email}
+  Organization: ${user.organizationName || 'To be assigned'}
+  Role: ${user.roleName || 'To be assigned'}
 
-ACCOUNT DETAILS
-Email: ${user.email}
-Organization: ${user.organizationName || 'To be assigned'}
-Role: ${user.roleName || 'To be assigned'}
+If you did not expect this email, please contact your system administrator.
 
-If you did not expect this email or have any questions, please contact your system administrator.
-
-Best regards,
-Adventist Community Services Australia
-
----
-This is an automated message. Please do not reply to this email.
-      `.trim(),
+— Adventist Community Services`,
     };
 
-    await this.transporter.sendMail(mailOptions);
+    const info = await this.transporter.sendMail(mailOptions);
+    logger.info(
+      `Verification email sent to ${user.email} (messageId=${info.messageId}, url=${verificationUrl})`
+    );
+    return { success: true, messageId: info.messageId };
   }
 
   // Send welcome email after verification

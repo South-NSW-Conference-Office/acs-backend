@@ -16,6 +16,7 @@ const {
 const { checkRoleQuota } = require('../middleware/quotaCheck');
 const authorizationService = require('../services/authorizationService');
 const secureQueryBuilder = require('../utils/secureQueryBuilder');
+const { AppError } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
@@ -775,7 +776,13 @@ router.post(
         data: user,
       });
     } catch (error) {
-      // Error creating user
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+          ...(error.errors ? { errors: error.errors } : {}),
+        });
+      }
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -966,7 +973,13 @@ router.put(
         },
       });
     } catch (error) {
-      // Error updating user
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+          ...(error.errors ? { errors: error.errors } : {}),
+        });
+      }
       res.status(500).json({
         success: false,
         message: 'Internal server error',
