@@ -9,6 +9,7 @@ const {
 } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const tokenService = require('../services/tokenService');
+const logger = require('../services/loggerService');
 const { validatePassword } = require('../config/security');
 
 const router = express.Router();
@@ -287,10 +288,16 @@ router.post(
       user.emailVerificationExpires = expirationTime;
       await user.save();
 
-      // Get role name for email
+      // Get role + organization name for the email body (best-effort)
+      const firstTeam = user.teamAssignments?.[0]?.teamId;
       const userWithDetails = {
         ...user.toObject(),
-        roleName: user.organizations[0]?.role?.displayName,
+        roleName:
+          user.teamAssignments?.[0]?.role ||
+          (Array.isArray(user.organizations) &&
+            user.organizations[0]?.role?.displayName) ||
+          undefined,
+        organizationName: firstTeam?.churchId?.name || firstTeam?.name || undefined,
       };
 
       // Send verification email
@@ -304,7 +311,11 @@ router.post(
         message: 'Verification email resent successfully',
       });
     } catch (error) {
-      // Error resending verification email
+      logger.error('Failed to resend verification email', {
+        userId: req.body?.userId,
+        message: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         message: 'Internal server error',
