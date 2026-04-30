@@ -493,7 +493,7 @@ router.get(
   }
 );
 
-// Delete team (soft delete)
+// Delete team (hard delete — also strips any user.teamAssignments references)
 router.delete(
   '/:teamId',
   authenticateToken,
@@ -524,7 +524,16 @@ router.delete(
         });
       }
 
-      // Hard delete from database
+      // Strip membership references from every User. The Team schema's
+      // pre('remove') hook does this for document-middleware flows, but
+      // findByIdAndDelete only fires query middleware, so we do it
+      // explicitly here to keep users' teamAssignments consistent.
+      const User = mongoose.model('User');
+      await User.updateMany(
+        { 'teamAssignments.teamId': teamId },
+        { $pull: { teamAssignments: { teamId: teamId } } }
+      );
+
       await Team.findByIdAndDelete(teamId);
 
       res.json({

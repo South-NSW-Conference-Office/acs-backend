@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Role = require('../models/Role');
 const authorizationService = require('../services/authorizationService');
+const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 const tokenService = require('../services/tokenService');
 
 const authenticateToken = async (req, res, next) => {
@@ -78,6 +80,66 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+// Walk a user's org-level assignments (union/conference/church), pick the
+// highest-ranked role (lowest hierarchyLevel number), and return a permissions
+// bundle in the same shape authorize() expects. Role.permissions is a string
+// array; we union it with the level-based implicit permissions from
+// hierarchicalAuthService. Returns { role: null, permissions: [] } when the
+// user has no org-level assignments or the referenced roles can't be resolved.
+const resolveOrgLevelPermissions = async (user) => {
+  const allAssignments = [
+    ...(user.unionAssignments || []),
+    ...(user.conferenceAssignments || []),
+    ...(user.churchAssignments || []),
+  ];
+
+  if (allAssignments.length === 0) {
+    return { role: null, permissions: [] };
+  }
+
+  let bestRole = null;
+  let bestLevel = 999;
+
+  for (const assignment of allAssignments) {
+    const roleRef = assignment.role;
+    if (!roleRef) continue;
+
+    let roleObj = roleRef;
+    if (typeof roleRef !== 'object' || roleObj.hierarchyLevel === undefined) {
+      const roleId = roleRef._id || roleRef;
+      roleObj = await Role.findById(roleId);
+    }
+    if (!roleObj || roleObj.hierarchyLevel === undefined) continue;
+
+    if (roleObj.hierarchyLevel < bestLevel) {
+      bestLevel = roleObj.hierarchyLevel;
+      bestRole = roleObj;
+    }
+  }
+
+  if (!bestRole) {
+    return { role: null, permissions: [] };
+  }
+
+  const permissions = new Set();
+  (bestRole.permissions || []).forEach((p) => {
+    if (typeof p === 'string') permissions.add(p);
+  });
+  hierarchicalAuthService
+    .getImplicitPermissions(bestLevel)
+    .forEach((p) => permissions.add(p));
+
+  return {
+    role: {
+      id: bestRole._id,
+      name: bestRole.name,
+      displayName: bestRole.displayName,
+      level: bestRole.level,
+    },
+    permissions: Array.from(permissions),
+  };
+};
+
 const authorize = (requiredPermission = {}) => {
   return async (req, res, next) => {
     try {
@@ -127,7 +189,7 @@ const authorize = (requiredPermission = {}) => {
             primaryTeamAssignment.teamId._id || primaryTeamAssignment.teamId
           );
 
-          if (teamPermissions && teamPermissions.permissions) {
+          if (teamPermissions && teamPermissions.teamRole) {
             userPermissions = {
               role: {
                 id: teamPermissions.teamRole,
@@ -146,10 +208,22 @@ const authorize = (requiredPermission = {}) => {
         }
       }
 
+      // ORG-LEVEL FALLBACK - Resolve role from union/conference/church assignments
+      // when the user has no team assignments (e.g. a newly granted Church Admin
+      // who has not yet joined a team). Without this fallback, any org-level
+      // admin with zero team memberships gets 403 "No role assigned" from every
+      // route that uses authorize(), even if their org role grants the permission.
+      if (!userPermissions.role) {
+        const orgPermissions = await resolveOrgLevelPermissions(req.user);
+        if (orgPermissions.role) {
+          userPermissions = orgPermissions;
+        }
+      }
+
       if (!userPermissions.role) {
         return res.status(403).json({
           success: false,
-          message: 'No role assigned',
+          message: 'No role assigned in any team or organisation',
         });
       }
 

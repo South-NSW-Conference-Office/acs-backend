@@ -386,8 +386,14 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
     return { role: null, permissions: [] };
   }
 
+  // teamId on each assignment may be populated (Team document) or a raw
+  // ObjectId depending on how the caller loaded the user — unwrap both shapes
+  // before comparing. Prior form used `.toString()` directly, which on a
+  // populated Document returns the object inspection, not the _id.
+  const extractId = (ref) => String(ref?._id ?? ref);
+  const targetId = extractId(teamId);
   const assignment = this.teamAssignments.find(
-    (team) => team.teamId.toString() === teamId.toString()
+    (team) => extractId(team.teamId) === targetId
   );
 
   if (!assignment) {
