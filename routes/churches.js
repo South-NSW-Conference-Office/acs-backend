@@ -300,7 +300,7 @@ router.get(
         Church.countDocuments(filter),
         Church.find(filter)
           .populate('conferenceId', 'name code')
-          .select('name code location contact isActive conferenceId metadata')
+          .select('name code location contact isActive conferenceId metadata leadership')
           .sort({ name: 1 })
           .skip(skip)
           .limit(limit)

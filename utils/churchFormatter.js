@@ -389,6 +389,7 @@ function formatChurchListItem(church) {
     code: raw.code || null,
     isActive: raw.isActive ?? true,
     conference: resolveConference(raw.conferenceId),
+    primaryPastor: extractPrimaryPastor(raw.leadership),
     locationShort: buildLocationShort(address) || null,
     location: {
       address: address
@@ -396,6 +397,7 @@ function formatChurchListItem(church) {
             street: address.street || null,
             city: address.city || null,
             state: address.state || null,
+            country: address.country || null,
             postalCode: address.postalCode || null,
           }
         : null,
