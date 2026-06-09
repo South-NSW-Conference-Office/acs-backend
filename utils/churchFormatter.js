@@ -407,6 +407,7 @@ function formatChurchListItem(church) {
       email: contact.email || null,
       website: normalizeWebsite(contact.website) || null,
     },
+    primaryImage: raw.primaryImage || null,
     stats: {
       teamCount: raw.metadata?.teamCount || 0,
       serviceCount: raw.metadata?.serviceCount || 0,

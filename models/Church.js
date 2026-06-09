@@ -239,6 +239,15 @@ const churchSchema = new mongoose.Schema(
       },
     },
 
+    // Banner image
+    primaryImage: {
+      url: String,
+      thumbnailUrl: String,
+      key: String,
+      alt: { type: String, default: '' },
+      mediaFileId: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaFile' },
+    },
+
     // Fellowship meals
     hasMeals: { type: Boolean, default: false },
     mealDay: { type: String, default: null },  // e.g. 'Saturday lunch 12:30 PM'
