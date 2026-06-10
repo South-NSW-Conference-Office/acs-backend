@@ -55,6 +55,9 @@ app.use(
         process.env.ADMIN_URL,
         'https://acs-admin.adventhub.org',
         'https://admin.adventhub.org',
+        ...(process.env.EXTRA_CORS_ORIGINS
+          ? process.env.EXTRA_CORS_ORIGINS.split(',').map((o) => o.trim())
+          : []),
       ].filter(Boolean);
 
       const localhostRegex = /^http:\/\/localhost:\d+$/;
