@@ -67,7 +67,7 @@ router.get('/public', async (req, res) => {
       .populate('churchId', 'name')
       .populate('leaderId', 'name')
       .select(
-        'name description category churchId leaderId members services coverImage profileImage createdAt'
+        'name description category type churchId leaderId location memberCount banner profilePhoto tags createdAt'
       )
       .sort('-createdAt')
       .limit(50);
