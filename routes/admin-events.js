@@ -62,51 +62,34 @@ router.get(
     // Build query
     const query = {};
 
-    // Organization filtering based on user permissions
-    // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = user.isSuperAdmin === true;
 
-    if (isSuperAdmin) {
-      // Super admin can see all events
-      if (organizationId) {
-        query.organization = organizationId;
-      }
-    } else {
-      // Other users can only see events from their organizations
-      const userOrgs = user.organizations || [];
+    if (!isSuperAdmin) {
+      const churchIds = (user.teamAssignments || [])
+        .filter((a) => a.teamId && a.teamId.churchId)
+        .map((a) => a.teamId.churchId._id);
 
-      if (userOrgs.length > 0) {
-        // Extract organization IDs from the user.organizations array
-        const orgIds = userOrgs.map((org) => org.organization._id);
-        query.organization = { $in: orgIds };
-      } else {
-        // User has no organizations, return empty result
-        return res.json([]);
-      }
+      if (churchIds.length === 0) return res.json([]);
+
+      const serviceFilter = { churchId: { $in: churchIds }, status: 'active' };
+      if (organizationId) serviceFilter.churchId = organizationId;
+      const serviceIds = await Service.find(serviceFilter).select('_id');
+      query.service = { $in: serviceIds.map((s) => s._id) };
+    } else if (organizationId) {
+      const serviceIds = await Service.find({ churchId: organizationId }).select('_id');
+      query.service = { $in: serviceIds.map((s) => s._id) };
     }
 
-    // Service filtering
     if (serviceId) {
       query.service = serviceId;
     }
 
-    // Date filtering
     if (dateFrom || dateTo) {
       query.start = {};
-      if (dateFrom) {
-        query.start.$gte = new Date(dateFrom);
-      }
-      if (dateTo) {
-        query.start.$lte = new Date(dateTo);
-      }
+      if (dateFrom) query.start.$gte = new Date(dateFrom);
+      if (dateTo) query.start.$lte = new Date(dateTo);
     }
 
-    // Search filtering
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -118,16 +101,12 @@ router.get(
     const events = await ServiceEvent.find(query)
       .populate({
         path: 'service',
-        select: 'name type organization',
-        populate: {
-          path: 'organization',
-          select: 'name type',
-        },
+        select: 'name type churchId',
+        populate: { path: 'churchId', select: 'name' },
       })
-      .populate('organization', 'name type')
       .populate('createdBy', 'name email')
-      .sort({ start: 1 }) // Sort by start date, upcoming first
-      .limit(1000); // Reasonable limit
+      .sort({ start: 1 })
+      .limit(1000);
 
     res.json(events);
   })
@@ -140,31 +119,24 @@ router.get(
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
     const user = req.user;
-    const query = { deletedAt: null, status: 'active' };
-
-    // Filter by user's organizations
-    // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const query = { status: 'active' };
+    const isSuperAdmin = user.isSuperAdmin === true;
 
     if (!isSuperAdmin) {
-      const userOrgs = user.organizations || [];
-      if (userOrgs.length > 0) {
-        // Extract organization IDs from the user.organizations array
-        const orgIds = userOrgs.map((org) => org.organization._id);
-        query.organization = { $in: orgIds };
+      const churchIds = (user.teamAssignments || [])
+        .filter((a) => a.teamId && a.teamId.churchId)
+        .map((a) => a.teamId.churchId._id);
+
+      if (churchIds.length > 0) {
+        query.churchId = { $in: churchIds };
       } else {
         return res.json([]);
       }
     }
 
     const services = await Service.find(query)
-      .select('name type organization')
-      .populate('organization', 'name type')
+      .select('name type churchId')
+      .populate('churchId', 'name')
       .sort({ name: 1 });
 
     res.json(services);
@@ -181,13 +153,9 @@ router.get(
     const event = await ServiceEvent.findById(req.params.id)
       .populate({
         path: 'service',
-        select: 'name type organization',
-        populate: {
-          path: 'organization',
-          select: 'name type',
-        },
+        select: 'name type churchId',
+        populate: { path: 'churchId', select: 'name' },
       })
-      .populate('organization', 'name type')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -211,25 +179,19 @@ router.post(
     const { serviceId } = req.body;
 
     // Verify service exists and user has access
-    const service = await Service.findOne({ _id: serviceId, deletedAt: null });
+    const service = await Service.findOne({ _id: serviceId, status: 'active' });
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    // Check if user has permission to manage this service's organization
     const user = req.user;
-    // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = user.isSuperAdmin === true;
 
     if (!isSuperAdmin) {
-      const userOrgs = user.organizations || [];
-      const orgIds = userOrgs.map((org) => org.organization._id.toString());
-      if (!orgIds.includes(service.organization.toString())) {
+      const churchIds = (user.teamAssignments || [])
+        .filter((a) => a.teamId && a.teamId.churchId)
+        .map((a) => a.teamId.churchId._id.toString());
+      if (!churchIds.includes(service.churchId.toString())) {
         return res
           .status(403)
           .json({ error: 'Insufficient permissions for this service' });
@@ -246,7 +208,6 @@ router.post(
         .json({ error: 'End date must be after start date' });
     }
 
-    // Create event — pick only allowed fields (no mass assignment)
     const event = new ServiceEvent({
       name: eventData.name,
       description: eventData.description,
@@ -255,23 +216,17 @@ router.post(
       locationText: eventData.locationText,
       capacity: eventData.capacity,
       service: service._id,
-      organization: service.organization,
       createdBy: user._id,
       updatedBy: user._id,
     });
 
     await event.save();
 
-    // Populate the created event for response
     await event.populate({
       path: 'service',
-      select: 'name type organization',
-      populate: {
-        path: 'organization',
-        select: 'name type',
-      },
+      select: 'name type churchId',
+      populate: { path: 'churchId', select: 'name' },
     });
-    await event.populate('organization', 'name type');
     await event.populate('createdBy', 'name email');
 
     res.status(201).json(event);
@@ -298,27 +253,20 @@ router.put(
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check permissions
     const user = req.user;
-    // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = user.isSuperAdmin === true;
 
     if (!isSuperAdmin) {
-      const userOrgs = user.organizations || [];
-      const orgIds = userOrgs.map((org) => org.organization._id.toString());
-      if (!orgIds.includes(event.organization.toString())) {
+      const churchIds = (user.teamAssignments || [])
+        .filter((a) => a.teamId && a.teamId.churchId)
+        .map((a) => a.teamId.churchId._id.toString());
+      if (!churchIds.includes(event.service.churchId.toString())) {
         return res
           .status(403)
           .json({ error: 'Insufficient permissions for this event' });
       }
     }
 
-    // Validate dates
     const startDate = new Date(eventData.start);
     const endDate = new Date(eventData.end);
 
@@ -328,7 +276,6 @@ router.put(
         .json({ error: 'End date must be after start date' });
     }
 
-    // Update event (service cannot be changed)
     Object.assign(event, {
       name: eventData.name,
       description: eventData.description,
@@ -341,16 +288,11 @@ router.put(
 
     await event.save();
 
-    // Populate the updated event for response
     await event.populate({
       path: 'service',
-      select: 'name type organization',
-      populate: {
-        path: 'organization',
-        select: 'name type',
-      },
+      select: 'name type churchId',
+      populate: { path: 'churchId', select: 'name' },
     });
-    await event.populate('organization', 'name type');
     await event.populate('updatedBy', 'name email');
 
     res.json(event);
@@ -364,33 +306,27 @@ router.delete(
   authenticateToken,
   authorize('services.manage'),
   asyncHandler(async (req, res) => {
-    const event = await ServiceEvent.findById(req.params.id);
+    const event = await ServiceEvent.findById(req.params.id)
+      .populate({ path: 'service', select: 'churchId' });
 
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
 
-    // Check permissions
     const user = req.user;
-    // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = user.isSuperAdmin === true;
 
     if (!isSuperAdmin) {
-      const userOrgs = user.organizations || [];
-      const orgIds = userOrgs.map((org) => org.organization._id.toString());
-      if (!orgIds.includes(event.organization.toString())) {
+      const churchIds = (user.teamAssignments || [])
+        .filter((a) => a.teamId && a.teamId.churchId)
+        .map((a) => a.teamId.churchId._id.toString());
+      if (!churchIds.includes(event.service.churchId.toString())) {
         return res
           .status(403)
           .json({ error: 'Insufficient permissions for this event' });
       }
     }
 
-    // Hard delete - permanently remove from database
     await ServiceEvent.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Event deleted successfully' });

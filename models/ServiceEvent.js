@@ -15,7 +15,6 @@ const serviceEventSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: true,
     },
     eventType: {
       type: String,
@@ -62,7 +61,6 @@ const serviceEventSchema = new mongoose.Schema(
     },
     locationText: {
       type: String,
-      required: true,
     },
     capacity: {
       maximum: Number,
