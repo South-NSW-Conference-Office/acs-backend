@@ -53,6 +53,12 @@ app.use(
       const allowedOrigins = [
         process.env.FRONTEND_URL,
         process.env.ADMIN_URL,
+        ...(process.env.CORS_ORIGINS
+          ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+          : []),
+        'https://communityservices.org.au',
+        'https://www.communityservices.org.au',
+        'https://api.communityservices.org.au',
         'https://acs-admin.adventhub.org',
         'https://admin.adventhub.org',
         ...(process.env.EXTRA_CORS_ORIGINS
