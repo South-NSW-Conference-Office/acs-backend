@@ -80,6 +80,7 @@ class TeamService {
       'name',
       'description',
       'leaderId',
+      'location',
       'settings',
       'metadata',
     ];
@@ -89,6 +90,46 @@ class TeamService {
       if (updates[field] !== undefined) {
         updateFields[field] = updates[field];
       }
+    }
+
+    // The client sends team type as `type`; it's stored as `category`.
+    if (updates.type !== undefined) {
+      updateFields.category = updates.type;
+    }
+
+    // Handle church reassignment (moving the team within the hierarchy).
+    if (
+      updates.churchId &&
+      updates.churchId.toString() !== team.churchId.toString()
+    ) {
+      const Church = require('../models/Church');
+      const newChurch = await Church.findById(updates.churchId);
+
+      if (!newChurch) {
+        throw new Error('Church not found');
+      }
+      if (!newChurch.isActive) {
+        throw new Error('Cannot assign team to inactive church');
+      }
+
+      // User must also be able to manage the destination church.
+      const canManageTarget =
+        await hierarchicalAuthService.canUserManageEntity(
+          updatedBy,
+          newChurch._id,
+          'update'
+        );
+      if (
+        !canManageTarget &&
+        team.leaderId?.toString() !== updatedBy._id.toString()
+      ) {
+        throw new Error('Insufficient permissions to move team to this church');
+      }
+
+      updateFields.churchId = newChurch._id;
+      // findByIdAndUpdate bypasses the model's pre-validate hook, so recompute
+      // the hierarchy path here to keep it consistent with the new church.
+      updateFields.hierarchyPath = `${newChurch.hierarchyPath}/team_${team._id}`;
     }
 
     updateFields.updatedBy = updatedBy._id;
