@@ -1,8 +1,60 @@
 // const Organization = require('../models/Organization'); // REMOVED - Using hierarchical models
 const Service = require('../models/Service');
+const Team = require('../models/Team');
 // const ServiceEvent = require('../models/ServiceEvent');
 // const VolunteerRole = require('../models/VolunteerRole');
 const Story = require('../models/Story');
+const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+
+function getTeamIdValue(teamId) {
+  if (!teamId) return null;
+  if (typeof teamId === 'object' && teamId._id) return teamId._id.toString();
+  return teamId.toString();
+}
+
+function userHasTeamAssignment(user, teamId, permission) {
+  const targetTeamId = getTeamIdValue(teamId);
+  if (!targetTeamId || !Array.isArray(user.teamAssignments)) return false;
+
+  const assignment = user.teamAssignments.find(
+    (teamAssignment) =>
+      getTeamIdValue(teamAssignment.teamId) === targetTeamId &&
+      teamAssignment.status === 'active'
+  );
+
+  if (!assignment) return false;
+
+  const explicitPermissions = assignment.permissions || [];
+  if (
+    explicitPermissions.includes(permission) ||
+    explicitPermissions.includes('*')
+  ) {
+    return true;
+  }
+
+  if (permission.endsWith('.read')) return true;
+
+  return ['leader', 'coordinator', 'communications'].includes(assignment.role);
+}
+
+function assignmentCanManageServices(assignment) {
+  if (!assignment || assignment.status !== 'active') return false;
+
+  const explicitPermissions = assignment.permissions || [];
+  return (
+    ['leader', 'coordinator', 'communications'].includes(assignment.role) ||
+    explicitPermissions.includes('*') ||
+    explicitPermissions.some(
+      (permission) =>
+        permission === 'services.manage' ||
+        permission === 'services.create' ||
+        permission === 'services.update' ||
+        permission === 'services.delete' ||
+        permission === 'team.services.manage' ||
+        permission === 'team.services.create'
+    )
+  );
+}
 
 /**
  * Check if user has permission to manage services for a given team
@@ -21,9 +73,22 @@ async function canManageService(user, teamId) {
     return true;
   }
 
-  // For non-super admin users, deny access for now
-  // TODO: Implement proper hierarchy-based permissions
-  return false;
+  if (userHasTeamAssignment(user, teamId, permission)) {
+    return true;
+  }
+
+  const team = await Team.findById(teamId).select('hierarchyPath isActive');
+  if (!team || !team.isActive || !team.hierarchyPath) {
+    return false;
+  }
+
+  const userHierarchyPath =
+    await hierarchicalAuthService.getUserHierarchyPath(user);
+  if (!userHierarchyPath) {
+    return false;
+  }
+
+  return team.hierarchyPath.startsWith(userHierarchyPath);
 }
 
 /**
@@ -79,13 +144,35 @@ async function getManageableTeams(user) {
 
   // Check if user is a super admin
   if (user.isSuperAdmin) {
-    // For super admin, return empty array to bypass team filtering
-    return [];
+    return Team.find({ isActive: true }).select('_id name category churchId');
   }
 
-  // For non-super admin users, return empty array for now
-  // TODO: Implement proper hierarchy-based permissions
-  return [];
+  const assignedTeamIds = (user.teamAssignments || [])
+    .filter(assignmentCanManageServices)
+    .map((assignment) => getTeamIdValue(assignment.teamId))
+    .filter(Boolean);
+
+  const userHierarchyPath =
+    await hierarchicalAuthService.getUserHierarchyPath(user);
+  const or = [];
+
+  if (assignedTeamIds.length > 0) {
+    or.push({ _id: { $in: assignedTeamIds } });
+  }
+
+  if (userHierarchyPath) {
+    or.push({
+      hierarchyPath: new RegExp(
+        `^${userHierarchyPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+      ),
+    });
+  }
+
+  if (or.length === 0) return [];
+
+  return Team.find({ isActive: true, $or: or }).select(
+    '_id name category churchId'
+  );
 }
 
 /**
@@ -211,7 +298,7 @@ async function getManageableServices(user) {
   const manageableTeamIds = await getManageableTeams(user);
 
   return Service.find({
-    teamId: { $in: manageableTeamIds },
+    teamId: { $in: manageableTeamIds.map((team) => team._id) },
   });
 }
 

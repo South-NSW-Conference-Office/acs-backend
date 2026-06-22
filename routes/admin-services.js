@@ -10,7 +10,21 @@ const { authenticateToken } = require('../middleware/auth');
 const {
   canManageService,
   requireServicePermission,
+  getManageableTeams,
 } = require('../middleware/serviceAuth');
+
+async function getServiceScopeQuery(user) {
+  if (user.isSuperAdmin) return {};
+
+  const teams = await getManageableTeams(user);
+  const teamIds = teams.map((team) => team._id);
+
+  if (teamIds.length === 0) {
+    return { _id: { $in: [] } };
+  }
+
+  return { teamId: { $in: teamIds } };
+}
 
 /** Middleware: reject invalid ObjectId params early with a clean 400 */
 function validateObjectId(paramName) {
@@ -53,16 +67,18 @@ router.get('/permissions', async (req, res) => {
       });
     }
 
-    // For non-super admin users, return basic permissions
+    const manageableTeams = await getManageableTeams(req.user);
+    const canManageServices = manageableTeams.length > 0;
+
     res.json({
       success: true,
       permissions: {
-        canCreateServices: false,
-        canUpdateServices: false,
-        canDeleteServices: false,
-        canManageServices: false,
-        canCreateStories: false,
-        canManageStories: false,
+        canCreateServices: canManageServices,
+        canUpdateServices: canManageServices,
+        canDeleteServices: canManageServices,
+        canManageServices,
+        canCreateStories: canManageServices,
+        canManageStories: canManageServices,
       },
     });
   } catch (error) {
@@ -76,8 +92,7 @@ router.get('/permissions', async (req, res) => {
  */
 router.get('/dashboard-stats', async (req, res) => {
   try {
-    // For super admin, show all services
-    const query = req.user.isSuperAdmin ? {} : { teamId: { $exists: false } }; // No services for non-super admin
+    const query = await getServiceScopeQuery(req.user);
 
     const [
       totalServices,
@@ -141,11 +156,22 @@ router.get('/', async (req, res) => {
     // Check if user is super admin
     const isSuperAdmin = req.user.isSuperAdmin;
 
-    // Query all services for super admin, no services for non-super admin (for now)
-    const query = isSuperAdmin ? {} : { teamId: { $exists: false } }; // Empty result for non-super admin
+    const query = await getServiceScopeQuery(req.user);
 
-    if (organization && isSuperAdmin) {
-      query.teamId = organization;
+    if (organization) {
+      if (!isSuperAdmin) {
+        const allowedTeamIds = (query.teamId?.$in || []).map((teamId) =>
+          teamId.toString()
+        );
+
+        if (!allowedTeamIds.includes(organization.toString())) {
+          query.teamId = { $in: [] };
+        } else {
+          query.teamId = organization;
+        }
+      } else {
+        query.teamId = organization;
+      }
     }
 
     if (type) query.type = type;
@@ -166,6 +192,7 @@ router.get('/', async (req, res) => {
     const [services, total] = await Promise.all([
       Service.find(query)
         .populate('teamId', 'name category')
+        .populate('churchId', 'name')
         .populate('createdBy', 'name email')
         .sort(sort)
         .skip(skip)
@@ -193,9 +220,9 @@ router.get('/', async (req, res) => {
       return {
         ...serviceObj,
         permissions: {
-          canUpdate: isSuperAdmin,
-          canDelete: isSuperAdmin,
-          canManage: isSuperAdmin,
+          canUpdate: true,
+          canDelete: true,
+          canManage: true,
         },
       };
     });
@@ -311,18 +338,10 @@ router.get('/types', async (req, res) => {
  */
 router.get('/organizations', async (req, res) => {
   try {
-    // For super admin, get all teams
-    if (!req.user.isSuperAdmin) {
-      return res.json({
-        success: true,
-        organizations: [], // Non-super admin gets no teams for now
-      });
-    }
-
     const Team = require('../models/Team');
-    const teams = await Team.find({ status: 'active' })
-      .select('name category')
-      .limit(50);
+    const teams = req.user.isSuperAdmin
+      ? await Team.find({ isActive: true }).select('name category').limit(50)
+      : await getManageableTeams(req.user);
 
     // Format teams as organizations for compatibility with frontend
     const organizations = teams.map((team) => ({

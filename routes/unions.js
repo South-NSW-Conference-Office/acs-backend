@@ -303,7 +303,7 @@ router.post(
       .isString()
       .withMessage('Headquarters country must be a string'),
     body('contact.email')
-      .optional()
+      .optional({ checkFalsy: true })
       .isEmail()
       .withMessage('Valid email required'),
   ],
@@ -355,7 +355,7 @@ router.put(
       .isLength({ min: 2 })
       .withMessage('Union name must be at least 2 characters'),
     body('contact.email')
-      .optional()
+      .optional({ checkFalsy: true })
       .isEmail()
       .withMessage('Valid email required'),
   ],

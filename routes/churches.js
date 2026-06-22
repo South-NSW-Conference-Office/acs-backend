@@ -241,8 +241,8 @@ router.get(
       .withMessage('Page must be a positive integer'),
     query('limit')
       .optional()
-      .isInt({ min: 1, max: 100 })
-      .withMessage('Limit must be 1–100'),
+      .isInt({ min: 1, max: 1000 })
+      .withMessage('Limit must be 1–1000'),
   ],
   async (req, res) => {
     try {
@@ -300,7 +300,7 @@ router.get(
         Church.countDocuments(filter),
         Church.find(filter)
           .populate('conferenceId', 'name code')
-          .select('name code location contact isActive conferenceId metadata')
+          .select('name code location contact isActive conferenceId metadata leadership primaryImage')
           .sort({ name: 1 })
           .skip(skip)
           .limit(limit)
