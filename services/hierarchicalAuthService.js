@@ -318,21 +318,34 @@ class HierarchicalAuthorizationService {
   parseHierarchyLevel(path) {
     const segments = path.split('/');
 
-    // Count actual levels: union=0, conference=1, church=2, team=3, service=4
-    let level = 0;
+    // Levels: union=0, conference=1, church=2, team=3, service=4
+    //
+    // Organisation depth and entity type must be tracked separately. Previously
+    // both shared one counter and the result was clamped with
+    // `Math.min(level - 1, 2)`, which discarded the team=3 / service=4 values
+    // the loop had just determined - so this could never return anything above
+    // 2. A church admin (level 2) asked to manage a team therefore hit
+    // canLevelManageLevel(2, 2) => 2 < 2 => false and was refused management of
+    // teams and services inside their own church.
+    let orgDepth = 0;
+    let entityLevel = null;
 
     for (const segment of segments) {
-      if (segment.includes('_')) {
-        // team_xxx or service_xxx
-        if (segment.startsWith('team_')) level = 3;
-        else if (segment.startsWith('service_')) level = 4;
+      if (segment.startsWith('team_')) {
+        entityLevel = 3;
+      } else if (segment.startsWith('service_')) {
+        entityLevel = 4;
       } else {
         // Organization IDs
-        level++;
+        orgDepth++;
       }
     }
 
-    return Math.min(level - 1, 2); // Organizations max at level 2 (church)
+    if (entityLevel !== null) {
+      return entityLevel;
+    }
+
+    return Math.min(orgDepth - 1, 2); // Organizations max at level 2 (church)
   }
 
   /**
