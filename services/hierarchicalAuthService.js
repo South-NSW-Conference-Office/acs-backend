@@ -6,6 +6,7 @@ const Service = require('../models/Service');
 const Role = require('../models/Role');
 // const User = require('../models/User');
 const HierarchyValidator = require('../utils/hierarchyValidator');
+const authorizationService = require('./authorizationService');
 
 /**
  * Hierarchical Authorization Service
@@ -83,8 +84,10 @@ class HierarchicalAuthorizationService {
       return null;
     }
 
-    // Super admin users have access to all hierarchy levels
-    if (user.isSuperAdmin === true) {
+    // Super admin users have access to all hierarchy levels.
+    // Uses authorizationService so an assigned super_admin role counts, not
+    // just the isSuperAdmin boolean.
+    if (authorizationService.isSuperAdmin(user)) {
       return ''; // Empty path means system-level access
     }
 
@@ -104,15 +107,28 @@ class HierarchicalAuthorizationService {
 
     for (const orgAssignment of allAssignments) {
       const role = orgAssignment.role;
-      // Get org reference based on assignment type
-      const org =
-        orgAssignment.union || orgAssignment.conference || orgAssignment.church;
+      // Get org reference based on assignment type, keeping track of which
+      // model it belongs to so it can be resolved directly if it is only a ref.
+      let org = null;
+      let OrgModel = null;
+      if (orgAssignment.union) {
+        org = orgAssignment.union;
+        OrgModel = Union;
+      } else if (orgAssignment.conference) {
+        org = orgAssignment.conference;
+        OrgModel = Conference;
+      } else if (orgAssignment.church) {
+        org = orgAssignment.church;
+        OrgModel = Church;
+      }
 
-      // Get role level
+      // Get role level. Note `typeof null === 'object'`, so the null check
+      // matters: an assignment with no role would otherwise throw here and
+      // take down the whole permission check.
       let roleLevel = 4;
-      if (typeof role === 'object' && role.hierarchyLevel !== undefined) {
+      if (role && typeof role === 'object' && role.hierarchyLevel !== undefined) {
         roleLevel = role.hierarchyLevel;
-      } else {
+      } else if (role) {
         const roleObj = await Role.findById(role);
         if (roleObj) roleLevel = roleObj.hierarchyLevel;
       }
@@ -121,17 +137,15 @@ class HierarchicalAuthorizationService {
       if (roleLevel < highestLevel) {
         highestLevel = roleLevel;
 
-        // Get organization hierarchy path
+        // Get organization hierarchy path.
+        // The reference may already be a populated document, or it may be a
+        // plain ObjectId/string. The previous `typeof org === 'string'` guard
+        // never matched an ObjectId, so the lookup was skipped and this
+        // returned null for every non-super-admin. Resolve whenever the value
+        // does not already carry the field we need.
         let orgObj = org;
-        if (typeof org === 'string') {
-          // Try to find in hierarchical models
-          orgObj = await Union.findById(org);
-          if (!orgObj) {
-            orgObj = await Conference.findById(org);
-          }
-          if (!orgObj) {
-            orgObj = await Church.findById(org);
-          }
+        if (org && !org.hierarchyPath && OrgModel) {
+          orgObj = await OrgModel.findById(org._id || org);
         }
 
         if (orgObj && orgObj.hierarchyPath) {
@@ -345,9 +359,12 @@ class HierarchicalAuthorizationService {
         const churchAssignment = user.churchAssignments[0];
         const churchId = churchAssignment.church;
 
+        // Same defect as getUserHierarchyPath: an ObjectId is not a string, so
+        // the lookup was skipped and callers received a bare ref instead of a
+        // Church document. Resolve unless it is already populated.
         let churchObj = churchId;
-        if (typeof churchId === 'string') {
-          churchObj = await Church.findById(churchId);
+        if (churchId && !churchId.hierarchyPath) {
+          churchObj = await Church.findById(churchId._id || churchId);
         }
 
         return churchObj;
