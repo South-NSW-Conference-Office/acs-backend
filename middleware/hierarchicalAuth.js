@@ -76,16 +76,24 @@ const authenticateToken = async (req, res, next) => {
     // User lookup — serve from cache when possible
     let user = getCachedUser(decoded.userId);
     if (!user) {
-      user = await User.findById(decoded.userId).populate({
-        path: 'teamAssignments.teamId',
-        populate: {
-          path: 'churchId',
+      user = await User.findById(decoded.userId)
+        .populate({
+          path: 'teamAssignments.teamId',
           populate: {
-            path: 'conferenceId',
-            populate: { path: 'unionId' },
+            path: 'churchId',
+            populate: {
+              path: 'conferenceId',
+              populate: { path: 'unionId' },
+            },
           },
-        },
-      });
+        })
+        // Must match middleware/auth.js — authorization reads
+        // `assignment.role.name` and `org.hierarchyPath`, both of which are
+        // undefined unless these are populated. The cached copy therefore has
+        // to carry them too, or cache hits silently lose permissions.
+        .populate('unionAssignments.role unionAssignments.union')
+        .populate('conferenceAssignments.role conferenceAssignments.conference')
+        .populate('churchAssignments.role churchAssignments.church');
       if (user) setCachedUser(decoded.userId, user);
     }
 
