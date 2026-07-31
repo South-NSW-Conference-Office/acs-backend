@@ -5,6 +5,7 @@ const Team = require('../models/Team');
 // const VolunteerRole = require('../models/VolunteerRole');
 const Story = require('../models/Story');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+const authorizationService = require('../services/authorizationService');
 
 function getTeamIdValue(teamId) {
   if (!teamId) return null;
@@ -63,13 +64,13 @@ function assignmentCanManageServices(assignment) {
  * @param {String} permission - The permission to check (e.g., 'services.manage', 'services.create')
  * @returns {Boolean} Whether the user has the permission
  */
-async function canManageService(user, teamId) {
+async function canManageService(user, teamId, permission = 'services.manage') {
   if (!user || !teamId) {
     return false;
   }
 
-  // Check if user is super admin
-  if (user.isSuperAdmin) {
+  // Check if user is super admin (flag or an assigned super_admin role)
+  if (authorizationService.isSuperAdmin(user)) {
     return true;
   }
 
@@ -143,7 +144,7 @@ async function getManageableTeams(user) {
   if (!user) return [];
 
   // Check if user is a super admin
-  if (user.isSuperAdmin) {
+  if (authorizationService.isSuperAdmin(user)) {
     return Team.find({ isActive: true }).select('_id name category churchId');
   }
 
@@ -190,7 +191,7 @@ function requireServicePermission(permission) {
       }
 
       // Check if user is super admin - bypass all checks
-      if (user.isSuperAdmin) {
+      if (authorizationService.isSuperAdmin(user)) {
         return next();
       }
 
