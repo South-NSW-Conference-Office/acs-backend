@@ -1,5 +1,6 @@
 const authorizationService = require('../services/authorizationService');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+const Team = require('../models/Team');
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -32,6 +33,37 @@ class SecureQueryBuilder {
     // Include own data if requested
     if (includeOwnData) {
       conditions.push({ _id: user._id });
+    }
+
+    // Scope to the churches within the caller's hierarchy. Without this the
+    // only condition was own-data, so any list built with
+    // includeOwnData: false (routes/users.js user list) fell through to
+    // { _id: null } and returned zero rows for every non-super-admin -
+    // regardless of how much hierarchy they legitimately administer.
+    try {
+      const accessibleChurches =
+        await hierarchicalAuthService.getAccessibleEntities(user, 'church');
+
+      if (accessibleChurches && accessibleChurches.length > 0) {
+        const churchIds = accessibleChurches.map((church) => church._id);
+        const accessibleTeams = await Team.find({
+          churchId: { $in: churchIds },
+          isActive: true,
+        }).select('_id');
+
+        conditions.push({ 'churchAssignments.church': { $in: churchIds } });
+
+        if (accessibleTeams.length > 0) {
+          conditions.push({
+            'teamAssignments.teamId': {
+              $in: accessibleTeams.map((team) => team._id),
+            },
+          });
+        }
+      }
+    } catch (error) {
+      // Fall through to the restrictive conditions below rather than widening
+      // access if the hierarchy lookup fails.
     }
 
     // Combine with base query
