@@ -6,6 +6,7 @@ const VolunteerRole = require('../models/VolunteerRole');
 const Service = require('../models/Service');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
+const authorizationService = require('../services/authorizationService');
 
 /** Middleware: reject invalid ObjectId params early with a clean 400 */
 function validateObjectId(paramName) {
@@ -77,12 +78,7 @@ router.get(
     const query = {};
 
     // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = authorizationService.isSuperAdmin(user);
 
     if (isSuperAdmin) {
       // Super admin can see all opportunities
@@ -291,12 +287,7 @@ router.put(
     // Check permissions
     const user = req.user;
     // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = authorizationService.isSuperAdmin(user);
 
     if (!isSuperAdmin) {
       const userOrgs = user.organizations || [];
@@ -362,12 +353,7 @@ router.delete(
     // Check permissions
     const user = req.user;
     // Check if user is super admin by looking at their role assignments
-    const isSuperAdmin =
-      user.organizations &&
-      user.organizations.some(
-        (org) =>
-          org.role && (org.role.name === 'super_admin' || org.role.isSuperAdmin)
-      );
+    const isSuperAdmin = authorizationService.isSuperAdmin(user);
 
     if (!isSuperAdmin) {
       const userOrgs = user.organizations || [];
