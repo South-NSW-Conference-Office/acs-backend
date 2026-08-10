@@ -6,12 +6,15 @@ const logger = require('../services/loggerService');
 /**
  * Grant website-content and media permissions to the admin roles.
  *
- * Why this migration is required:
+ * Why this migration exists:
  * Roles are documents in MongoDB, not code. The definitions in models/Role.js
- * are only applied by roleSchema.statics.createSystemRoles, which is never
- * called anywhere in the app. Editing Role.js therefore has no effect on the
- * roles already in the database - this migration is what actually applies the
- * change to a running system.
+ * are applied by roleSchema.statics.createSystemRoles, which runs on every
+ * server start via utils/initializeDatabase.js and upserts each role - so the
+ * permission grants in Role.js do reach a running system on deploy.
+ *
+ * This migration is therefore a safety net rather than a requirement: it
+ * applies the same change explicitly, without needing a restart, and makes the
+ * intent auditable.
  *
  * Background: no role in the system granted page_content.manage, media.upload
  * or media.manage, so every route in routes/admin/page-content.js and the
