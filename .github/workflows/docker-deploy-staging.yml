@@ -1,11 +1,15 @@
 # -----------------------------------------------------------------------------
 # acs-backend — CI/CD (Staging)
 #
-# Migrated 2026-08-17 from kylevps to morpheus (arm64). Deploys ONLY the
-# staging backend container on morpheus (port 5050) — the public API proxy
-# stub on snswserver (which fronts both prod and staging) is synced by the
-# production workflow's deploy-api-proxy job, not this one. See
-# deploy/README.md.
+# Migrated 2026-08-17 from kylevps to morpheus (arm64). Deploys the staging
+# backend container on morpheus (port 5050) — the public API proxy stub on
+# snswserver (which fronts both prod and staging) is synced by the production
+# workflow's deploy-api-proxy job, not this one. See deploy/README.md.
+#
+# kylevps is KEPT as a parallel fallback target (user request) while DNS
+# cutover is pending — build-and-push therefore produces a multi-arch
+# (amd64+arm64) manifest under one tag so both hosts pull their native image.
+# Remove deploy-backend-staging-legacy once kylevps is decommissioned.
 # -----------------------------------------------------------------------------
 
 name: Build and Deploy Docker (Staging)
@@ -35,6 +39,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU (for amd64 cross-build on this arm64 runner)
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -58,7 +65,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -93,3 +100,25 @@ jobs:
 
       - name: Prune dangling images
         run: docker image prune -f
+
+  # Original deploy target, kept running in parallel as a fallback until DNS
+  # cuts over to the new infra — remove this job once kylevps is
+  # decommissioned. Unchanged from the pre-migration workflow.
+  deploy-backend-staging-legacy:
+    name: Deploy staging backend on kylevps (legacy, parallel fallback)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: acs-backend
+    steps:
+      - name: Deploy to Genesis VPS (Staging, legacy)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.VPS_STAGING_HOST || vars.VPS_HOST }}
+          username: ${{ vars.VPS_STAGING_USERNAME || vars.VPS_USERNAME }}
+          key: ${{ vars.VPS_STAGING_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ vars.VPS_STAGING_PORT || vars.VPS_PORT }}
+          script: |
+            cd /opt/adventist-community-services-staging
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
