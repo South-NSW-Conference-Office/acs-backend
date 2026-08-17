@@ -1,0 +1,62 @@
+# =============================================================================
+# acs-backend — production docker-compose for the **morpheus** host
+# (NVIDIA GB10, linux/arm64). Migrated from kylevps (76.13.176.13) 2026-08-17.
+# =============================================================================
+#
+# Lives at /home/morpheus/adventist-community-services/docker-compose.yml on morpheus.
+# The "deploy-backend" CI job copies it here, then runs `docker compose pull
+# && up -d`. Morpheus does ZERO building — it only PULLS the prebuilt
+# linux/arm64 image from GHCR (built on an ubuntu-24.04-arm runner).
+#
+# ---------------------------------------------------------------------------
+# NETWORK EXPOSURE — reached two ways, both loopback/tailnet only (never
+#   0.0.0.0):
+#     - 127.0.0.1:5000  — host-local (debugging on morpheus itself).
+#     - 100.87.6.30:5000 — morpheus's Tailscale IP. The public front door is
+#       an nginx reverse-proxy stub on snswserver (deploy/docker-compose.
+#       snswserver.yml) at api.communityservices.org.au, forwarding here over
+#       WireGuard — ACS's API has no same-stack frontend to proxy through
+#       (unlike morpheustools/cfodashboard), so it needs this dedicated stub.
+#
+# ---------------------------------------------------------------------------
+# DATABASE — MongoDB is HOST-resident on morpheus (mongod, TLS, self-signed
+#   cert, shared with other apps: cfodashboard, morpheustools, etc.), NOT a
+#   container in this compose file. The container reaches it via the docker
+#   host gateway (extra_hosts). ACS's data was migrated into its own
+#   `adventistcommunityservices` database on this same mongod instance —
+#   dumped from kylevps's shared mongo container and restored here.
+# =============================================================================
+
+services:
+  backend:
+    # Defaults to :latest; set IMAGE_TAG=<git-sha> in .env to pin/rollback.
+    image: ghcr.io/south-nsw-conference-office/acs-backend:${IMAGE_TAG:-latest}
+    container_name: acs-backend
+    restart: unless-stopped
+
+    # Secrets + config (gitignored, placed once on the host next to this file).
+    env_file:
+      - .env.backend
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      - "127.0.0.1:5000:5000"
+      - "100.87.6.30:5000:5000"
+
+    volumes:
+      - ./logs:/app/logs
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

@@ -1,0 +1,58 @@
+# =============================================================================
+# acs-api-proxy — public front door for ACS's backend API, on snswserver
+# (Debian 13, linux/amd64, public IP). The actual backend containers
+# (acs-backend, acs-backend-staging) run on morpheus and are tailnet-only —
+# see ../deploy/docker-compose.morpheus.yml and docker-compose-staging.
+# morpheus.yml. This is a THIN nginx reverse-proxy stub, not the app itself:
+# unlike morpheustools/cfodashboard, ACS's API is hit DIRECTLY by external
+# clients (no same-stack Next.js frontend to proxy through server-side), so it
+# needs its own dedicated public entry point.
+#
+# Lives at /opt/acs-api-proxy/docker-compose.yml on snswserver. CI scp's this
+# file plus nginx-api-proxy.conf here, then runs `docker compose pull && up
+# -d`. Builds nothing — pulls the public `nginx:1.27-alpine` image.
+#
+# FRONT DOOR (TLS) — joins snswserver's existing SHARED nginx-proxy +
+#   acme-companion stack (owned by /opt/adventistpulse/proxy, not this
+#   project) rather than terminating its own TLS. VIRTUAL_HOST/LETSENCRYPT_HOST
+#   list both the prod and staging API hostnames so acme-companion issues one
+#   cert covering both SANs.
+# =============================================================================
+
+services:
+  api-proxy:
+    image: nginx:1.27-alpine
+    container_name: acs-api-proxy
+    restart: unless-stopped
+
+    volumes:
+      - ./nginx-api-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+
+    environment:
+      - VIRTUAL_HOST=api.communityservices.org.au,staging-api.communityservices.org.au
+      - VIRTUAL_PORT=80
+      - LETSENCRYPT_HOST=api.communityservices.org.au,staging-api.communityservices.org.au
+
+    expose:
+      - "80"
+
+    networks:
+      - proxy-network
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/", "-T", "5"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  # Owned by /opt/adventistpulse/proxy's compose project, not this one.
+  proxy-network:
+    external: true

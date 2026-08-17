@@ -1,8 +1,33 @@
+# -----------------------------------------------------------------------------
+# acs-backend — CI/CD (Production)
+#
+# Migrated 2026-08-17 from kylevps (Genesis, amd64) to morpheus (NVIDIA GB10,
+# arm64) + a public front-door proxy stub on snswserver. See deploy/README.md.
+#
+#   build-and-push : native arm64 build on ubuntu-24.04-arm, push to GHCR.
+#   deploy-backend  : pull-only, runs ON morpheus via its self-hosted runner.
+#   deploy-api-proxy: syncs the snswserver reverse-proxy stub that exposes
+#                     api.communityservices.org.au publicly (over Tailscale to
+#                     morpheus) — runs on a GitHub-hosted runner over SSH,
+#                     mirroring how snswserver apps without a self-hosted
+#                     runner already deploy (adventistpulse, morpheustools
+#                     frontend).
+# -----------------------------------------------------------------------------
+
 name: Build and Deploy Docker (Production)
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -10,11 +35,8 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
+    name: Build & push (arm64)
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,27 +64,78 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    runs-on: ubuntu-latest
+  deploy-backend:
+    name: Deploy backend on morpheus (pull-only)
     needs: build-and-push
-    environment: acs-backend
-
+    runs-on: [self-hosted, morpheus]
     steps:
-      - name: Deploy to Genesis VPS
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync compose file into deploy dir
+        run: |
+          mkdir -p /home/morpheus/adventist-community-services
+          cp deploy/docker-compose.morpheus.yml /home/morpheus/adventist-community-services/docker-compose.yml
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull & restart backend
+        working-directory: /home/morpheus/adventist-community-services
+        run: |
+          docker compose pull
+          docker compose up -d --remove-orphans
+
+      - name: Prune dangling images
+        run: docker image prune -f
+
+  deploy-api-proxy:
+    name: Sync public API proxy on snswserver
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-acs-api-proxy-snswserver
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy proxy compose + nginx config to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 107.155.65.229
+          username: snswcomms
+          key: ${{ secrets.SNSW_SSH_KEY }}
+          source: "deploy/docker-compose.snswserver.yml,deploy/nginx-api-proxy.conf"
+          target: /opt/acs-api-proxy/
+
+      - name: Pull and restart on server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ vars.VPS_HOST }}
-          username: ${{ vars.VPS_USERNAME }}
-          key: ${{ vars.VPS_SSH_KEY }}
-          port: ${{ vars.VPS_PORT }}
+          host: 107.155.65.229
+          username: snswcomms
+          key: ${{ secrets.SNSW_SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
-            cd /opt/adventist-community-services
+            cd /opt/acs-api-proxy
+            mv deploy/docker-compose.snswserver.yml docker-compose.yml
+            mv deploy/nginx-api-proxy.conf nginx-api-proxy.conf
+            rmdir deploy 2>/dev/null || true
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
