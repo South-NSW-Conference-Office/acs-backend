@@ -39,8 +39,11 @@ services:
     networks:
       - proxy-network
 
+    # Probes with the real prod Host header so it actually exercises the
+    # proxy_pass route, not nginx's default "no server_name match" behavior
+    # (which would 400 and falsely report unhealthy).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/", "-T", "5"]
+      test: ["CMD", "wget", "-qO-", "--header=Host: api.communityservices.org.au", "http://127.0.0.1:80/health", "-T", "5"]
       interval: 30s
       timeout: 5s
       retries: 5
