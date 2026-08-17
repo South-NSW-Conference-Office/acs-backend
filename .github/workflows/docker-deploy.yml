@@ -3,15 +3,21 @@
 #
 # Migrated 2026-08-17 from kylevps (Genesis, amd64) to morpheus (NVIDIA GB10,
 # arm64) + a public front-door proxy stub on snswserver. See deploy/README.md.
+# kylevps is KEPT as a parallel fallback target (user request) while DNS
+# cutover is pending — build-and-push therefore produces a multi-arch
+# (amd64+arm64) manifest under one tag so both hosts pull their native image.
 #
-#   build-and-push : native arm64 build on ubuntu-24.04-arm, push to GHCR.
-#   deploy-backend  : pull-only, runs ON morpheus via its self-hosted runner.
-#   deploy-api-proxy: syncs the snswserver reverse-proxy stub that exposes
-#                     api.communityservices.org.au publicly (over Tailscale to
-#                     morpheus) — runs on a GitHub-hosted runner over SSH,
-#                     mirroring how snswserver apps without a self-hosted
-#                     runner already deploy (adventistpulse, morpheustools
-#                     frontend).
+#   build-and-push     : multi-arch (amd64+arm64) build on ubuntu-24.04-arm
+#                         (amd64 side via QEMU), push to GHCR.
+#   deploy-backend      : pull-only, runs ON morpheus via its self-hosted
+#                         runner (arm64 image).
+#   deploy-api-proxy    : syncs the snswserver reverse-proxy stub that exposes
+#                         api.communityservices.org.au publicly (over
+#                         Tailscale to morpheus) — GitHub-hosted runner over
+#                         SSH, mirroring adventistpulse/morpheustools frontend.
+#   deploy-backend-legacy: pull-only on kylevps (amd64 image), the ORIGINAL
+#                         deploy target — kept running in parallel until DNS
+#                         cuts over and this job is removed.
 # -----------------------------------------------------------------------------
 
 name: Build and Deploy Docker (Production)
@@ -41,6 +47,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU (for amd64 cross-build on this arm64 runner)
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -64,7 +73,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -139,3 +148,25 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
+
+  # Original deploy target, kept running in parallel as a fallback until DNS
+  # cuts over to the new infra — remove this job once kylevps is
+  # decommissioned. Unchanged from the pre-migration workflow.
+  deploy-backend-legacy:
+    name: Deploy backend on kylevps (legacy, parallel fallback)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: acs-backend
+    steps:
+      - name: Deploy to Genesis VPS (legacy)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.VPS_HOST }}
+          username: ${{ vars.VPS_USERNAME }}
+          key: ${{ vars.VPS_SSH_KEY }}
+          port: ${{ vars.VPS_PORT }}
+          script: |
+            cd /opt/adventist-community-services
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
