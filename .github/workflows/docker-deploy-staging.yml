@@ -104,6 +104,9 @@ jobs:
   # Original deploy target, kept running in parallel as a fallback until DNS
   # cuts over to the new infra — remove this job once kylevps is
   # decommissioned. Unchanged from the pre-migration workflow.
+  # kylevps's stored `docker login ghcr.io` credential is expired (predates
+  # this migration), so a fresh login with this run's GITHUB_TOKEN happens
+  # first — see docker-deploy.yml's deploy-backend-legacy for the same fix.
   deploy-backend-staging-legacy:
     name: Deploy staging backend on kylevps (legacy, parallel fallback)
     needs: build-and-push
@@ -117,8 +120,13 @@ jobs:
           username: ${{ vars.VPS_STAGING_USERNAME || vars.VPS_USERNAME }}
           key: ${{ vars.VPS_STAGING_SSH_KEY || vars.VPS_SSH_KEY }}
           port: ${{ vars.VPS_STAGING_PORT || vars.VPS_PORT }}
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
             cd /opt/adventist-community-services-staging
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
