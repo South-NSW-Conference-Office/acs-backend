@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const tokenService = require('../services/tokenService');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+const authorizationService = require('../services/authorizationService');
 
 // =============================================================================
 // User cache — avoids 4-level deep Atlas populate on every request.
@@ -203,14 +204,27 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
           });
         }
       } else if (requiredAction === 'create') {
-        const requiredLevel =
-          hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
+        // getEntityCreationLevel returns the level of the parent that creates the
+        // entity — 'team: 2' means a church (level 2) creates teams. So the test
+        // is `userLevel > requiredLevel`, not `>=`. With `>=` a role was refused
+        // the very thing its own entry names: a church_admin (2) could not create
+        // a team, a conference_admin (1) could not create a church, and a
+        // team_leader (3) could not create a service, each despite holding the
+        // matching `*.create` permission.
+        //
+        // Super admin is checked by role rather than by level, because
+        // union_admin also sits at level 0 — keying the bypass on `userLevel === 0`
+        // would let it create unions, which creationLevels marks -1 to forbid.
+        if (!authorizationService.isSuperAdmin(user)) {
+          const requiredLevel =
+            hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
 
-        if (userLevel >= requiredLevel) {
-          return res.status(403).json({
-            success: false,
-            message: 'Insufficient permissions',
-          });
+          if (userLevel > requiredLevel) {
+            return res.status(403).json({
+              success: false,
+              message: 'Insufficient permissions',
+            });
+          }
         }
       }
 
