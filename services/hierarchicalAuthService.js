@@ -656,7 +656,11 @@ class HierarchicalAuthorizationService {
       organization: 1, // Treated as church creation
     };
 
-    return creationLevels[entityType.toLowerCase()] || 4;
+    // `?? 4`, not `|| 4`: conference is 0, which is falsy, so `||` replaced it
+    // with 4 and reported conferences as creatable by anyone above level 4 —
+    // every role. A church_admin could create a conference two levels above
+    // itself. Only an unknown entityType should fall through to 4.
+    return creationLevels[entityType.toLowerCase()] ?? 4;
   }
 
   /**
