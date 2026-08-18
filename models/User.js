@@ -408,7 +408,19 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
 
   const team = assignment.teamId;
 
-  // Base permissions based on team role
+  // Base permissions based on team role.
+  //
+  // Note the two vocabularies in play. These grants use the singular `team.*`
+  // form, while the team routes require the plural `teams.*` form
+  // (routes/teams.js: teams.read, teams.update, teams.manage,
+  // teams.manage_members). checkPermissionWithScope compares the resource
+  // segment exactly, so 'team' never satisfies 'teams' - which made the team
+  // banner and profile-photo endpoints unreachable for every team role.
+  //
+  // The plural equivalents below are added alongside the existing singular
+  // ones rather than replacing them: nothing that passes today starts
+  // failing, and authorizeWithTeam already scopes these to the specific team
+  // in the request, so a leader gains rights only over their own team.
   let basePermissions = [];
   switch (assignment.role) {
     case 'leader':
@@ -419,6 +431,11 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
         'team.services.create',
         'team.services.manage',
         'church.view',
+        // plural aliases required by routes/teams.js
+        'teams.read',
+        'teams.update',
+        'teams.manage',
+        'teams.manage_members',
       ];
       break;
     case 'coordinator':
@@ -427,13 +444,22 @@ userSchema.methods.getPermissionsForTeam = async function (teamId) {
         'team.services.manage',
         'team.view',
         'church.view',
+        // plural aliases required by routes/teams.js
+        'teams.read',
+        'teams.update',
       ];
       break;
     case 'member':
-      basePermissions = ['team.participate', 'team.view', 'church.view'];
+      basePermissions = [
+        'team.participate',
+        'team.view',
+        'church.view',
+        // plural alias required by routes/teams.js
+        'teams.read',
+      ];
       break;
     default:
-      basePermissions = ['team.view'];
+      basePermissions = ['team.view', 'teams.read'];
   }
 
   // Combine base permissions with team-specific overrides

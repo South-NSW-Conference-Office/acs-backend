@@ -23,13 +23,10 @@ logs/
 
 # Testing
 coverage/
-test/
-tests/
-__tests__/
-*.test.js
-*.test.ts
-*.spec.js
-*.spec.ts
+# __tests__/ and the *.test.js / *.spec.js patterns used to be ignored here,
+# which meant the directory jest's testMatch requires could never be committed —
+# any test written was untrackable, and CI had nothing to run. Unignored so the
+# authorization suite can live in the repo.
 scripts/
 
 # Uploads

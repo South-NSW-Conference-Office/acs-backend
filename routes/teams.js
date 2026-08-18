@@ -27,6 +27,7 @@ const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const { upload, handleUploadError } = require('../middleware/uploadMiddleware');
 const TeamService = require('../services/teamService');
 const teamImageService = require('../services/teamImageService');
+const authorizationService = require('../services/authorizationService');
 const Team = require('../models/Team');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 
@@ -100,15 +101,11 @@ router.get('/public/:id', validateObjectId('id'), async (req, res) => {
 // Get all teams accessible to user (hierarchical)
 router.get('/all', authenticateToken, async (req, res) => {
   try {
-    // Check if user is super admin first
-    const isSuperAdmin =
-      req.user.isSuperAdmin ||
-      (req.user.organizations &&
-        req.user.organizations.some(
-          (org) =>
-            org.role &&
-            (org.role.isSuperAdmin || org.role.permissions?.includes('*'))
-        ));
+    // Check if user is super admin first.
+    // This also tested req.user.organizations, which is not a field on the
+    // User schema - it only ever exists on built API responses - so that half
+    // of the check was always undefined and never contributed.
+    const isSuperAdmin = authorizationService.isSuperAdmin(req.user);
 
     let teams;
 
@@ -511,10 +508,15 @@ router.delete(
         });
       }
 
-      // Check permissions
+      // Check permissions. Pass the team's own hierarchy path and name the
+      // action: this previously passed team.churchId, a bare ObjectId, which
+      // canUserManageEntity reads as a level-0 path matching nobody's subtree —
+      // so it denied every non-super-admin. The action was omitted too, on a
+      // delete route.
       const hasPermission = await hierarchicalAuthService.canUserManageEntity(
         req.user,
-        team.churchId
+        team.hierarchyPath,
+        'delete'
       );
 
       if (!hasPermission) {

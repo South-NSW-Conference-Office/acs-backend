@@ -229,9 +229,12 @@ router.get(
     try {
       const { id } = req.params;
 
-      // Verify user has access to this union
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to this union. Pass a hierarchy path, not an id:
+      // canUserManageEntity compares paths, so an id parses as level 0 and fails
+      // the subtree test for everyone but a super admin.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'union',
         id,
         'read'
       );
@@ -372,9 +375,11 @@ router.put(
 
       const { id } = req.params;
 
-      // Verify user has access to update this union
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this union. Path, not id — see the note
+      // on the read route above.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'union',
         id,
         'update'
       );
@@ -696,9 +701,10 @@ router.put(
     try {
       const { id } = req.params;
 
-      // Verify user has access to update this union
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this union. Path, not id.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'union',
         id,
         'update'
       );
@@ -810,9 +816,10 @@ router.put(
       const { id } = req.params;
       const { mediaFileId, alt = '' } = req.body;
 
-      // Verify user has access to update this union
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this union. Path, not id.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'union',
         id,
         'update'
       );

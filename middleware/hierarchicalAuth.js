@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const tokenService = require('../services/tokenService');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+const authorizationService = require('../services/authorizationService');
 
 // =============================================================================
 // User cache — avoids 4-level deep Atlas populate on every request.
@@ -76,16 +77,24 @@ const authenticateToken = async (req, res, next) => {
     // User lookup — serve from cache when possible
     let user = getCachedUser(decoded.userId);
     if (!user) {
-      user = await User.findById(decoded.userId).populate({
-        path: 'teamAssignments.teamId',
-        populate: {
-          path: 'churchId',
+      user = await User.findById(decoded.userId)
+        .populate({
+          path: 'teamAssignments.teamId',
           populate: {
-            path: 'conferenceId',
-            populate: { path: 'unionId' },
+            path: 'churchId',
+            populate: {
+              path: 'conferenceId',
+              populate: { path: 'unionId' },
+            },
           },
-        },
-      });
+        })
+        // Must match middleware/auth.js — authorization reads
+        // `assignment.role.name` and `org.hierarchyPath`, both of which are
+        // undefined unless these are populated. The cached copy therefore has
+        // to carry them too, or cache hits silently lose permissions.
+        .populate('unionAssignments.role unionAssignments.union')
+        .populate('conferenceAssignments.role conferenceAssignments.conference')
+        .populate('churchAssignments.role churchAssignments.church');
       if (user) setCachedUser(decoded.userId, user);
     }
 
@@ -195,14 +204,27 @@ const authorizeHierarchical = (requiredAction, targetEntityType) => {
           });
         }
       } else if (requiredAction === 'create') {
-        const requiredLevel =
-          hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
+        // getEntityCreationLevel returns the level of the parent that creates the
+        // entity — 'team: 2' means a church (level 2) creates teams. So the test
+        // is `userLevel > requiredLevel`, not `>=`. With `>=` a role was refused
+        // the very thing its own entry names: a church_admin (2) could not create
+        // a team, a conference_admin (1) could not create a church, and a
+        // team_leader (3) could not create a service, each despite holding the
+        // matching `*.create` permission.
+        //
+        // Super admin is checked by role rather than by level, because
+        // union_admin also sits at level 0 — keying the bypass on `userLevel === 0`
+        // would let it create unions, which creationLevels marks -1 to forbid.
+        if (!authorizationService.isSuperAdmin(user)) {
+          const requiredLevel =
+            hierarchicalAuthService.getEntityCreationLevel(targetEntityType);
 
-        if (userLevel >= requiredLevel) {
-          return res.status(403).json({
-            success: false,
-            message: 'Insufficient permissions',
-          });
+          if (userLevel > requiredLevel) {
+            return res.status(403).json({
+              success: false,
+              message: 'Insufficient permissions',
+            });
+          }
         }
       }
 

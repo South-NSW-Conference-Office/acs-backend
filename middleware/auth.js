@@ -32,16 +32,25 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.userId).populate({
-      path: 'teamAssignments.teamId',
-      populate: {
-        path: 'churchId',
+    const user = await User.findById(decoded.userId)
+      .populate({
+        path: 'teamAssignments.teamId',
         populate: {
-          path: 'conferenceId',
-          populate: { path: 'unionId' },
+          path: 'churchId',
+          populate: {
+            path: 'conferenceId',
+            populate: { path: 'unionId' },
+          },
         },
-      },
-    });
+      })
+      // Hierarchical assignments must be populated too: authorization reads
+      // `assignment.role.name` (authorizationService.isSuperAdmin) and
+      // `org.hierarchyPath` (hierarchicalAuthService.getUserHierarchyPath).
+      // Left as raw ObjectIds, both reads are undefined and every permission
+      // check fails for anyone without the isSuperAdmin flag.
+      .populate('unionAssignments.role unionAssignments.union')
+      .populate('conferenceAssignments.role conferenceAssignments.conference')
+      .populate('churchAssignments.role churchAssignments.church');
 
     if (!user || !user.isActive) {
       return res.status(401).json({

@@ -168,6 +168,12 @@ roleSchema.statics.createSystemRoles = async function () {
         'dashboard.view',
         'analytics.read:subordinate',
         'reports.generate:subordinate',
+        // Website content and media. No role previously granted these, which
+        // made routes/admin/page-content.js and routes/media.js
+        // super-admin-only by construction.
+        'page_content.manage',
+        'media.upload',
+        'media.manage',
       ],
       description: 'Administrative access for union level operations',
       roleCategory: 'union_admin',
@@ -200,6 +206,10 @@ roleSchema.statics.createSystemRoles = async function () {
         'users.manage:subordinate',
         'dashboard.view',
         'analytics.read:subordinate',
+        // Website content and media - see note on union_admin above.
+        'page_content.manage',
+        'media.upload',
+        'media.manage',
       ],
       description: 'Administrative access for conference level',
       roleCategory: 'conference_admin',
@@ -217,8 +227,16 @@ roleSchema.statics.createSystemRoles = async function () {
       displayName: 'Church Administrator',
       level: 'church',
       hierarchyLevel: 2,
-      canManage: [3, 4], // Teams and services only
+      canManage: [3, 4], // Teams and services below it; its own church via :own below
       permissions: [
+        // The church this role administers. Without these the role had no
+        // 'churches.*' entry at all, so a church admin could edit every team and
+        // service inside their church but not the church record itself - not the
+        // "full access within own church" the description promises. Deliberately
+        // no 'churches.delete:own': retiring a church stays with conference_admin,
+        // which holds 'churches.delete:subordinate'.
+        'churches.read:own',
+        'churches.update:own',
         'teams.create:own',
         'teams.read:own',
         'teams.update:own',
@@ -227,6 +245,10 @@ roleSchema.statics.createSystemRoles = async function () {
         'services.manage:own',
         'users.manage:own',
         'dashboard.view',
+        // Website content and media - see note on union_admin above.
+        'page_content.manage',
+        'media.upload',
+        'media.manage',
       ],
       description: 'Full access within own church',
       roleCategory: 'team_leader',
