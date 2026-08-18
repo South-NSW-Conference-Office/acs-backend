@@ -8,6 +8,21 @@ const Role = require('../models/Role');
 const HierarchyValidator = require('../utils/hierarchyValidator');
 const authorizationService = require('./authorizationService');
 
+// Permission resource name for each hierarchy level, matching how role
+// permissions are written in models/Role.js ('churches.update:own').
+const ENTITY_BY_LEVEL = {
+  0: 'unions',
+  1: 'conferences',
+  2: 'churches',
+  3: 'teams',
+  4: 'services',
+};
+
+// Actions that mutate. Anything not listed here is treated as a read.
+// `manage` is included so it is both a recognised action and, below, a verb that
+// satisfies any other write — a role granting 'services.manage:own' can update.
+const WRITE_ACTIONS = new Set(['create', 'update', 'delete', 'manage']);
+
 /**
  * Hierarchical Authorization Service
  * Enforces strict hierarchical permissions: Super Admin → Regions/Conferences → Churches → Teams → Services
@@ -158,21 +173,134 @@ class HierarchicalAuthorizationService {
   }
 
   /**
+   * Resolve the assignment a user acts under: their highest-level one.
+   *
+   * getUserHighestLevel and getUserHierarchyPath each walk the assignments
+   * separately and return one field apiece, so a caller wanting the role too had
+   * no way to be sure it belonged to the same assignment as the path. This
+   * returns the three together.
+   *
+   * @param {Object} user - User object
+   * @returns {Promise<{level: Number, path: String|null, role: Object}|null>}
+   */
+  async getUserHighestAssignment(user) {
+    if (!user) return null;
+
+    const allAssignments = [
+      ...(user.unionAssignments || []),
+      ...(user.conferenceAssignments || []),
+      ...(user.churchAssignments || []),
+    ];
+
+    if (allAssignments.length === 0) return null;
+
+    let best = null;
+    let bestLevel = 999;
+
+    for (const assignment of allAssignments) {
+      const role = assignment.role;
+      if (!role) continue;
+
+      // Resolve the role unless it is already populated with the level.
+      let roleObj = role;
+      if (typeof role !== 'object' || role.hierarchyLevel === undefined) {
+        roleObj = await Role.findById(role._id || role);
+      }
+      if (!roleObj || roleObj.hierarchyLevel === undefined) continue;
+
+      if (roleObj.hierarchyLevel >= bestLevel) continue;
+
+      let org = null;
+      let OrgModel = null;
+      if (assignment.union) {
+        org = assignment.union;
+        OrgModel = Union;
+      } else if (assignment.conference) {
+        org = assignment.conference;
+        OrgModel = Conference;
+      } else if (assignment.church) {
+        org = assignment.church;
+        OrgModel = Church;
+      }
+
+      // Same resolution as getUserHierarchyPath: an ObjectId is not a string, so
+      // the value has to be looked up unless it already carries the path.
+      let orgObj = org;
+      if (org && !org.hierarchyPath && OrgModel) {
+        orgObj = await OrgModel.findById(org._id || org);
+      }
+
+      bestLevel = roleObj.hierarchyLevel;
+      best = {
+        level: roleObj.hierarchyLevel,
+        path: orgObj?.hierarchyPath ?? null,
+        role: roleObj,
+      };
+    }
+
+    return best;
+  }
+
+  /**
+   * Check whether a role grants a write action against an entity.
+   *
+   * Split by where the entity sits relative to the role:
+   * - Below it — the role's own `canManage` list is the authority, which is what
+   *   that field already documents ("canManage: [3, 4] // Teams and services only").
+   * - At the same level — that entity is the role's own, and the subtree check in
+   *   canUserManageEntity has already established it *is* theirs rather than a
+   *   sibling's. Require a permission naming it, so read-only roles that sit at a
+   *   level (church_viewer) cannot write to it.
+   *
+   * Never reached for an entity above the role: canLevelManageLevel rejects that.
+   *
+   * @param {Object} role - Role document (permissions: [String], canManage: [Number])
+   * @param {Number} userLevel - The role's hierarchy level
+   * @param {Number} targetLevel - Hierarchy level of the target entity
+   * @param {String} action - Write action being performed
+   * @returns {Boolean}
+   */
+  roleAllowsWrite(role, userLevel, targetLevel, action) {
+    if (!role) return false;
+
+    const permissions = Array.isArray(role.permissions) ? role.permissions : [];
+    if (permissions.includes('*')) return true;
+
+    if (targetLevel > userLevel) {
+      return Array.isArray(role.canManage) && role.canManage.includes(targetLevel);
+    }
+
+    const entity = ENTITY_BY_LEVEL[targetLevel];
+    if (!entity) return false;
+
+    return permissions.some((permission) => {
+      // Drop the scope suffix ('churches.update:own' -> 'churches.update'); the
+      // level and subtree checks already constrain which entity this can be.
+      const [name] = String(permission).split(':');
+      const [resource, verb] = name.split('.');
+      return resource === entity && (verb === action || verb === 'manage');
+    });
+  }
+
+  /**
    * Check if user can manage a specific entity
    * @param {Object} user - User object
    * @param {String} targetEntityPath - Target entity hierarchy path
-   * @param {String} action - Action being performed
+   * @param {String} action - Action being performed. Defaults to a write, so a
+   *   caller that omits it is gated more tightly rather than less.
    * @returns {Promise<Boolean>} - True if user can manage entity
    */
-  async canUserManageEntity(user, targetEntityPath) {
+  async canUserManageEntity(user, targetEntityPath, action = 'manage') {
     try {
       // 1. Get user's highest role level
       const userLevel = await this.getUserHighestLevel(user);
-      const userPath = await this.getUserHierarchyPath(user);
 
       if (userLevel === 0) {
         return true; // Super admin can manage everything
       }
+
+      const assignment = await this.getUserHighestAssignment(user);
+      const userPath = assignment?.path ?? (await this.getUserHierarchyPath(user));
 
       if (!userPath || !targetEntityPath) {
         return false;
@@ -186,12 +314,29 @@ class HierarchicalAuthorizationService {
         return false;
       }
 
-      // 4. Check if target is in user's subtree
-      if (!targetEntityPath.startsWith(userPath)) {
+      // 4. Check if target is the user's own entity or sits inside its subtree.
+      // A bare startsWith is not enough: it treats 'u1/c1/ch10' as inside
+      // 'u1/c1/ch1', so a sibling whose id merely begins with the user's would
+      // pass. HierarchyValidator.isInSubtree requires the '/' boundary; the
+      // equality check covers the entity itself, which it deliberately excludes.
+      const isOwnEntity = targetEntityPath === userPath;
+      if (!isOwnEntity && !HierarchyValidator.isInSubtree(targetEntityPath, userPath)) {
         return false;
       }
 
-      return true;
+      // 5. Reading anywhere inside your own subtree is allowed; writing has to be
+      // granted by the role. Without this the `action` argument every caller
+      // passes was accepted and discarded, so read and write were the same check.
+      if (!WRITE_ACTIONS.has(action)) {
+        return true;
+      }
+
+      return this.roleAllowsWrite(
+        assignment?.role,
+        userLevel,
+        targetLevel,
+        action
+      );
     } catch (error) {
       // console.error('Error in canUserManageEntity:', error);
       return false;
@@ -324,9 +469,9 @@ class HierarchicalAuthorizationService {
     // both shared one counter and the result was clamped with
     // `Math.min(level - 1, 2)`, which discarded the team=3 / service=4 values
     // the loop had just determined - so this could never return anything above
-    // 2. A church admin (level 2) asked to manage a team therefore hit
-    // canLevelManageLevel(2, 2) => 2 < 2 => false and was refused management of
-    // teams and services inside their own church.
+    // 2. A church admin (level 2) asked to manage a team therefore had it read
+    // back as a church, and was refused management of teams and services inside
+    // their own church by the level comparison that followed.
     let orgDepth = 0;
     let entityLevel = null;
 
@@ -355,7 +500,17 @@ class HierarchicalAuthorizationService {
    * @returns {Boolean} - True if can manage
    */
   canLevelManageLevel(managerLevel, targetLevel) {
-    return managerLevel < targetLevel; // Higher levels (lower numbers) manage lower levels
+    // <=, not <: a role also acts on the entity at its own level — the church a
+    // church_admin administers, the conference a conference_admin administers.
+    // Strict < denied that, so conference_admin was refused its own conference
+    // despite the role granting 'conferences.update:own'.
+    //
+    // This does not widen access to siblings: canUserManageEntity still requires
+    // the target to sit inside the user's own subtree, and same-level writes
+    // additionally need an explicit grant (see roleAllowsWrite). Both matter —
+    // church_viewer also sits at level 2, and on this check alone would gain
+    // write access to the church it can only read.
+    return managerLevel <= targetLevel; // Higher levels (lower numbers) manage lower levels
   }
 
   /**
