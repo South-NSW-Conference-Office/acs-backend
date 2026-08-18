@@ -10,8 +10,9 @@ class TeamService {
     const { churchId, leaderId, name, type, description } = data;
 
     // Validate church exists and user has permission
-    const hasPermission = await hierarchicalAuthService.canUserManageEntity(
+    const hasPermission = await hierarchicalAuthService.canUserManageEntityById(
       createdBy,
+      'church',
       churchId,
       'create'
     );
@@ -28,8 +29,9 @@ class TeamService {
       }
 
       // Check if leader belongs to the church hierarchy
-      const canAccess = await hierarchicalAuthService.canUserManageEntity(
+      const canAccess = await hierarchicalAuthService.canUserManageEntityById(
         leader,
+        'church',
         churchId,
         'read'
       );
@@ -62,8 +64,9 @@ class TeamService {
     }
 
     // Check permissions
-    const hasPermission = await hierarchicalAuthService.canUserManageEntity(
+    const hasPermission = await hierarchicalAuthService.canUserManageEntityById(
       updatedBy,
+      'church',
       team.churchId,
       'update'
     );
@@ -114,8 +117,9 @@ class TeamService {
 
       // User must also be able to manage the destination church.
       const canManageTarget =
-        await hierarchicalAuthService.canUserManageEntity(
+        await hierarchicalAuthService.canUserManageEntityById(
           updatedBy,
+          'church',
           newChurch._id,
           'update'
         );
@@ -141,8 +145,9 @@ class TeamService {
         throw new Error('New leader not found');
       }
 
-      const canAccess = await hierarchicalAuthService.canUserManageEntity(
+      const canAccess = await hierarchicalAuthService.canUserManageEntityById(
         leader,
+        'church',
         team.churchId,
         'read'
       );
@@ -191,8 +196,9 @@ class TeamService {
 
     // Check permissions - team leader or church admin can add members
     const hasChurchPermission =
-      await hierarchicalAuthService.canUserManageEntity(
+      await hierarchicalAuthService.canUserManageEntityById(
         addedBy,
+        'church',
         team.churchId,
         'update'
       );
@@ -220,8 +226,9 @@ class TeamService {
 
     // Check permissions
     const hasChurchPermission =
-      await hierarchicalAuthService.canUserManageEntity(
+      await hierarchicalAuthService.canUserManageEntityById(
         removedBy,
+        'church',
         team.churchId,
         'update'
       );
@@ -253,8 +260,9 @@ class TeamService {
    */
   static async getChurchTeams(churchId, user, options = {}) {
     // Check if user can view teams in this church
-    const hasPermission = await hierarchicalAuthService.canUserManageEntity(
+    const hasPermission = await hierarchicalAuthService.canUserManageEntityById(
       user,
+      'church',
       churchId,
       'read'
     );
@@ -297,8 +305,9 @@ class TeamService {
 
     // Check permissions
     const hasChurchPermission =
-      await hierarchicalAuthService.canUserManageEntity(
+      await hierarchicalAuthService.canUserManageEntityById(
         user,
+        'church',
         team.churchId._id,
         'read'
       );
@@ -342,8 +351,9 @@ class TeamService {
 
     // Check permissions
     const hasChurchPermission =
-      await hierarchicalAuthService.canUserManageEntity(
+      await hierarchicalAuthService.canUserManageEntityById(
         updatedBy,
+        'church',
         team.churchId,
         'update'
       );
@@ -396,8 +406,9 @@ class TeamService {
 
     // Filter by church if specified
     if (churchId) {
-      const hasPermission = await hierarchicalAuthService.canUserManageEntity(
+      const hasPermission = await hierarchicalAuthService.canUserManageEntityById(
         user,
+        'church',
         churchId,
         'read'
       );

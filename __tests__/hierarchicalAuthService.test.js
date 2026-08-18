@@ -374,3 +374,109 @@ describe('roleAllowsWrite', () => {
     expect(allows(role, 2, 4, 'update')).toBe(false);
   });
 });
+
+describe('canUserManageEntityById', () => {
+  // getEntity is the only part that touches the database; stub it so these stay
+  // unit tests. Everything past the lookup is the same path canUserManageEntity
+  // already covers above.
+  let getEntity;
+
+  beforeEach(() => {
+    getEntity = jest.spyOn(hierarchicalAuthService, 'getEntity');
+  });
+
+  afterEach(() => {
+    getEntity.mockRestore();
+  });
+
+  it('resolves the entity and authorises against its hierarchy path', async () => {
+    getEntity.mockResolvedValue({ hierarchyPath: PATHS.church });
+
+    await expect(
+      hierarchicalAuthService.canUserManageEntityById(
+        userWithChurchRole(ROLES.church_admin),
+        'church',
+        'ch1',
+        'update'
+      )
+    ).resolves.toBe(true);
+
+    expect(getEntity).toHaveBeenCalledWith('church', 'ch1');
+  });
+
+  it('still applies the action check after resolving', async () => {
+    getEntity.mockResolvedValue({ hierarchyPath: PATHS.church });
+
+    await expect(
+      hierarchicalAuthService.canUserManageEntityById(
+        userWithChurchRole(ROLES.church_viewer),
+        'church',
+        'ch1',
+        'update'
+      )
+    ).resolves.toBe(false);
+  });
+
+  it('denies when the entity does not exist', async () => {
+    getEntity.mockResolvedValue(null);
+
+    await expect(
+      hierarchicalAuthService.canUserManageEntityById(
+        userWithChurchRole(ROLES.church_admin),
+        'church',
+        'missing',
+        'update'
+      )
+    ).resolves.toBe(false);
+  });
+
+  it('denies when the entity carries no hierarchy path', async () => {
+    // Rather than falling through to a path comparison against undefined.
+    getEntity.mockResolvedValue({ _id: 'ch1' });
+
+    await expect(
+      hierarchicalAuthService.canUserManageEntityById(
+        userWithChurchRole(ROLES.church_admin),
+        'church',
+        'ch1',
+        'update'
+      )
+    ).resolves.toBe(false);
+  });
+
+  it('denies a missing id without hitting the database', async () => {
+    await expect(
+      hierarchicalAuthService.canUserManageEntityById(
+        userWithChurchRole(ROLES.church_admin),
+        'church',
+        null,
+        'update'
+      )
+    ).resolves.toBe(false);
+
+    expect(getEntity).not.toHaveBeenCalled();
+  });
+
+  it('is what a bare id needed: the same id via canUserManageEntity is denied', async () => {
+    // The defect this replaced. An ObjectId has no '/', so it parses as level 0
+    // and matches nobody's subtree — the call returned false for every
+    // non-super-admin, which read as "permission denied" rather than a bug.
+    await expect(
+      hierarchicalAuthService.canUserManageEntity(
+        userWithChurchRole(ROLES.church_admin),
+        'ch1',
+        'update'
+      )
+    ).resolves.toBe(false);
+
+    getEntity.mockResolvedValue({ hierarchyPath: PATHS.church });
+    await expect(
+      hierarchicalAuthService.canUserManageEntityById(
+        userWithChurchRole(ROLES.church_admin),
+        'church',
+        'ch1',
+        'update'
+      )
+    ).resolves.toBe(true);
+  });
+});

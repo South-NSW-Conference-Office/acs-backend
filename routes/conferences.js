@@ -181,9 +181,12 @@ router.get(
     try {
       const { id } = req.params;
 
-      // Verify user has access to this conference
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to this conference. Pass a hierarchy path, not an
+      // id: canUserManageEntity compares paths, so an id parses as level 0 and
+      // fails the subtree test for everyone but a super admin.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'conference',
         id,
         'read'
       );
@@ -312,10 +315,11 @@ router.put(
         });
       }
 
-      // Verify user has access to update this conference
+      // Verify user has access to update this conference. Path, not id — see the
+      // note on the read route above.
       const hasAccess = await hierarchicalAuthService.canUserManageEntity(
         req.user,
-        id,
+        currentConference.hierarchyPath,
         'update'
       );
 
@@ -364,10 +368,10 @@ router.delete(
         });
       }
 
-      // Verify user has access to delete this conference
+      // Verify user has access to delete this conference. Path, not id.
       const hasAccess = await hierarchicalAuthService.canUserManageEntity(
         req.user,
-        id,
+        conference.hierarchyPath,
         'delete'
       );
 
@@ -488,9 +492,11 @@ router.put(
     try {
       const { id } = req.params;
 
-      // Verify user has access to update this conference
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this conference. No conference document
+      // is in scope here, so resolve by id rather than passing the id as a path.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'conference',
         id,
         'update'
       );
@@ -568,9 +574,11 @@ router.put(
       const { id } = req.params;
       const { mediaFileId, alt } = req.body;
 
-      // Verify user has access to update this conference
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this conference. Resolve by id — no
+      // conference document is in scope here.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'conference',
         id,
         'update'
       );

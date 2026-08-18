@@ -508,10 +508,15 @@ router.delete(
         });
       }
 
-      // Check permissions
+      // Check permissions. Pass the team's own hierarchy path and name the
+      // action: this previously passed team.churchId, a bare ObjectId, which
+      // canUserManageEntity reads as a level-0 path matching nobody's subtree —
+      // so it denied every non-super-admin. The action was omitted too, on a
+      // delete route.
       const hasPermission = await hierarchicalAuthService.canUserManageEntity(
         req.user,
-        team.churchId
+        team.hierarchyPath,
+        'delete'
       );
 
       if (!hasPermission) {

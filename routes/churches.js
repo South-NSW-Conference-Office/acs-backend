@@ -662,10 +662,12 @@ router.put(
         });
       }
 
-      // Verify user has access to update this church
+      // Verify user has access to update this church. Pass the hierarchy path,
+      // not the id: canUserManageEntity compares paths, so an id parses as level
+      // 0 and fails the subtree test for everyone but a super admin.
       const hasAccess = await hierarchicalAuthService.canUserManageEntity(
         req.user,
-        id,
+        currentChurch.hierarchyPath,
         'update'
       );
 
@@ -736,10 +738,11 @@ router.delete(
         });
       }
 
-      // Verify user has access to delete this church
+      // Verify user has access to delete this church. Path, not id — see the
+      // note on the update route above.
       const hasAccess = await hierarchicalAuthService.canUserManageEntity(
         req.user,
-        id,
+        church.hierarchyPath,
         'delete'
       );
 
@@ -886,9 +889,11 @@ router.put(
     try {
       const { id } = req.params;
 
-      // Verify user has access to update this church
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this church. No church document is in
+      // scope here, so resolve by id rather than passing the id as a path.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'church',
         id,
         'update'
       );
@@ -1000,9 +1005,11 @@ router.put(
       const { id } = req.params;
       const { mediaFileId, alt } = req.body;
 
-      // Verify user has access to update this church
-      const hasAccess = await hierarchicalAuthService.canUserManageEntity(
+      // Verify user has access to update this church. Resolve by id — no church
+      // document is in scope here.
+      const hasAccess = await hierarchicalAuthService.canUserManageEntityById(
         req.user,
+        'church',
         id,
         'update'
       );

@@ -344,6 +344,33 @@ class HierarchicalAuthorizationService {
   }
 
   /**
+   * canUserManageEntity, for callers holding an id rather than a hierarchy path.
+   *
+   * canUserManageEntity compares hierarchy paths — it derives the target's level
+   * by counting path segments and tests subtree membership by prefix. Handing it
+   * a bare ObjectId silently fails both: a value with no '/' parses as level 0,
+   * and it can never be a prefix of the user's path, so the call returns false
+   * for everyone except super admin (who short-circuits earlier). That reads as
+   * "permission denied" rather than as the bug it is, which is why it survived.
+   *
+   * Resolving the entity here keeps callers from each repeating the lookup.
+   *
+   * @param {Object} user - User object
+   * @param {String} entityType - 'union' | 'conference' | 'church' | 'team' | 'service'
+   * @param {String|ObjectId} entityId - Id of the target entity
+   * @param {String} action - Action being performed
+   * @returns {Promise<Boolean>}
+   */
+  async canUserManageEntityById(user, entityType, entityId, action) {
+    if (!entityId) return false;
+
+    const entity = await this.getEntity(entityType, entityId);
+    if (!entity || !entity.hierarchyPath) return false;
+
+    return this.canUserManageEntity(user, entity.hierarchyPath, action);
+  }
+
+  /**
    * Get entities user can access based on hierarchy
    * @param {Object} user - User object
    * @param {String} entityType - Type of entity ('organization', 'team', 'service')
