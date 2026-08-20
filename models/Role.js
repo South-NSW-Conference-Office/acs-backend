@@ -275,6 +275,17 @@ roleSchema.statics.createSystemRoles = async function () {
         'users.read:team',
         'teams.read:own',
         'teams.update:own',
+        // A role that creates and edits its team's services has to be able to put
+        // photos on them. Without these, a team leader could write every field of
+        // a service and then be refused by the media library, which is where the
+        // panel's image picker and uploader both go. Every other role that can
+        // write a service already holds them.
+        //
+        // Bounded by routes/media.js, which scopes listing and deletion to
+        // `uploadedBy: req.user.id` for anyone without the isSuperAdmin flag — so
+        // this reaches their own uploads and nobody else's.
+        'media.upload',
+        'media.manage',
       ],
       description: 'Team leadership with service management',
       roleCategory: 'team_leader',
@@ -310,7 +321,15 @@ roleSchema.statics.createSystemRoles = async function () {
       level: 'service',
       hierarchyLevel: 4,
       canManage: [], // Cannot manage other entities
-      permissions: ['services.read:own', 'services.update:own'],
+      permissions: [
+        'services.read:own',
+        'services.update:own',
+        // Same reasoning as team_leader: this role's whole job is editing its
+        // service, and photos are part of that. Media stays scoped to its own
+        // uploads (see routes/media.js).
+        'media.upload',
+        'media.manage',
+      ],
       description: 'Service-level coordinator with limited access',
       roleCategory: 'team_member',
       quotaLimits: {
