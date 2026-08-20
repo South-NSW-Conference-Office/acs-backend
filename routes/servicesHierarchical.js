@@ -11,6 +11,8 @@ const {
 } = require('../middleware/hierarchicalAuth');
 const { auditLogMiddleware: auditLog } = require('../middleware/auditLog');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
+const storageService = require('../services/storageService');
+const { upload, requireFile } = require('../middleware/uploadMiddleware');
 
 /** Middleware: reject invalid ObjectId params early with a clean 400 */
 function validateObjectId(paramName) {
@@ -524,5 +526,119 @@ router.get('/:id/images', validateObjectId('id'), async (req, res) => {
     });
   }
 });
+
+// POST /services/:id/gallery - Add images to the service gallery
+//
+// Ported from routes/services.js, which is not mounted anywhere — app.js wires
+// /api/services to THIS router. The gallery page could read images (GET
+// /:id/images above) but every upload 404ed against a route that only existed
+// in dead code, so gallery upload had never worked for anyone, super admins
+// included. authorizeServiceAccess loads the service into req.serviceContext
+// and takes the write decision on the service's own hierarchy path.
+router.post(
+  '/:id/gallery',
+  validateObjectId('id'),
+  authenticateToken,
+  authorizeServiceAccess('update'),
+  upload.gallery,
+  requireFile('images'),
+  auditLog('service.gallery.add'),
+  async (req, res) => {
+    try {
+      const service = req.serviceContext;
+
+      const currentGallerySize = service.gallery?.length || 0;
+      const newImagesCount = req.files.length;
+      if (currentGallerySize + newImagesCount > 20) {
+        return res.status(400).json({
+          success: false,
+          error: `Gallery limit exceeded. Maximum 20 images allowed. Current: ${currentGallerySize}`,
+        });
+      }
+
+      const uploadedImages = await Promise.all(
+        req.files.map(async (file, index) => {
+          const uploadResult = await storageService.uploadImage(file.buffer, {
+            originalName: file.originalname,
+            type: 'gallery',
+            serviceId: service._id,
+            generateThumbnail: true,
+          });
+
+          return {
+            url: uploadResult.url,
+            key: uploadResult.key,
+            thumbnailUrl: uploadResult.thumbnail?.url,
+            thumbnailKey: uploadResult.thumbnail?.key,
+            alt: req.body[`alt_${index}`] || '',
+            caption: req.body[`caption_${index}`] || '',
+          };
+        })
+      );
+
+      service.gallery.push(...uploadedImages);
+      service.updatedBy = req.user._id;
+      await service.save();
+
+      res.json({
+        success: true,
+        message: `${uploadedImages.length} images added to gallery`,
+        images: uploadedImages,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to upload gallery images',
+      });
+    }
+  }
+);
+
+// DELETE /services/:id/gallery/:imageId - Remove one image from the gallery
+router.delete(
+  '/:id/gallery/:imageId',
+  validateObjectId('id'),
+  authenticateToken,
+  authorizeServiceAccess('update'),
+  auditLog('service.gallery.remove'),
+  async (req, res) => {
+    try {
+      const service = req.serviceContext;
+
+      const imageIndex = (service.gallery || []).findIndex(
+        (img) => img._id.toString() === req.params.imageId
+      );
+
+      if (imageIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          error: 'Image not found in gallery',
+        });
+      }
+
+      const image = service.gallery[imageIndex];
+      if (image.key) {
+        await storageService.deleteImage(image.key);
+      }
+      if (image.thumbnailKey) {
+        await storageService.deleteImage(image.thumbnailKey);
+      }
+
+      service.gallery.splice(imageIndex, 1);
+      service.updatedBy = req.user._id;
+      await service.save();
+
+      res.json({
+        success: true,
+        message: 'Image removed from gallery',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to delete gallery image',
+      });
+    }
+  }
+);
 
 module.exports = router;
