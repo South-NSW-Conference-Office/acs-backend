@@ -547,14 +547,9 @@ router.post(
     try {
       const service = req.serviceContext;
 
-      const currentGallerySize = service.gallery?.length || 0;
-      const newImagesCount = req.files.length;
-      if (currentGallerySize + newImagesCount > 20) {
-        return res.status(400).json({
-          success: false,
-          error: `Gallery limit exceeded. Maximum 20 images allowed. Current: ${currentGallerySize}`,
-        });
-      }
+      // No cap on gallery size (removed 2026-08-20 by request). The transport
+      // limits in uploadMiddleware still apply per request — 10 files, 5MB each —
+      // and the client chunks larger selections into successive requests.
 
       const uploadedImages = await Promise.all(
         req.files.map(async (file, index) => {
