@@ -1,7 +1,30 @@
 const Role = require('../models/Role');
 const User = require('../models/User');
-const mongoose = require('mongoose');
 const logger = require('../services/loggerService');
+
+/**
+ * Look a role up by either its ObjectId or its name.
+ *
+ * Deliberately does NOT use mongoose.Types.ObjectId.isValid to decide which:
+ * isValid returns true for ANY 12-character string, because 12 bytes is a legal
+ * ObjectId encoding. Role names are 11-19 characters, and exactly one of them —
+ * 'church_admin' — is 12. It was therefore routed to findById, converted from its
+ * bytes into a meaningless id, matched nothing, and reported "Invalid role
+ * specified". Every other role name is a different length and worked fine, so
+ * creating a church admin was the single broken case.
+ *
+ * A real ObjectId is 24 hex characters, so test for that instead.
+ *
+ * @param {String} roleIdOrName - Role ObjectId or role name
+ * @returns {Promise<Object|null>} The role document, or null if no match
+ */
+async function findRoleByIdOrName(roleIdOrName) {
+  if (!roleIdOrName) return null;
+  const value = String(roleIdOrName);
+  return /^[0-9a-fA-F]{24}$/.test(value)
+    ? Role.findById(value)
+    : Role.findOne({ name: value });
+}
 
 /**
  * Middleware to check role quotas before creating users or assigning roles
@@ -29,9 +52,7 @@ const checkRoleQuota = async (req, res, next) => {
     }
 
     // Get the role - handle both ObjectId and string role names
-    const role = mongoose.Types.ObjectId.isValid(roleId)
-      ? await Role.findById(roleId)
-      : await Role.findOne({ name: roleId });
+    const role = await findRoleByIdOrName(roleId);
     if (!role) {
       return res.status(400).json({
         success: false,
@@ -125,9 +146,7 @@ const checkBulkQuota = async (req, res, next) => {
     // Check quota for each role
     const quotaChecks = [];
     for (const [roleId, count] of Object.entries(roleGroups)) {
-      const role = mongoose.Types.ObjectId.isValid(roleId)
-        ? await Role.findById(roleId)
-        : await Role.findOne({ name: roleId });
+      const role = await findRoleByIdOrName(roleId);
       if (!role || !role.quotaLimits || !role.quotaLimits.maxUsers) {
         continue;
       }
@@ -280,4 +299,5 @@ module.exports = {
   checkBulkQuota,
   getQuotaStatus,
   checkRoleChangeQuota,
+  findRoleByIdOrName,
 };
