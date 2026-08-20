@@ -285,6 +285,33 @@ const checkPermission = (userPermissions, requiredPermission) => {
     return true;
   }
 
+  // `<resource>.manage` covers every action on that resource, scoped or not.
+  //
+  // hierarchicalAuthService.roleAllowsWrite already reads it that way
+  // ("verb === action || verb === 'manage'"), and the two layers disagreeing is
+  // what broke the media gallery: every admin role grants media.upload and
+  // media.manage, no role anywhere grants media.read, and routes/media.js asks
+  // authorize('media.read') — so listing media answered 403 for everyone except a
+  // super admin.
+  //
+  // This grants nothing the seeds withhold on purpose. church_admin has no
+  // churches.manage — it holds churches.read:own and churches.update:own, with
+  // deleting a church deliberately left to conference_admin — and team_leader and
+  // church_viewer carry no .manage at all.
+  const grantsManageOnResource = userPermissions.some((permission) => {
+    const [permResource, permActionWithScope] = String(permission).split('.');
+    if (permResource !== resource || !permActionWithScope) {
+      return false;
+    }
+
+    const [permAction] = permActionWithScope.split(':');
+    return permAction === 'manage';
+  });
+
+  if (grantsManageOnResource) {
+    return true;
+  }
+
   // Check for scoped permissions (e.g., 'organizations.create:subordinate' matches 'organizations.create')
   const matchesScoped = userPermissions.some((permission) => {
     const [permResource, permActionWithScope] = permission.split('.');
