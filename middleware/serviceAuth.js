@@ -83,13 +83,24 @@ async function canManageService(user, teamId, permission = 'services.manage') {
     return false;
   }
 
-  const userHierarchyPath =
-    await hierarchicalAuthService.getUserHierarchyPath(user);
-  if (!userHierarchyPath) {
-    return false;
-  }
+  // Services and stories hang off the team at level 4, so the decision belongs to
+  // that level rather than the team's own.
+  //
+  // This used to be `team.hierarchyPath.startsWith(userHierarchyPath)`, which was
+  // wrong twice over. A bare startsWith treats 'u1/c1/ch10' as inside 'u1/c1/ch1',
+  // so a neighbouring church whose id merely shares a prefix passed. And comparing
+  // paths ignores `permission` entirely — every caller passed one and it changed
+  // nothing, so a read-only church_viewer, which sits at the same level as a
+  // church_admin, would have been granted service edit and delete alongside it.
+  const [, verb] = String(permission).split('.');
+  const action = verb || 'manage';
 
-  return team.hierarchyPath.startsWith(userHierarchyPath);
+  return hierarchicalAuthService.canUserActOnChildLevel(
+    user,
+    team.hierarchyPath,
+    4,
+    action
+  );
 }
 
 /**

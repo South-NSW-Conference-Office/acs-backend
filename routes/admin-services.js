@@ -267,8 +267,16 @@ router.get('/:id/full', validateObjectId('id'), async (req, res) => {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    // Check if user can view this service (super admin only for now)
-    if (!req.user.isSuperAdmin) {
+    // "Super admin only for now" was a placeholder that outlived its "for now":
+    // it refused every church and conference admin the details of a service in
+    // their own church, which is the complaint this file exists to serve.
+    // canManageService answers the question properly — by team assignment or by
+    // hierarchy — and is already what getServiceScopeQuery above scopes with.
+    //
+    // teamId is populated here, so hand over the id rather than the document.
+    const serviceTeamId = service.teamId?._id ?? service.teamId;
+
+    if (!(await canManageService(req.user, serviceTeamId, 'services.read'))) {
       return res
         .status(403)
         .json({ error: 'Insufficient permissions to view this service' });
@@ -281,13 +289,19 @@ router.get('/:id/full', validateObjectId('id'), async (req, res) => {
       Story.find({ service: service._id }).sort('-publishedAt').limit(10),
     ]);
 
-    // Check permissions (simplified for super admin)
-    const permissions = {
-      canUpdate: req.user.isSuperAdmin,
-      canDelete: req.user.isSuperAdmin,
-      canManage: req.user.isSuperAdmin,
-      canCreateStories: req.user.isSuperAdmin,
-    };
+    // These four drive whether the panel offers Edit, Delete and photo upload at
+    // all. Hardcoded to isSuperAdmin, they were false for every church admin, so
+    // even a service they could open rendered read-only — "cannot upload or edit
+    // minor details", exactly as reported.
+    const [canUpdate, canDelete, canManage, canCreateStories] =
+      await Promise.all([
+        canManageService(req.user, serviceTeamId, 'services.update'),
+        canManageService(req.user, serviceTeamId, 'services.delete'),
+        canManageService(req.user, serviceTeamId, 'services.manage'),
+        canManageService(req.user, serviceTeamId, 'stories.create'),
+      ]);
+
+    const permissions = { canUpdate, canDelete, canManage, canCreateStories };
 
     res.json({
       success: true,

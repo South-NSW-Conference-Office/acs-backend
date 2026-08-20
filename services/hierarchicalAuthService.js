@@ -367,11 +367,34 @@ class HierarchicalAuthorizationService {
    * @returns {Promise<Boolean>}
    */
   async canUserCreateUnder(user, parentEntityPath, childLevel) {
+    return this.canUserActOnChildLevel(
+      user,
+      parentEntityPath,
+      childLevel,
+      'create'
+    );
+  }
+
+  /**
+   * canUserCreateUnder generalised to any action.
+   *
+   * Same reasoning: the entity being acted on is a child of `parentEntityPath`,
+   * so the write decision belongs to the child's level, not the parent's. Used
+   * for services (level 4) hanging off a team, where asking about the team's own
+   * level answers a different question than the one being posed.
+   *
+   * @param {Object} user - User object
+   * @param {String} parentEntityPath - Hierarchy path of the parent
+   * @param {Number} childLevel - Hierarchy level of the entity being acted on
+   * @param {String} action - Action being performed
+   * @returns {Promise<Boolean>}
+   */
+  async canUserActOnChildLevel(user, parentEntityPath, childLevel, action) {
     try {
       const userLevel = await this.getUserHighestLevel(user);
 
       if (userLevel === 0) {
-        return true; // Super admin can create anywhere
+        return true; // Super admin can act anywhere
       }
 
       const assignment = await this.getUserHighestAssignment(user);
@@ -381,8 +404,8 @@ class HierarchicalAuthorizationService {
         return false;
       }
 
-      // The child is created inside the parent, so the parent itself being the
-      // user's own entity is the ordinary case — a church admin creating a team in
+      // The child sits inside the parent, so the parent itself being the user's
+      // own entity is the ordinary case — a church admin acting on a team in
       // exactly their own church.
       const isOwnEntity = parentEntityPath === userPath;
       if (
@@ -396,7 +419,15 @@ class HierarchicalAuthorizationService {
         return false;
       }
 
-      return this.roleAllowsWrite(assignment?.role, userLevel, childLevel, 'create');
+      // Reading anywhere inside your own subtree is allowed; writing has to be
+      // granted by the role. Same split as canUserManageEntity — without it a
+      // read-only church_viewer, which sits at the same level as a church_admin,
+      // would be handed write access to everything below its church.
+      if (!WRITE_ACTIONS.has(action)) {
+        return true;
+      }
+
+      return this.roleAllowsWrite(assignment?.role, userLevel, childLevel, action);
     } catch (error) {
       return false;
     }
