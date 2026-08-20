@@ -1,11 +1,46 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const User = require('../models/User');
+const Role = require('../models/Role');
 const { authenticateToken } = require('../middleware/auth');
-// const authorizationService = require('../services/authorizationService');
+const authorizationService = require('../services/authorizationService');
 const { AuditLog } = require('../middleware/auditLog');
 
 const router = express.Router();
+
+// The hierarchical assignment arrays that replaced the removed `organizations`
+// field, and the role paths worth populating on them. Populating
+// 'organizations.role' instead threw outright: mongoose 7 rejects a populate on
+// a path that is not in the schema (strictPopulate).
+const ASSIGNMENT_ROLE_PATHS = [
+  'unionAssignments.role',
+  'conferenceAssignments.role',
+  'churchAssignments.role',
+].join(' ');
+
+/**
+ * The role assignments a user holds, in the shape the rest of the API reports
+ * them (see routes/auth.js). Replaces reads of `user.organizations`, which is not
+ * a field on the User schema — it only ever exists on built API responses, so
+ * every read of it here was undefined.
+ */
+function assignmentSummary(user) {
+  return [
+    ...(user.unionAssignments || []),
+    ...(user.conferenceAssignments || []),
+    ...(user.churchAssignments || []),
+  ]
+    .filter((assignment) => assignment.role)
+    .map((assignment) => ({
+      role: {
+        _id: assignment.role._id,
+        name: assignment.role.name,
+        displayName: assignment.role.displayName,
+        level: assignment.role.level,
+      },
+      assignedAt: assignment.assignedAt,
+    }));
+}
 
 // Middleware to ensure only super admins can access these routes
 const requireSuperAdmin = async (req, res, next) => {
@@ -60,45 +95,55 @@ const logSuperAdminAction = async (
 // GET /api/super-admin/users - Get all users with super admin status
 router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
-    // Get all users with isSuperAdmin flag or super_admin role
+    // Someone can be a super admin two ways: the isSuperAdmin flag, or a
+    // super_admin role on one of their hierarchical assignments. The second half
+    // used to be `{ 'organizations.role': { $exists: true } }`, a path that is not
+    // on the User schema, so it matched nobody — a super admin who holds the role
+    // by assignment rather than the flag was missing from this list entirely.
+    const superAdminRole = await Role.findOne({ name: 'super_admin' })
+      .select('_id')
+      .lean();
+
+    const holdsSuperAdminRole = superAdminRole
+      ? [
+          { 'unionAssignments.role': superAdminRole._id },
+          { 'conferenceAssignments.role': superAdminRole._id },
+          { 'churchAssignments.role': superAdminRole._id },
+        ]
+      : [];
+
     const superAdminUsers = await User.find({
-      $or: [
-        { isSuperAdmin: true },
-        { 'organizations.role': { $exists: true } },
-      ],
+      $or: [{ isSuperAdmin: true }, ...holdsSuperAdminRole],
     })
-      .populate('organizations.organization')
-      .populate('organizations.role')
+      .populate(ASSIGNMENT_ROLE_PATHS)
       .select('-password')
       .sort({ createdAt: -1 });
 
-    // Filter to only include actual super admins
-    const filteredUsers = superAdminUsers.filter((user) => {
-      if (user.isSuperAdmin) return true;
+    // Second pass in code, so the flag and the role are judged by the same rule
+    // the rest of the API uses rather than a copy of it here.
+    const filteredUsers = superAdminUsers.filter((user) =>
+      authorizationService.isSuperAdmin(user)
+    );
 
-      // Check if user has super_admin role
-      return user.organizations.some(
-        (org) => org.role && org.role.name === 'super_admin'
-      );
-    });
-
-    // Get all regular users for potential promotion
-    const regularUsers = await User.find({
+    // Everyone else who could be promoted. Excluding the role-holders in the query
+    // keeps the list accurate even before the code-side filter runs.
+    const eligibleQuery = {
       isSuperAdmin: { $ne: true },
       isActive: true,
       verified: true,
-    })
-      .populate('organizations.organization')
-      .populate('organizations.role')
+    };
+    if (holdsSuperAdminRole.length > 0) {
+      eligibleQuery.$nor = holdsSuperAdminRole;
+    }
+
+    const regularUsers = await User.find(eligibleQuery)
+      .populate(ASSIGNMENT_ROLE_PATHS)
       .select('-password')
       .sort({ name: 1 });
 
-    // Filter out users who already have super_admin role
-    const eligibleUsers = regularUsers.filter((user) => {
-      return !user.organizations.some(
-        (org) => org.role && org.role.name === 'super_admin'
-      );
-    });
+    const eligibleUsers = regularUsers.filter(
+      (user) => !authorizationService.isSuperAdmin(user)
+    );
 
     res.json({
       success: true,
@@ -109,7 +154,7 @@ router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
           email: user.email,
           isSuperAdmin: user.isSuperAdmin || false,
           avatar: user.avatar,
-          organizations: user.organizations,
+          organizations: assignmentSummary(user),
           createdAt: user.createdAt,
           lastLogin: user.lastLogin,
           isActive: user.isActive,
@@ -119,7 +164,7 @@ router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
           name: user.name,
           email: user.email,
           avatar: user.avatar,
-          organizations: user.organizations,
+          organizations: assignmentSummary(user),
           verified: user.verified,
         })),
       },
