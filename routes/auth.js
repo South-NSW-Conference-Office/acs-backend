@@ -8,6 +8,7 @@ const {
   checkPermission,
 } = require('../middleware/auth');
 const emailService = require('../services/emailService');
+const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 const tokenService = require('../services/tokenService');
 const logger = require('../services/loggerService');
 const { validatePassword } = require('../config/security');
@@ -290,12 +291,13 @@ router.post(
 
       // Get role + organization name for the email body (best-effort)
       const firstTeam = user.teamAssignments?.[0]?.teamId;
+      const highestAssignment =
+        await hierarchicalAuthService.getUserHighestAssignment(user);
       const userWithDetails = {
         ...user.toObject(),
         roleName:
           user.teamAssignments?.[0]?.role ||
-          (Array.isArray(user.organizations) &&
-            user.organizations[0]?.role?.displayName) ||
+          highestAssignment?.role?.displayName ||
           undefined,
         organizationName: firstTeam?.churchId?.name || firstTeam?.name || undefined,
       };
@@ -421,17 +423,22 @@ router.post(
           displayName: 'Super Administrator',
           level: 'system',
         };
-      } else if (Array.isArray(user.organizations) && user.organizations.length > 0) {
-        // Legacy organizations field (not on current User schema — guarded to avoid TypeError)
-        const primaryOrgAssignment = user.organizations[0];
+      } else {
+        // Everyone else is described by their hierarchical assignments. The
+        // `organizations` field this used to read was dropped from the User schema
+        // by the hierarchical refactor and now only exists on built API responses
+        // (see the note in routes/teams.js), so it yielded no role and no
+        // permissions — a conference or church admin signed in to an empty panel.
+        const assignment =
+          await hierarchicalAuthService.getUserHighestAssignment(user);
 
-        if (primaryOrgAssignment && primaryOrgAssignment.role) {
-          permissions = primaryOrgAssignment.role.permissions || [];
+        if (assignment?.role) {
+          permissions = assignment.role.permissions || [];
           role = {
-            id: primaryOrgAssignment.role._id,
-            name: primaryOrgAssignment.role.name,
-            displayName: primaryOrgAssignment.role.displayName,
-            level: primaryOrgAssignment.role.level,
+            id: assignment.role._id,
+            name: assignment.role.name,
+            displayName: assignment.role.displayName,
+            level: assignment.role.level,
           };
         }
       }
@@ -505,17 +512,22 @@ router.get('/is-auth', authenticateToken, async (req, res) => {
         displayName: 'Super Administrator',
         level: 'system',
       };
-    } else if (user.organizations.length > 0) {
-      // Get the first organization assignment since we no longer have primaryOrganization
-      const primaryOrgAssignment = user.organizations[0];
+    } else {
+      // `user.organizations` is not a field on the User schema, so reading `.length`
+      // off it threw a TypeError here for every user without the isSuperAdmin flag.
+      // The handler turned that into a 500, the admin panel read the failure as "not
+      // authenticated" and redirected to the login page — so a correct password
+      // appeared to sign in and then bounce straight back out.
+      const assignment =
+        await hierarchicalAuthService.getUserHighestAssignment(user);
 
-      if (primaryOrgAssignment && primaryOrgAssignment.role) {
-        permissions = primaryOrgAssignment.role.permissions || [];
+      if (assignment?.role) {
+        permissions = assignment.role.permissions || [];
         role = {
-          id: primaryOrgAssignment.role._id,
-          name: primaryOrgAssignment.role.name,
-          displayName: primaryOrgAssignment.role.displayName,
-          level: primaryOrgAssignment.role.level,
+          id: assignment.role._id,
+          name: assignment.role.name,
+          displayName: assignment.role.displayName,
+          level: assignment.role.level,
         };
       }
     }
@@ -863,7 +875,6 @@ router.post(
 // GET /api/auth/is-auth-hierarchical - Verify authentication with hierarchical data
 router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
   try {
-    const hierarchicalAuthService = require('../services/hierarchicalAuthService');
     const user = req.user;
 
     // Get user's highest level in hierarchy
@@ -892,18 +903,22 @@ router.get('/is-auth-hierarchical', authenticateToken, async (req, res) => {
         level: 'system',
         hierarchyLevel: 0,
       };
-    } else if (user.organizations.length > 0) {
-      // Get the first organization assignment since we no longer have primaryOrganization
-      const primaryOrgAssignment = user.organizations[0];
+    } else {
+      // Same removed-field bug as /is-auth above, on the endpoint the admin panel
+      // actually calls on every page load. Read the hierarchical assignments instead.
+      const assignment =
+        await hierarchicalAuthService.getUserHighestAssignment(user);
 
-      if (primaryOrgAssignment && primaryOrgAssignment.role) {
-        permissions = primaryOrgAssignment.role.permissions || [];
+      if (assignment?.role) {
+        permissions = assignment.role.permissions || [];
         role = {
-          id: primaryOrgAssignment.role._id,
-          name: primaryOrgAssignment.role.name,
-          displayName: primaryOrgAssignment.role.displayName,
-          level: primaryOrgAssignment.role.level,
-          hierarchyLevel: primaryOrgAssignment.role.hierarchyLevel || 4,
+          id: assignment.role._id,
+          name: assignment.role.name,
+          displayName: assignment.role.displayName,
+          level: assignment.role.level,
+          // `?? 4`, not `|| 4`: hierarchyLevel 0 is union — the highest level there
+          // is — and `||` would demote it to 4, the lowest.
+          hierarchyLevel: assignment.role.hierarchyLevel ?? 4,
         };
       }
     }
