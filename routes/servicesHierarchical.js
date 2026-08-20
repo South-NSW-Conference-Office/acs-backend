@@ -321,10 +321,13 @@ router.post(
       }
 
       // Validate user can create service in this team
-      const canCreate = await hierarchicalAuthService.canUserManageEntity(
+      // A service is level 4. Against the team's own path this tested
+      // `teams.create`, which a team leader does not hold — the role grants
+      // `services.create:team`.
+      const canCreate = await hierarchicalAuthService.canUserCreateUnder(
         req.user,
         team.hierarchyPath,
-        'create'
+        4
       );
 
       if (!canCreate) {

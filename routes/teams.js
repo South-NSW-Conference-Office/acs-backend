@@ -273,10 +273,13 @@ router.post(
         });
       }
 
-      const canCreate = await hierarchicalAuthService.canUserManageEntity(
+      // A team is level 3. Asking canUserManageEntity about the church's own path
+      // instead tested `churches.create`, which a church admin does not hold and
+      // should not — so creating a team in their own church was refused.
+      const canCreate = await hierarchicalAuthService.canUserCreateUnder(
         req.user,
         church.hierarchyPath,
-        'create'
+        3
       );
 
       if (!canCreate) {

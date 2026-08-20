@@ -5,6 +5,12 @@ const hierarchicalAuthService = require('./hierarchicalAuthService');
 class TeamService {
   /**
    * Create a new team
+   *
+   * NOTE: nothing calls this — POST /teams builds the team through Team.createTeam
+   * instead. Before wiring it up, fix the check below: it asks whether the user can
+   * create *a church*, because it names the church as the target of a 'create'. That
+   * is the bug that denied church admins their own teams; the route now uses
+   * hierarchicalAuthService.canUserCreateUnder(user, church.hierarchyPath, 3).
    */
   static async createTeam(data, createdBy) {
     const { churchId, leaderId, name, type, description } = data;

@@ -344,6 +344,65 @@ class HierarchicalAuthorizationService {
   }
 
   /**
+   * Can `user` create a child of `childLevel` directly under `parentEntityPath`?
+   *
+   * canUserManageEntity(user, parentPath, 'create') cannot answer this. It derives
+   * the target entity type from the path it is given, so "create a team under this
+   * church" was tested as "create a church": roleAllowsWrite looked up level 2,
+   * resolved it to `churches`, and searched the role for `churches.create`. A church
+   * admin holds `teams.create:own` and deliberately no `churches.create` — creating
+   * a church is conference_admin's job — so creating a team inside their own church
+   * was refused with "Insufficient permissions to create team in this church".
+   *
+   * The same shape denied a team leader creating a service in their own team, which
+   * was checked as `teams.create` while the role grants `services.create:team`.
+   *
+   * The parent still has to sit in the user's subtree; only the level used for the
+   * write decision changes, so this grants nothing that roleAllowsWrite would not
+   * already grant for that child level.
+   *
+   * @param {Object} user - User object
+   * @param {String} parentEntityPath - Hierarchy path of the parent to create under
+   * @param {Number} childLevel - Hierarchy level of the entity being created
+   * @returns {Promise<Boolean>}
+   */
+  async canUserCreateUnder(user, parentEntityPath, childLevel) {
+    try {
+      const userLevel = await this.getUserHighestLevel(user);
+
+      if (userLevel === 0) {
+        return true; // Super admin can create anywhere
+      }
+
+      const assignment = await this.getUserHighestAssignment(user);
+      const userPath = assignment?.path ?? (await this.getUserHierarchyPath(user));
+
+      if (!userPath || !parentEntityPath || typeof childLevel !== 'number') {
+        return false;
+      }
+
+      // The child is created inside the parent, so the parent itself being the
+      // user's own entity is the ordinary case — a church admin creating a team in
+      // exactly their own church.
+      const isOwnEntity = parentEntityPath === userPath;
+      if (
+        !isOwnEntity &&
+        !HierarchyValidator.isInSubtree(parentEntityPath, userPath)
+      ) {
+        return false;
+      }
+
+      if (!this.canLevelManageLevel(userLevel, childLevel)) {
+        return false;
+      }
+
+      return this.roleAllowsWrite(assignment?.role, userLevel, childLevel, 'create');
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * canUserManageEntity, for callers holding an id rather than a hierarchy path.
    *
    * canUserManageEntity compares hierarchy paths — it derives the target's level
