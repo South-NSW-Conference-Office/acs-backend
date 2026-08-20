@@ -387,10 +387,38 @@ const authorizeWithTeam = (requiredPermission = {}) => {
         const teamPermissions = await req.user.getPermissionsForTeam(teamId);
 
         if (!teamPermissions.teamRole) {
-          return res.status(403).json({
-            success: false,
-            message: 'No access to this team',
-          });
+          // No team assignment — but that is membership, not authority.
+          // getPermissionsForTeam only ever reports whether the user belongs to
+          // the team, and a church admin governs every team in their church
+          // without being a member of any of them. Without this fallback,
+          // creating a team in your own church and then opening it answered 403
+          // "No access to this team", which the panel renders as "Team Not Found".
+          //
+          // Anything that is not a plain read is treated as a write, so a verb
+          // this middleware has not seen before ('teams.manage_members') is gated
+          // tightly rather than waved through.
+          const [, verb] = String(requiredPermission).split('.');
+          const action = verb === 'read' ? 'read' : 'manage';
+
+          const allowedByHierarchy =
+            await hierarchicalAuthService.canUserManageEntityById(
+              req.user,
+              'team',
+              teamId,
+              action
+            );
+
+          if (!allowedByHierarchy) {
+            return res.status(403).json({
+              success: false,
+              message: 'No access to this team',
+            });
+          }
+
+          // Authorized by hierarchy rather than membership, so there is no team
+          // role or team-scoped permission set to attach.
+          req.teamId = teamId;
+          return next();
         }
 
         // Check team-scoped permissions
