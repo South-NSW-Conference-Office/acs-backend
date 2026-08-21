@@ -137,13 +137,28 @@ jobs:
           key: ${{ secrets.SNSW_SSH_KEY }}
           envs: GHCR_TOKEN,GHCR_USER
           script: |
+            set -euo pipefail
             cd /opt/acs-api-proxy
             mv deploy/docker-compose.snswserver.yml docker-compose.yml
             mv deploy/nginx-api-proxy.conf nginx-api-proxy.conf
             rmdir deploy 2>/dev/null || true
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker compose pull
-            docker compose up -d --remove-orphans
+
+            # --force-recreate because this container's configuration is a MOUNTED
+            # FILE, not part of the image. `docker compose up -d` compares the image
+            # and the compose file, sees neither changed, and leaves the running
+            # container alone — so an edited nginx-api-proxy.conf sat on disk while
+            # nginx kept serving the config it read at startup. That is how the
+            # client_max_body_size fix deployed green and changed nothing.
+            docker compose up -d --force-recreate --remove-orphans
+
+            # Assert nginx parsed the config now in place, and that the directive
+            # actually made it into the running container.
+            docker exec acs-api-proxy nginx -t
+            docker exec acs-api-proxy grep -q client_max_body_size /etc/nginx/conf.d/default.conf
+            echo "OK: client_max_body_size present in running container"
+
             docker image prune -f
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
