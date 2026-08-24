@@ -7,6 +7,7 @@ const {
   ConflictError,
 } = require('../middleware/errorHandler');
 const emailService = require('./emailService');
+const logger = require('./loggerService');
 
 class UserService {
   // Get users with filtering and pagination - TEAM-CENTRIC
@@ -298,17 +299,28 @@ class UserService {
         teamName: primaryTeam?.name,
       };
 
-      // Send verification email (preserving existing invitation system)
+      // Send the invitation. A failure here must not undo the user, who is
+      // already saved — but it must not vanish either. Swallowing it silently is
+      // how an invited colleague waited days for an email that never left, while
+      // the panel reported "User created successfully" both times.
+      let invitationSent = null; // null = not attempted
+      let invitationError = null;
+
       if (sendInvitation) {
         try {
           await emailService.sendVerificationEmail(
             userWithDetails,
             verificationToken
           );
+          invitationSent = true;
         } catch (emailError) {
-          // Failed to send verification email
-          // Don't fail user creation if email fails
-          // Silently handle email error
+          invitationSent = false;
+          invitationError = emailError.message;
+          logger.error('Failed to send invitation email for new user', {
+            userId: user._id.toString(),
+            email: user.email,
+            error: emailError.message,
+          });
         }
       }
 
@@ -318,6 +330,10 @@ class UserService {
       return {
         ...userObj,
         id: userObj._id.toString(),
+        // Reported so the caller can tell the admin the invitation did not go
+        // out, rather than leaving them to discover it from the person waiting.
+        invitationSent,
+        invitationError,
       };
     } catch (error) {
       if (error instanceof AppError) throw error;

@@ -770,9 +770,18 @@ router.post(
       // Use UserService to create user with proper validation and role assignment
       const user = await UserService.createUser(userData, req.user._id);
 
+      // Say so when the invitation did not go out. The account exists either
+      // way, but an admin told only "User created successfully" has no way to
+      // know the person will never receive anything — which is exactly how an
+      // invited colleague ended up waiting on an email that never left.
+      const invitationFailed = user.invitationSent === false;
+
       res.status(201).json({
         success: true,
-        message: 'User created successfully',
+        message: invitationFailed
+          ? 'User created, but the invitation email could not be sent. Use Resend Invitation, or send them a password reset instead.'
+          : 'User created successfully',
+        invitationSent: user.invitationSent,
         data: user,
       });
     } catch (error) {
