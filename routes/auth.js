@@ -696,12 +696,19 @@ router.post(
       user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
       await user.save();
 
-      // Send password reset email
+      // Send password reset email.
+      //
+      // The response stays deliberately vague either way — telling a caller that
+      // sending failed would reveal that the account exists. But the failure has
+      // to reach the logs, or a broken mail transport looks identical to a
+      // working one from every angle available to us.
       try {
         await emailService.sendPasswordResetEmail(email, resetToken);
       } catch (emailError) {
-        // Failed to send password reset email
-        // Don't reveal email sending failure to user for security
+        logger.error('Failed to send password reset email', {
+          email,
+          error: emailError.message,
+        });
       }
 
       res.status(200).json({
