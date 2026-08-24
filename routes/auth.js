@@ -2,11 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const {
-  authenticateToken,
-  authorize,
-  checkPermission,
-} = require('../middleware/auth');
+const { authenticateToken, authorize } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const hierarchicalAuthService = require('../services/hierarchicalAuthService');
 const tokenService = require('../services/tokenService');
@@ -235,6 +231,12 @@ router.get('/check-verification-token/:token', async (req, res) => {
 router.post(
   '/resend-verification',
   authenticateToken,
+  // authorize() is what populates req.userPermissions. Without it this handler
+  // read `req.userPermissions.permissions` off undefined, threw a TypeError, and
+  // answered 500 — so resending an invitation had never worked for anyone,
+  // including super admins. Enforcing the permission as middleware also removes
+  // the hand-rolled check below, which duplicated what authorize() already does.
+  authorize('users.update'),
   [body('userId').isMongoId().withMessage('Valid user ID required')],
   async (req, res) => {
     try {
@@ -248,19 +250,6 @@ router.post(
       }
 
       const { userId } = req.body;
-
-      // Check permissions
-      const hasPermission = checkPermission(
-        req.userPermissions.permissions,
-        'users.update'
-      );
-
-      if (!hasPermission) {
-        return res.status(403).json({
-          success: false,
-          message: 'You do not have permission to resend verification emails',
-        });
-      }
 
       const user = await User.findById(userId).populate({
         path: 'teamAssignments.teamId',
