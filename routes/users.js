@@ -776,13 +776,21 @@ router.post(
       // invited colleague ended up waiting on an email that never left.
       const invitationFailed = user.invitationSent === false;
 
+      // The raw transport error stays out of the response. It reads like
+      // `connect ECONNREFUSED mail.internal:587` — naming the mail host and
+      // port — and an admin can act on none of it; the message below already
+      // tells them what to do instead. userService has already logged it, which
+      // is where that detail belongs.
+      const userForResponse = { ...user };
+      delete userForResponse.invitationError;
+
       res.status(201).json({
         success: true,
         message: invitationFailed
           ? 'User created, but the invitation email could not be sent. Use Resend Invitation, or send them a password reset instead.'
           : 'User created successfully',
         invitationSent: user.invitationSent,
-        data: user,
+        data: userForResponse,
       });
     } catch (error) {
       if (error instanceof AppError) {
