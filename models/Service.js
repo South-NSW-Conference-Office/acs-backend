@@ -108,6 +108,20 @@ const serviceSchema = new mongoose.Schema(
         type: String,
         default: '',
       },
+      // Where to centre the banner vertically when it is cropped, as a percentage
+      // from the top: 0 keeps the top edge, 50 centres, 100 keeps the bottom.
+      // Renders as CSS `object-position: center <focalY>%`.
+      //
+      // A number rather than a raw object-position string so the value cannot carry
+      // arbitrary CSS into a style attribute, and so the admin can express it as a
+      // single slider. Horizontal control is deliberately not offered: banners are
+      // wide and shallow, so the crop that actually loses faces is the vertical one.
+      focalY: {
+        type: Number,
+        default: 50,
+        min: 0,
+        max: 100,
+      },
     },
     gallery: [
       {
