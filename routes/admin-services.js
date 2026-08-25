@@ -7,6 +7,7 @@ const VolunteerRole = require('../models/VolunteerRole');
 const Story = require('../models/Story');
 // const Organization = require('../models/Organization'); // REMOVED - Using hierarchical models
 const { authenticateToken } = require('../middleware/auth');
+const logger = require('../services/loggerService');
 const {
   canManageService,
   requireServicePermission,
@@ -425,6 +426,70 @@ router.post(
       }
 
       res.status(500).json({ error: 'Failed to create service' });
+    }
+  }
+);
+
+/**
+ * PATCH /api/admin/services/:id/primary-image/focus
+ * Set where the banner is centred vertically when it gets cropped.
+ *
+ * Deliberately separate from PUT /:id, which assigns `primaryImage` wholesale from
+ * the request body — posting just a focal point there would blank the url, key and
+ * alt alongside it.
+ */
+router.patch(
+  '/:id/primary-image/focus',
+  validateObjectId('id'),
+  requireServicePermission('services.update'),
+  async (req, res) => {
+    try {
+      const { focalY } = req.body;
+
+      if (
+        typeof focalY !== 'number' ||
+        !Number.isFinite(focalY) ||
+        focalY < 0 ||
+        focalY > 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'focalY must be a number between 0 and 100',
+        });
+      }
+
+      const service = await Service.findById(req.params.id);
+
+      if (!service) {
+        return res.status(404).json({ error: 'Service not found' });
+      }
+
+      // Positioning nothing is almost certainly a mistake on the caller's side, and
+      // silently storing a focal point for an absent image would hide it.
+      if (!service.primaryImage?.url) {
+        return res.status(400).json({
+          success: false,
+          message: 'This service has no banner image to position',
+        });
+      }
+
+      service.primaryImage.focalY = focalY;
+      service.updatedBy = req.user._id;
+      await service.save();
+
+      return res.json({
+        success: true,
+        message: 'Banner position updated successfully',
+        image: service.primaryImage,
+      });
+    } catch (error) {
+      logger.error('Failed to update banner focal point', {
+        serviceId: req.params.id,
+        error: error.message,
+      });
+      return res
+        .status(500)
+        .json({ error: 'Failed to update banner position' });
     }
   }
 );

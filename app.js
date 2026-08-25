@@ -78,10 +78,28 @@ app.use(
           localNetworkRegex.test(origin));
 
       if (isAllowedOrigin || isLocalDev) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: Origin ${origin} not allowed`));
+        return callback(null, true);
       }
+
+      // Refuse by withholding the CORS headers, not by raising.
+      //
+      // This used to `callback(new Error(...))`. cors hands that to next(err), so
+      // every request from an unlisted origin fell through to the global error
+      // handler and came back "500 Internal server error" — indistinguishable from
+      // the API being broken. A sign-in from a dev origin looked like a server
+      // fault and took a while to trace, while the browser's own CORS message,
+      // which names the problem exactly, never got a chance to appear.
+      //
+      // callback(null, false) is the library's way to decline: no
+      // Access-Control-Allow-Origin is sent, the browser blocks the response and
+      // reports a CORS violation. That is both honest and actionable. It weakens
+      // nothing — CORS only governs what a browser will hand back to page scripts,
+      // and never gated non-browser callers, which reach these routes either way
+      // and are stopped by authentication instead.
+      logger.warn('CORS: refused a request from an unlisted origin', {
+        origin,
+      });
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
