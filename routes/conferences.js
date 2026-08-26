@@ -678,7 +678,7 @@ router.delete(
       await Church.deleteMany({ hierarchyPath: hierarchyRegex });
 
       if (conference.primaryImage?.key) {
-        try { await storageService.deleteImage(conference.primaryImage.key); }
+        try { await storageService.releaseImage(conference.primaryImage.key); }
         catch (err) { console.error(`Failed to delete banner for conference ${id}:`, err); }
       }
 

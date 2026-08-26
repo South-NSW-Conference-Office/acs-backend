@@ -411,7 +411,7 @@ router.put(
 
       // Delete old primary image if exists
       if (service.primaryImage?.key) {
-        await storageService.deleteImage(service.primaryImage.key);
+        await storageService.releaseImage(service.primaryImage.key);
       }
 
       // Upload new banner
@@ -488,7 +488,7 @@ router.put(
 
       // Delete old primary image if exists
       if (service.primaryImage?.key) {
-        await storageService.deleteImage(service.primaryImage.key);
+        await storageService.releaseImage(service.primaryImage.key);
       }
 
       // Update service with media file

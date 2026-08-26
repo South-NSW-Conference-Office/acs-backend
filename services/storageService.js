@@ -375,6 +375,36 @@ class StorageService {
   }
 
   /**
+   * Release an image a record has stopped using, without touching anything the
+   * media library owns.
+   *
+   * Replacing a banner used to call deleteImage on the outgoing key outright. When
+   * that key belonged to a media-library file — which it does whenever the banner
+   * was picked from the library rather than uploaded fresh — the bytes went even
+   * though the MediaFile row, the library listing, and every other record pointing
+   * at the same file all remained. Three banners were emptied that way in one
+   * afternoon: replacing one service's picture silently blanked another service's
+   * and a team's, because all three had been set from the same library file.
+   *
+   * A library file is shared by definition, so its lifetime belongs to the library
+   * and its own delete route, not to whichever record happens to drop it first.
+   * Only a key nothing in the library claims is safe to remove here.
+   *
+   * @param {string} key - S3 object key the record is releasing
+   * @returns {Promise<{deleted: boolean, reason?: string}>}
+   */
+  async releaseImage(key) {
+    if (!key) return { deleted: false, reason: 'no key' };
+
+    if (MediaFile && (await MediaFile.exists({ key }))) {
+      return { deleted: false, reason: 'owned by the media library' };
+    }
+
+    await this.deleteImage(key);
+    return { deleted: true };
+  }
+
+  /**
    * Delete MediaFile and associated storage files
    * @param {string} mediaFileId - MediaFile document ID
    * @param {string} userId - User ID for permission check

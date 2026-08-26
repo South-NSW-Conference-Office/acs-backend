@@ -645,7 +645,7 @@ router.put(
         // Delete old primary image if exists
         if (service.primaryImage?.key) {
           const storageService = require('../services/storageService');
-          await storageService.deleteImage(service.primaryImage.key);
+          await storageService.releaseImage(service.primaryImage.key);
         }
 
         // Update service with selected media file
