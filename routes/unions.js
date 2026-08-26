@@ -580,7 +580,7 @@ router.delete(
       // Delete banner image from storage if it exists
       if (union.primaryImage?.key) {
         try {
-          await storageService.deleteImage(union.primaryImage.key);
+          await storageService.releaseImage(union.primaryImage.key);
         } catch (err) {
           console.error(`Failed to delete banner image for union ${id}:`, err);
         }
@@ -726,7 +726,7 @@ router.put(
 
       // Delete old banner if exists
       if (union.primaryImage?.key) {
-        await storageService.deleteImage(union.primaryImage.key);
+        await storageService.releaseImage(union.primaryImage.key);
       }
 
       // Upload new banner with tracking

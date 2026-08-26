@@ -915,7 +915,7 @@ router.put(
 
       // Delete old banner if exists
       if (church.primaryImage?.key) {
-        await storageService.deleteImage(church.primaryImage.key);
+        await storageService.releaseImage(church.primaryImage.key);
       }
 
       // Upload new banner with tracking
