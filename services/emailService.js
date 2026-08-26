@@ -350,6 +350,22 @@ Adventist Community Services Australia
     return value.replace(/[\r\n]/g, '');
   }
 
+  /**
+   * Where enquiries from the public are delivered.
+   *
+   * These used to go `to: EMAIL_FROM`, which forced the mailbox that *receives*
+   * enquiries to be the same one the system *sends* from. Those are different
+   * jobs: the sender wants a domain whose SPF authorises the relay, while the
+   * recipient is a staffed inbox people are told to write to. Tying them together
+   * means changing the sending account silently redirects the public's mail.
+   *
+   * CONTACT_EMAIL sets the recipient. It falls back to EMAIL_FROM, so an
+   * installation that has not set it behaves exactly as before.
+   */
+  getContactRecipient() {
+    return process.env.CONTACT_EMAIL || process.env.EMAIL_FROM;
+  }
+
   // Send contact form notification to admin
   async sendContactFormAdminNotification(contactData) {
     const { name, email, phone, subject, message } = contactData;
@@ -365,7 +381,8 @@ Adventist Community Services Australia
 
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
-      to: process.env.EMAIL_FROM,
+      to: this.getContactRecipient(),
+      replyTo: email,
       subject: `New Contact Form Submission - ${this.sanitizeEmailHeader(subject)}`,
       text: `
 NEW CONTACT FORM SUBMISSION
@@ -434,7 +451,8 @@ Date: ${submittedDate} AEDT
 
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
-      to: process.env.EMAIL_FROM,
+      to: this.getContactRecipient(),
+      replyTo: email,
       subject: `New Volunteer Application - ${this.sanitizeEmailHeader(name)}`,
       text: `
 NEW VOLUNTEER APPLICATION
