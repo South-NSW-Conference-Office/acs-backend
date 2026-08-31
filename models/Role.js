@@ -136,8 +136,17 @@ roleSchema.statics.createSystemRoles = async function () {
       permissions: ['*'], // All permissions
       description: 'Full system access including system administration',
       roleCategory: 'super_admin',
+      // Raised from 5 to 10 on request: the cap was full and another super
+      // administrator was needed.
+      //
+      // It has to change here, not only in Settings > Role Limits. That page
+      // writes quotaLimits straight to the database and takes effect immediately,
+      // but createSystemRoles runs on every boot and findOneAndUpdates the whole
+      // role object from this seed — so a limit set through the panel is silently
+      // reverted by the next deploy, and nobody finds out until an assignment is
+      // refused. Keep the two in step.
       quotaLimits: {
-        maxUsers: 5,
+        maxUsers: 10,
         scope: 'system',
         warningThreshold: 0.8,
       },
