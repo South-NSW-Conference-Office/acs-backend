@@ -12,6 +12,14 @@ const { upload, requireFile } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
+// `type` on MediaFile is the file's *purpose* (banner, gallery, avatar, ...), not its
+// format, so telling photos from videos has to go through the mime type. Anchored at
+// the start so 'video/mp4' matches while something like 'image/x-video' does not.
+const MEDIA_KIND_PATTERN = {
+  image: /^image\//,
+  video: /^video\//,
+};
+
 // Apply authentication to all routes
 router.use(authenticateToken);
 
@@ -34,6 +42,10 @@ router.get(
       .optional()
       .isIn(['banner', 'gallery', 'thumbnail', 'avatar', 'document'])
       .withMessage('Invalid file type'),
+    query('mediaKind')
+      .optional()
+      .isIn(['image', 'video'])
+      .withMessage('mediaKind must be image or video'),
     query('category')
       .optional()
       .isIn([
@@ -76,6 +88,7 @@ router.get(
         page = 1,
         limit = 20,
         type,
+        mediaKind,
         category,
         search,
         sortBy = 'createdAt',
@@ -97,6 +110,7 @@ router.get(
 
         const queryFilter = { isActive: true };
         if (type) queryFilter.type = type;
+        if (mediaKind) queryFilter.mimeType = MEDIA_KIND_PATTERN[mediaKind];
         if (category) queryFilter.category = category;
         if (search) {
           queryFilter.$text = { $search: search };
@@ -115,6 +129,7 @@ router.get(
 
         const queryFilter = { uploadedBy: req.user.id, isActive: true };
         if (type) queryFilter.type = type;
+        if (mediaKind) queryFilter.mimeType = MEDIA_KIND_PATTERN[mediaKind];
         if (category) queryFilter.category = category;
         if (search) {
           queryFilter.$text = { $search: search };
