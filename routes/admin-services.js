@@ -432,7 +432,11 @@ router.post(
 
 /**
  * PATCH /api/admin/services/:id/primary-image/focus
- * Set where the banner is centred vertically when it gets cropped.
+ * Set where the banner is centred when it gets cropped.
+ *
+ * Takes focalX, focalY, or both — each a percentage, 0-100. Either may be omitted,
+ * so a caller that only knows about the vertical axis (which is all this endpoint
+ * accepted at first) keeps working unchanged.
  *
  * Deliberately separate from PUT /:id, which assigns `primaryImage` wholesale from
  * the request body — posting just a focal point there would blank the url, key and
@@ -444,17 +448,24 @@ router.patch(
   requireServicePermission('services.update'),
   async (req, res) => {
     try {
-      const { focalY } = req.body;
+      const { focalX, focalY } = req.body;
 
-      if (
-        typeof focalY !== 'number' ||
-        !Number.isFinite(focalY) ||
-        focalY < 0 ||
-        focalY > 100
-      ) {
+      const invalid = (v) =>
+        v !== undefined &&
+        (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 100);
+
+      if (invalid(focalX) || invalid(focalY)) {
         return res.status(400).json({
           success: false,
-          message: 'focalY must be a number between 0 and 100',
+          message: 'focalX and focalY must be numbers between 0 and 100',
+        });
+      }
+
+      // Sending neither is a caller mistake, not a no-op worth accepting quietly.
+      if (focalX === undefined && focalY === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: 'Provide focalX, focalY, or both',
         });
       }
 
@@ -473,7 +484,9 @@ router.patch(
         });
       }
 
-      service.primaryImage.focalY = focalY;
+      // Only the axes actually sent, so updating one does not reset the other.
+      if (focalX !== undefined) service.primaryImage.focalX = focalX;
+      if (focalY !== undefined) service.primaryImage.focalY = focalY;
       service.updatedBy = req.user._id;
       await service.save();
 
