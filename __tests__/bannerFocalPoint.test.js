@@ -47,6 +47,7 @@ function serviceWithBanner() {
       url: 'https://example.test/banner.webp',
       key: 'general/banner.webp',
       alt: 'Crew on a trailer',
+      focalX: 50,
       focalY: 50,
     },
     save: async function () {
@@ -87,6 +88,55 @@ describe('PATCH banner focal point', () => {
   it('accepts the boundaries', async () => {
     expect((await patch({ focalY: 0 })).status).toBe(200);
     expect((await patch({ focalY: 100 })).status).toBe(200);
+  });
+
+  // The horizontal axis is the one that matters in practice. Banners are uploaded
+  // at the recommended 1200x400 (3:1) and the site renders them at roughly 16:10,
+  // a taller box — so a compliant banner overflows sideways and not at all
+  // vertically. focalY alone had nothing to move.
+  it('stores a horizontal focal point', async () => {
+    const res = await patch({ focalX: 25 });
+
+    expect(res.status).toBe(200);
+    expect(mockState.saved.primaryImage.focalX).toBe(25);
+  });
+
+  it('stores both axes at once', async () => {
+    await patch({ focalX: 25, focalY: 75 });
+
+    expect(mockState.saved.primaryImage.focalX).toBe(25);
+    expect(mockState.saved.primaryImage.focalY).toBe(75);
+  });
+
+  it('leaves the other axis alone when only one is sent', async () => {
+    // Otherwise adjusting sideways would silently recentre vertically.
+    mockState.service.primaryImage.focalY = 80;
+
+    await patch({ focalX: 10 });
+
+    expect(mockState.saved.primaryImage.focalX).toBe(10);
+    expect(mockState.saved.primaryImage.focalY).toBe(80);
+  });
+
+  it('still accepts a focalY-only call, as the first version did', async () => {
+    const res = await patch({ focalY: 30 });
+
+    expect(res.status).toBe(200);
+    expect(mockState.saved.primaryImage.focalY).toBe(30);
+  });
+
+  it('rejects an out-of-range focalX', async () => {
+    const res = await patch({ focalX: 140 });
+
+    expect(res.status).toBe(400);
+    expect(mockState.saved).toBeNull();
+  });
+
+  it('rejects a call with neither axis', async () => {
+    const res = await patch({});
+
+    expect(res.status).toBe(400);
+    expect(mockState.saved).toBeNull();
   });
 
   it.each([

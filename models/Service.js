@@ -108,14 +108,26 @@ const serviceSchema = new mongoose.Schema(
         type: String,
         default: '',
       },
-      // Where to centre the banner vertically when it is cropped, as a percentage
-      // from the top: 0 keeps the top edge, 50 centres, 100 keeps the bottom.
-      // Renders as CSS `object-position: center <focalY>%`.
+      // Where to centre the banner when it is cropped, as percentages: focalX from
+      // the left, focalY from the top. 50/50 is the plain centre crop. Renders as
+      // CSS `object-position: <focalX>% <focalY>%`.
       //
-      // A number rather than a raw object-position string so the value cannot carry
-      // arbitrary CSS into a style attribute, and so the admin can express it as a
-      // single slider. Horizontal control is deliberately not offered: banners are
-      // wide and shallow, so the crop that actually loses faces is the vertical one.
+      // Numbers rather than a raw object-position string, so a value coming from the
+      // panel cannot carry arbitrary CSS into a style attribute.
+      //
+      // focalY shipped first, on the reasoning that banners are wide and shallow so
+      // the crop that loses faces is the vertical one. That was wrong in practice.
+      // Banners are uploaded at the recommended 1200x400 (3:1) but the site renders
+      // them at roughly 16:10 on service cards and detail pages — a *taller* box —
+      // so a compliant banner overflows sideways and not at all vertically. focalY
+      // had nothing to move, and the control appeared broken because it was: the
+      // wrong axis for the shape mismatch that actually exists.
+      focalX: {
+        type: Number,
+        default: 50,
+        min: 0,
+        max: 100,
+      },
       focalY: {
         type: Number,
         default: 50,
