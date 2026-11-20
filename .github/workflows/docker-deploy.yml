@@ -1,3 +1,9 @@
+# snswserver API proxy (api.communityservices.org.au), since 2026-11-20: CI no
+# longer touches snswserver. The proxy's compose file + nginx-api-proxy.conf are
+# root-owned on the server in /etc/site-pull/acs-api-proxy/ (deploy/ copies are
+# reference only). Changing the proxy config is a server step: copy the file
+# there with sudo, then run `sudo site-pull acs-api-proxy`.
+#
 # -----------------------------------------------------------------------------
 # acs-backend — CI/CD (Production)
 #
@@ -109,60 +115,6 @@ jobs:
       - name: Prune dangling images
         run: docker image prune -f
 
-  deploy-api-proxy:
-    name: Sync public API proxy on snswserver
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-acs-api-proxy-snswserver
-      cancel-in-progress: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Copy proxy compose + nginx config to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: 107.155.65.229
-          username: snswcomms
-          key: ${{ secrets.SNSW_SSH_KEY }}
-          source: "deploy/docker-compose.snswserver.yml,deploy/nginx-api-proxy.conf"
-          target: /opt/acs-api-proxy/
-
-      - name: Pull and restart on server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 107.155.65.229
-          username: snswcomms
-          key: ${{ secrets.SNSW_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_USER
-          script: |
-            set -euo pipefail
-            cd /opt/acs-api-proxy
-            mv deploy/docker-compose.snswserver.yml docker-compose.yml
-            mv deploy/nginx-api-proxy.conf nginx-api-proxy.conf
-            rmdir deploy 2>/dev/null || true
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker compose pull
-
-            # --force-recreate because this container's configuration is a MOUNTED
-            # FILE, not part of the image. `docker compose up -d` compares the image
-            # and the compose file, sees neither changed, and leaves the running
-            # container alone — so an edited nginx-api-proxy.conf sat on disk while
-            # nginx kept serving the config it read at startup. That is how the
-            # client_max_body_size fix deployed green and changed nothing.
-            docker compose up -d --force-recreate --remove-orphans
-
-            # Assert nginx parsed the config now in place, and that the directive
-            # actually made it into the running container.
-            docker exec acs-api-proxy nginx -t
-            docker exec acs-api-proxy grep -q client_max_body_size /etc/nginx/conf.d/default.conf
-            echo "OK: client_max_body_size present in running container"
-
-            docker image prune -f
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
 
   # Original deploy target, kept running in parallel as a fallback until DNS
   # cuts over to the new infra — remove this job once kylevps is

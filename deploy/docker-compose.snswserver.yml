@@ -1,3 +1,6 @@
+# REFERENCE COPY. The live file is root-owned on snswserver at
+# /etc/site-pull/acs-api-proxy/docker-compose.yml (pull-based deploy, 2026-11-20).
+# Changing it is a server step (sudo), then `sudo site-pull acs-api-proxy`.
 # =============================================================================
 # acs-api-proxy — public front door for ACS's backend API, on snswserver
 # (Debian 13, linux/amd64, public IP). The actual backend containers
